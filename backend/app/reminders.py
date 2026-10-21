@@ -7,10 +7,12 @@ Two kinds of reminders exist:
 
 import asyncio
 import base64
+import ipaddress
 import json
 import logging
 import os
 import smtplib
+import socket
 import ssl
 import urllib.request
 from datetime import date, datetime, timedelta
@@ -316,12 +318,34 @@ def _summary(user_id: str, items: list[dict]) -> dict:
 # --------------------------------------------------------------------------- delivery
 
 
+def ntfy_url_allowed(url: str, is_admin: bool) -> bool:
+    """Members may not point the server at the internal network (only the admin decides that).
+
+    Allowed for members: the ntfy server configured by the admin and public addresses.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        return False
+    if is_admin:
+        return True
+    if settings.ntfy_url and parsed.hostname == urlparse(settings.ntfy_url).hostname:
+        return True
+    try:
+        infos = socket.getaddrinfo(parsed.hostname, parsed.port or 443, proto=socket.IPPROTO_TCP)
+    except OSError:
+        return True  # unresolvable: delivery fails anyway
+    return all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
+
+
 def _targets(user_id: str) -> dict:
     """Where to deliver a user's notifications. The admin falls back to the global env settings."""
     user = vault.user(user_id)
     cfg = user.get("settings", {})
     is_admin = user.get("role") == "admin"
     ntfy = cfg.get("ntfy_url") or (settings.ntfy_url if is_admin else "")
+    if ntfy and not ntfy_url_allowed(ntfy, is_admin):  # checked again on every delivery (DNS may change)
+        log.warning("ntfy address of user %s points to the internal network – skipped", user_id)
+        ntfy = ""
     email = cfg.get("notify_email") or (settings.smtp_to if is_admin else "")
     return {"ntfy": ntfy, "email": email if settings.smtp_host else ""}
 
@@ -336,6 +360,14 @@ def channels(user_id: str) -> dict[str, bool]:
     }
 
 
+class _RejectRedirects(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *_args, **_kwargs):
+        return None  # a redirect must not lead the request somewhere else
+
+
+_NO_REDIRECTS = urllib.request.build_opener(_RejectRedirects)
+
+
 def _send_ntfy(url: str, title: str, body: str, link: str | None) -> None:
     req = urllib.request.Request(url, data=body.encode("utf-8"), method="POST")
     # HTTP headers must be latin-1; ntfy accepts RFC 2047 encoded titles.
@@ -346,7 +378,7 @@ def _send_ntfy(url: str, title: str, body: str, link: str | None) -> None:
     # The global access token only goes to the server configured via CONTRACTLY_NTFY_URL.
     if settings.ntfy_token and settings.ntfy_url and urlparse(url).netloc == urlparse(settings.ntfy_url).netloc:
         req.add_header("Authorization", f"Bearer {settings.ntfy_token}")
-    with urllib.request.urlopen(req, timeout=15):
+    with _NO_REDIRECTS.open(req, timeout=15):
         pass
 
 

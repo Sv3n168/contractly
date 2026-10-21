@@ -239,10 +239,13 @@ def test_legacy_plaintext_data_is_migrated(app_env):
 
     (app_env / "documents").mkdir()
     plain = create_engine(f"sqlite:///{app_env / 'contractly.db'}")
-    # Schema of the first version: baseline tables, no migration bookkeeping.
+    # Schema of the first version: no migration bookkeeping, no bonus/promo columns yet.
     with plain.begin() as conn:
         command.upgrade(alembic_config(conn), "0001")
         conn.execute(text("DROP TABLE alembic_version"))
+        for column in ("bonuses", "promo_price", "promo_months"):
+            conn.execute(text(f"ALTER TABLE offers DROP COLUMN {column}"))
+        conn.execute(text("DROP TABLE meter_readings"))
         conn.execute(
             text(
                 "INSERT INTO contracts (name, category, start_date, notice_unit, attributes, created_at, updated_at) "
@@ -263,6 +266,8 @@ def test_legacy_plaintext_data_is_migrated(app_env):
         c.post("/api/auth/setup", json={"username": "admin", "password": PASSWORD})
         contracts = c.get("/api/contracts").json()
         assert contracts[0]["name"] == "Alter Vertrag"
+        offer = {"name": "Neu", "monthly_price": 5, "bonuses": [{"type": "switch", "amount": 50}]}
+        assert c.post(f"/api/contracts/{contracts[0]['id']}/offers", json=offer).status_code == 201
         doc_id = c.get(f"/api/contracts/{contracts[0]['id']}").json()["documents"][0]["id"]
         assert c.get(f"/api/documents/{doc_id}").content == PDF
     # plaintext originals are gone
@@ -336,3 +341,51 @@ def test_home_assistant_summary(client):
         data = r.json()
         assert data["monthly_total"] == 19.99 and data["active_contracts"] == 1
         assert SECRET_NAME not in r.text
+
+
+def test_rate_limit_per_username_and_parallel_attempts():
+    """Changing client addresses (spoofed X-Forwarded-For) doesn't lift the per-account limit."""
+    import pytest
+
+    from app.security import VaultError
+
+    for i in range(20):
+        vault.check_rate_limit(f"10.0.0.{i}", "Admin")  # counted up front, before the slow KDF
+    with pytest.raises(VaultError):
+        vault.check_rate_limit("10.0.1.1", "admin")
+    vault.check_rate_limit("10.0.1.1", "someone-else")
+
+
+def test_shutdown_keeps_sessions(client):
+    """Stopping the app (container update) must not log anyone out."""
+    import asyncio
+
+    from app.main import create_app, lifespan
+
+    async def run():
+        app = create_app(background=False)
+        async with lifespan(app):
+            pass
+
+    asyncio.run(run())
+    database.close_all()
+    assert client.get("/api/contracts").status_code == 200
+
+
+def test_member_cannot_target_internal_network(client, monkeypatch):
+    import socket
+
+    def resolve(host, *_a, **_kw):
+        ip = {"ntfy.sh": "159.203.148.75", "router.fritz.box": "192.168.178.1"}.get(host, host)
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 443))]
+
+    monkeypatch.setattr("app.reminders.socket.getaddrinfo", resolve)
+    invite = client.post("/api/users", json={"username": "partner"}).json()
+    with make_client() as partner:
+        partner.post("/api/auth/activate", json={"username": "partner", "code": invite["code"], "password": PASSWORD})
+        for url in ("http://router.fritz.box/admin", "http://127.0.0.1:8000/x", "http://[::1]/x"):
+            r = partner.put("/api/auth/me/settings", json={"ntfy_url": url})
+            assert r.status_code == 400, url
+        assert partner.put("/api/auth/me/settings", json={"ntfy_url": "https://ntfy.sh/topic"}).status_code == 200
+    # the admin may use a self-hosted ntfy in the home network
+    assert client.put("/api/auth/me/settings", json={"ntfy_url": "http://router.fritz.box/ntfy"}).status_code == 200

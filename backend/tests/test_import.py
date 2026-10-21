@@ -3,7 +3,8 @@ from datetime import date
 from app import importer
 from app.calc import add_months
 
-SPARKASSE = """Auftragskonto;Buchungstag;Valutadatum;Buchungstext;Verwendungszweck;Glaeubiger ID;Mandatsreferenz;Beguenstigter/Zahlungspflichtiger;Kontonummer/IBAN;BIC (SWIFT-Code);Betrag;Waehrung;Info
+# Real Sparkasse CSV-CAMT header: "Lastschrift Ursprungsbetrag" comes before "Betrag".
+SPARKASSE = """Auftragskonto;Buchungstag;Valutadatum;Buchungstext;Verwendungszweck;Glaeubiger ID;Mandatsreferenz;Kundenreferenz (End-to-End);Sammlerreferenz;Lastschrift Ursprungsbetrag;Auslagenersatz Ruecklastschrift;Beguenstigter/Zahlungspflichtiger;Kontonummer/IBAN;BIC (SWIFT-Code);Betrag;Waehrung;Info
 {rows}"""
 
 
@@ -29,6 +30,7 @@ def _bank_csv():
     rows.append(
         f"DE1;{date.today().replace(month=1, day=10):%d.%m.%y};x;LASTSCHRIFT;Beitrag 2026;DE33ZZZ;M3;HUK-COBURG;DE5;BIC;-534,00;EUR;"
     )
+    rows = [";".join((f := r.split(";"))[:7] + ["", "", "", ""] + f[7:]) for r in rows]
     return SPARKASSE.format(rows="\n".join(rows)).encode("cp1252")
 
 

@@ -65,8 +65,13 @@ def _unb64(text: str) -> bytes:
     return base64.b64decode(text)
 
 
+# Each scrypt run needs ~64 MB: limit how many run at once (parallel login attempts).
+_KDF_SLOTS = threading.BoundedSemaphore(2)
+
+
 def _kdf(secret: str, salt: bytes, n: int = SCRYPT_N) -> bytes:
-    return Scrypt(salt=salt, length=32, n=n, r=8, p=1).derive(secret.encode("utf-8"))
+    with _KDF_SLOTS:
+        return Scrypt(salt=salt, length=32, n=n, r=8, p=1).derive(secret.encode("utf-8"))
 
 
 def _wrap(dek: bytes, secret: str) -> dict:
@@ -571,19 +576,33 @@ class Vault:
 
     # ----------------------------------------------------------------- brute force protection
 
-    def check_rate_limit(self, client: str) -> None:
+    def check_rate_limit(self, client: str, username: str | None = None) -> list[str]:
+        """Count a login-type attempt up front (also parallel ones) per client and per username.
+
+        The username limit still applies when the client address can be spoofed or is shared
+        (reverse proxy). Returns the keys to pass to clear_failures/record_failure.
+        """
         now = time.time()
-        recent = [t for t in self._failures.get(client, []) if now - t < 900]
-        self._failures[client] = recent
-        if len(recent) >= 10:
-            raise VaultError("too many attempts")
+        keys = [f"ip:{client}"]
+        if username:
+            keys.append(f"user:{username.strip().lower()}")
+        with self._lock:
+            for key in keys:
+                self._failures[key] = [t for t in self._failures.get(key, []) if now - t < 900]
+            if any(len(self._failures[k]) >= (10 if k.startswith("ip:") else 20) for k in keys):
+                raise VaultError("too many attempts")
+            for key in keys:
+                self._failures[key].append(now)
+        return keys
 
-    def record_failure(self, client: str) -> None:
-        self._failures.setdefault(client, []).append(time.time())
-        time.sleep(min(len(self._failures[client]), 5) * 0.4)
+    def record_failure(self, keys: list[str]) -> None:
+        """The attempt was already counted; slow the caller down a little."""
+        time.sleep(min(max(len(self._failures.get(k, [])) for k in keys), 5) * 0.4)
 
-    def clear_failures(self, client: str) -> None:
-        self._failures.pop(client, None)
+    def clear_failures(self, keys: list[str]) -> None:
+        with self._lock:
+            for key in keys:
+                self._failures.pop(key, None)
 
 
 def public_user(u: dict) -> dict:

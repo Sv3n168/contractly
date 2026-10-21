@@ -280,12 +280,12 @@ def contract_reference_monthly(contract: Contract, today: date) -> float:
         energy = energy_monthly_cost(a.get("base_price_month"), a.get("unit_price_ct"), a.get("consumption_kwh"))
         if energy is not None:
             return energy
-    cost = current_monthly_cost(contract, today)
-    if cost == 0.0:
-        p = price_at(contract, today) or (recurring_prices(contract) or [None])[-1]
-        if p:
-            cost = monthly_equivalent(p.amount, p.interval)
-    return cost
+    # The full price (not only the own share): offers are entered with their full price, too.
+    p = price_at(contract, today)
+    if p is None:
+        prices = recurring_prices(contract)
+        p = (prices[0] if is_active_on(contract, today) else prices[-1]) if prices else None
+    return monthly_equivalent(p.amount, p.interval) if p else 0.0
 
 
 def offer_monthly(offer: Offer, contract: Contract) -> float:

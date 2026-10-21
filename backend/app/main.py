@@ -57,6 +57,19 @@ def _on_user_locked(user_id: str) -> None:
     database.close_database(user_id)
 
 
+def _session_user(token: str | None) -> str:
+    """User id of a valid session with the user's area opened, or the reason why there is none."""
+    if not vault.initialized:
+        return "setup_required"
+    user_id = vault.session_user(token)
+    if not user_id:
+        return "auth_required"
+    if not database.is_open(user_id):
+        # Valid session after a restart or on another instance: open the area with its key.
+        auth.open_user_area(user_id)
+    return user_id
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # All user databases stay closed (encrypted) until their owner logs in.
@@ -65,7 +78,8 @@ async def lifespan(app: FastAPI):
     if app.state.background:
         tasks = [asyncio.create_task(notifier_loop()), asyncio.create_task(backup_loop())]
     yield
-    vault.lock_all()
+    # Only drop the in-memory keys: sessions stay valid across restarts and other instances.
+    vault.forget_keys()
     database.close_all()
     for task in tasks:
         task.cancel()
@@ -83,14 +97,10 @@ def create_app(background: bool = True) -> FastAPI:
         path = request.url.path
         request.state.user_id = None
         if not is_public(path):
-            if not vault.initialized:
-                return JSONResponse(status_code=401, content={"detail": "setup_required"})
-            user_id = vault.session_user(request.cookies.get(COOKIE))
-            if not user_id:
-                return JSONResponse(status_code=401, content={"detail": "auth_required"})
-            if not database.is_open(user_id):
-                # Valid session after a restart or on another instance: open the area with its key.
-                await asyncio.to_thread(auth.open_user_area, user_id)
+            # File and database access (users.json, sessions.db, opening the area) off the event loop.
+            user_id = await asyncio.to_thread(_session_user, request.cookies.get(COOKIE))
+            if user_id in ("setup_required", "auth_required"):
+                return JSONResponse(status_code=401, content={"detail": user_id})
             request.state.user_id = user_id
             database.current_user.set(user_id)
         response = await call_next(request)

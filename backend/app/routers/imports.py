@@ -1,5 +1,6 @@
 """Import endpoints: bank statements and contract lists (analyse first, then apply)."""
 
+import asyncio
 from datetime import date
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -30,10 +31,10 @@ async def _read(file: UploadFile) -> bytes:
 async def analyse_bank_statement(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """Find recurring debits in a bank export and compare them with the existing contracts."""
     try:
-        txs = importer.read_transactions(await _read(file), file.filename or "")
+        txs = await asyncio.to_thread(importer.read_transactions, await _read(file), file.filename or "")
     except importer.ImportError_ as exc:
         raise HTTPException(400, str(exc)) from exc
-    suggestions = importer.detect_recurring(txs)
+    suggestions = await asyncio.to_thread(importer.detect_recurring, txs)
     importer.match_contracts(suggestions, load_contracts(db))
     return {
         "transactions": len(txs),
@@ -45,7 +46,7 @@ async def analyse_bank_statement(file: UploadFile = File(...), db: Session = Dep
 @router.post("/contracts")
 async def analyse_contract_list(file: UploadFile = File(...)):
     try:
-        rows = importer.read_contract_list(await _read(file), file.filename or "")
+        rows = await asyncio.to_thread(importer.read_contract_list, await _read(file), file.filename or "")
     except importer.ImportError_ as exc:
         raise HTTPException(400, str(exc)) from exc
     return {"rows": rows}

@@ -109,6 +109,9 @@ def switch_to_offer(contract_id: int, offer_id: int, data: SwitchIn, db: Session
         attributes=attributes,
         notes=offer.notes,
         predecessor_id=old.id,
+        # A shared contract usually stays shared; the tax setting is a property of the kind of contract.
+        share_percent=old.share_percent,
+        tax_relevant=old.tax_relevant,
     )
     regular_from = data.switch_date
     if offer.promo_price is not None and offer.promo_months:

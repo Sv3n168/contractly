@@ -109,6 +109,8 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt (siehe `docker-compos
 Jede Person trägt unter *Einstellungen → Benachrichtigungen* ihre E-Mail-Adresse und/oder ihr
 ntfy-Thema ein. Erinnerungen kommen auch dann an, wenn man gerade abgemeldet ist. Die folgenden
 Variablen konfigurieren den Server und gelten für den Admin zusätzlich als Vorgabe.
+Mitglieder können öffentliche ntfy-Server oder den hier eingestellten Server nutzen; Adressen im
+internen Netz (z. B. ein eigener ntfy auf dem NAS) darf nur ein Administrator für sich eintragen.
 
 **ntfy** (Push aufs Handy, z. B. mit der ntfy-App):
 

@@ -384,7 +384,7 @@ def _year_report(db: Session, year: int) -> dict:
         "year": year,
         "complete": year < ref.year,
         "total": total,
-        "monthly_average": round(total / (12 if year < ref.year else max(ref.month, 1)), 2),
+        "monthly_average": round(total / (ref.month if year == ref.year else 12), 2),
         "months": months,
         "monthly": [round(monthly[m], 2) for m in months],
         "by_category": sorted(

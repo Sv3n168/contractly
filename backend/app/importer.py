@@ -87,15 +87,25 @@ def _find_header(rows: list[list[str]], keywords: dict[str, tuple[str, ...]], re
     """Locate the header row (bank exports often start with some info lines) and map columns.
 
     For every field the keywords are tried in order of preference, so "Betrag" wins over
-    a column like "Umsatzart".
+    a column like "Umsatzart"; an exact label wins over one that only contains the keyword
+    (Sparkasse: "Betrag" vs. "Lastschrift Ursprungsbetrag").
     """
+    matchers = (
+        lambda w, label: label == w,
+        lambda w, label: label.startswith(w),
+        lambda w, label: w in label,
+    )
+
     for idx, row in enumerate(rows[:40]):
         labels = [cell.lower().strip() for cell in row]
         cols: dict[str, int] = {}
         used: set[int] = set()
         for key, words in keywords.items():
             for w in words:
-                j = next((j for j, label in enumerate(labels) if w in label and j not in used), None)
+                j = next(
+                    (j for match in matchers for j, label in enumerate(labels) if j not in used and match(w, label)),
+                    None,
+                )
                 if j is not None:
                     cols[key] = j
                     used.add(j)

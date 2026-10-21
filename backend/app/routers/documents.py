@@ -40,7 +40,9 @@ async def _store_upload(file: UploadFile) -> tuple[str, str, int, str]:
             raise HTTPException(413, f"Datei größer als {settings.max_upload_mb} MB")
     size = len(buf)
     tmp = target.with_name(stored + ".partial")
-    tmp.write_bytes(encrypt_bytes(bytes(buf), file_key(), stored.encode()))
+    # Encrypting up to max_upload_mb takes a moment: keep the event loop free for other users.
+    sealed = await asyncio.to_thread(encrypt_bytes, bytes(buf), file_key(), stored.encode())
+    await asyncio.to_thread(tmp.write_bytes, sealed)
     tmp.replace(target)
     content_type = file.content_type or mimetypes.guess_type(original)[0] or "application/octet-stream"
     return original, stored, size, content_type

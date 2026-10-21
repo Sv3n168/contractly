@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
@@ -73,7 +75,8 @@ async def restore(
 ):
     """``passphrase`` = backup key of a .ctly file."""
     blob = await file.read()
-    result = _wrap(backup.restore, blob, passphrase or None, request.state.user_id)
+    # Key derivation, unpacking and the safety backup take a while: run them outside the event loop.
+    result = await asyncio.to_thread(_wrap, backup.restore, blob, passphrase or None, request.state.user_id)
     if result["relogin"]:
         response.delete_cookie(COOKIE, path="/")
     return {"restored": True, **result}

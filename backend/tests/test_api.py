@@ -302,3 +302,32 @@ def test_yearly_report_and_tax_export(client):
     assert {c["name"]: c["tax_relevant"] for c in r["contracts"]} == {"Haftpflicht": True, "Netflix": False}
     csv = client.get(f"/api/stats/tax.csv?year={y}").text
     assert '"Haftpflicht"' in csv and "Netflix" not in csv and '"Summe";;;;;60,00;' in csv
+
+
+def test_shared_contract_compare_and_switch(client):
+    """Offers are compared with the full price; a switch keeps the cost share."""
+    c = _create(
+        client,
+        name="Netflix",
+        category="streaming",
+        share_percent=50,
+        initial_price={"valid_from": add_months(date.today(), -12).isoformat(), "amount": 60},
+    )
+    o = client.post(f"/api/contracts/{c['id']}/offers", json={"name": "Günstiger", "monthly_price": 45}).json()
+    ev = client.get(f"/api/contracts/{c['id']}/offers/evaluate?horizon_months=12").json()
+    assert ev["current_monthly"] == 60
+    assert ev["results"][0]["savings_total"] == 180 and ev["results"][0]["verdict"] == "worth_it"
+    switch_date = (date.today() + timedelta(days=1)).isoformat()
+    new = client.post(f"/api/contracts/{c['id']}/offers/{o['id']}/switch", json={"switch_date": switch_date}).json()
+    assert new["share_percent"] == 50
+
+
+def test_report_average_for_future_year(client):
+    _create(
+        client,
+        name="Strom",
+        category="electricity",
+        initial_price={"valid_from": add_months(date.today(), -12).isoformat(), "amount": 120},
+    )
+    r = client.get(f"/api/stats/report?year={date.today().year + 1}").json()
+    assert r["monthly_average"] == pytest.approx(r["total"] / 12, abs=0.01)

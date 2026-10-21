@@ -131,13 +131,11 @@ def open_user_area(user_id: str) -> None:
             database.current_user.reset(token)
 
 
-def _rate_limited(request: Request) -> str:
-    client = client_id(request)
+def _rate_limited(request: Request, username: str) -> list[str]:
     try:
-        vault.check_rate_limit(client)
+        return vault.check_rate_limit(client_id(request), username)
     except VaultError as exc:
         raise HTTPException(429, "Zu viele Fehlversuche – bitte in 15 Minuten erneut versuchen") from exc
-    return client
 
 
 def me(user_id: str) -> dict:
@@ -180,16 +178,16 @@ def setup(data: SetupIn, request: Request, response: Response):
 
 @router.post("/login")
 def login(data: LoginIn, request: Request, response: Response):
-    client = _rate_limited(request)
+    attempt = _rate_limited(request, data.username)
     try:
         user = vault.authenticate(data.username, data.password, data.totp)
     except TotpRequired as exc:
         raise HTTPException(401, "totp_required") from exc
     except InvalidCredentials as exc:
-        vault.record_failure(client)
-        log.warning("failed login from %s", client)
+        vault.record_failure(attempt)
+        log.warning("failed login from %s", client_id(request))
         raise HTTPException(401, "Benutzername oder Passwort falsch") from exc
-    vault.clear_failures(client)
+    vault.clear_failures(attempt)
     _start_session(request, response, user, data.remember)
     return {"ok": True}
 
@@ -197,15 +195,15 @@ def login(data: LoginIn, request: Request, response: Response):
 @router.post("/activate")
 def activate(data: ActivateIn, request: Request, response: Response):
     """Invited user: set the own password with the invitation code."""
-    client = _rate_limited(request)
+    attempt = _rate_limited(request, data.username)
     try:
         user, recovery = vault.accept_invite(data.username, data.code, data.password)
     except InvalidCredentials as exc:
-        vault.record_failure(client)
+        vault.record_failure(attempt)
         raise HTTPException(401, "Benutzername oder Einladungscode falsch") from exc
     except VaultError as exc:
         raise HTTPException(400, str(exc)) from exc
-    vault.clear_failures(client)
+    vault.clear_failures(attempt)
     _start_session(request, response, user, remember=False)
     return {"recovery_key": recovery}
 
@@ -213,15 +211,15 @@ def activate(data: ActivateIn, request: Request, response: Response):
 @router.post("/recover")
 def recover(data: RecoverIn, request: Request, response: Response):
     """Forgotten password: set a new one with the recovery key."""
-    client = _rate_limited(request)
+    attempt = _rate_limited(request, data.username)
     try:
         user, recovery = vault.recover(data.username, data.recovery_key, data.new_password)
     except InvalidCredentials as exc:
-        vault.record_failure(client)
+        vault.record_failure(attempt)
         raise HTTPException(401, "Benutzername oder Wiederherstellungsschlüssel falsch") from exc
     except VaultError as exc:
         raise HTTPException(400, str(exc)) from exc
-    vault.clear_failures(client)
+    vault.clear_failures(attempt)
     _start_session(request, response, user, remember=False)
     return {"recovery_key": recovery}
 
@@ -244,11 +242,13 @@ def get_me(user_id: str = Depends(current_user_id)):
 
 @router.put("/me/settings")
 def update_settings(data: AccountSettingsIn, user_id: str = Depends(current_user_id)):
+    from ..reminders import ntfy_url_allowed, refresh_outbox
+
     if data.ntfy_url and not data.ntfy_url.startswith(("https://", "http://")):
         raise HTTPException(400, "Die ntfy-Adresse muss mit https:// beginnen")
+    if data.ntfy_url and not ntfy_url_allowed(data.ntfy_url, vault.user(user_id)["role"] == "admin"):
+        raise HTTPException(400, "Adressen im internen Netz kann nur ein Administrator eintragen")
     vault.update_settings(user_id, data.model_dump())
-    from ..reminders import refresh_outbox
-
     refresh_outbox(user_id)
     return me(user_id)
 

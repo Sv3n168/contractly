@@ -57,12 +57,12 @@ jobs:
         run: docker build -t contractly:ci .
       - name: Smoke test
         run: |
-          docker run -d --name c -p 8000:8000 contractly:ci
+          docker run -d --name contractly-ci -p 8000:8000 contractly:ci
           for i in $(seq 1 30); do curl -fsS localhost:8000/healthz && break; sleep 1; done
           test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/contracts)" = "401"
           curl -fsS -c jar -H 'content-type: application/json' \
             -d '{"username":"admin","password":"ci-test-passwort"}' localhost:8000/api/auth/setup
           curl -fsS -b jar -X POST localhost:8000/api/demo
           curl -fsS -b jar localhost:8000/api/stats/summary > /dev/null
-          docker exec c sh -c 'head -c 15 /data/users/*/contractly.db | grep -qv "SQLite format"'
-          docker exec c tesseract --list-langs | grep deu
+          docker exec contractly-ci sh -c 'head -c 15 /data/users/*/contractly.db | grep -qv "SQLite format"'
+          docker exec contractly-ci tesseract --list-langs | grep deu

@@ -1,0 +1,102 @@
+// Thin fetch wrapper for the Contractly REST API.
+
+async function request(method, url, body, { raw = false } = {}) {
+  const opts = { method, headers: {}, credentials: "same-origin" };
+  if (body instanceof FormData) opts.body = body;
+  else if (body !== undefined) {
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    let detail = res.statusText;
+    try {
+      const data = await res.json();
+      detail = Array.isArray(data.detail)
+        ? data.detail.map((d) => `${(d.loc || []).slice(-1)[0]}: ${d.msg}`).join(", ")
+        : data.detail || detail;
+    } catch {
+      /* not JSON */
+    }
+    throw new Error(detail || `Fehler ${res.status}`);
+  }
+  if (raw) return res;
+  if (res.status === 204) return null;
+  return res.json();
+}
+
+const qs = (params = {}) => {
+  const p = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => v !== undefined && v !== null && p.set(k, v));
+  const s = p.toString();
+  return s ? `?${s}` : "";
+};
+
+export const api = {
+  meta: () => request("GET", "/api/meta"),
+  summary: () => request("GET", "/api/stats/summary"),
+  timeseries: (params) => request("GET", `/api/stats/timeseries${qs(params)}`),
+  projection: (params) => request("GET", `/api/stats/projection${qs(params)}`),
+
+  contracts: (params) => request("GET", `/api/contracts${qs(params)}`),
+  contract: (id) => request("GET", `/api/contracts/${id}`),
+  createContract: (data) => request("POST", "/api/contracts", data),
+  updateContract: (id, data) => request("PUT", `/api/contracts/${id}`, data),
+  deleteContract: (id) => request("DELETE", `/api/contracts/${id}`),
+  cancelContract: (id, data) => request("POST", `/api/contracts/${id}/cancel`, data),
+  reactivateContract: (id) => request("POST", `/api/contracts/${id}/reactivate`),
+  history: (id, params) => request("GET", `/api/contracts/${id}/history${qs(params)}`),
+
+  addPrice: (id, data) => request("POST", `/api/contracts/${id}/prices`, data),
+  updatePrice: (id, pid, data) => request("PUT", `/api/contracts/${id}/prices/${pid}`, data),
+  deletePrice: (id, pid) => request("DELETE", `/api/contracts/${id}/prices/${pid}`),
+
+  addReading: (id, data) => request("POST", `/api/contracts/${id}/readings`, data),
+  deleteReading: (id, rid) => request("DELETE", `/api/contracts/${id}/readings/${rid}`),
+
+  uploadDocument: (id, file, description) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (description) fd.append("description", description);
+    return request("POST", `/api/contracts/${id}/documents`, fd);
+  },
+  analyzeDocument: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request("POST", "/api/documents/analyze", fd);
+  },
+  extractDocument: (docId, refresh = false) => request("POST", `/api/documents/${docId}/extract${qs({ refresh })}`),
+  deleteDocument: (docId) => request("DELETE", `/api/documents/${docId}`),
+
+  offers: (id) => request("GET", `/api/contracts/${id}/offers`),
+  createOffer: (id, data) => request("POST", `/api/contracts/${id}/offers`, data),
+  updateOffer: (id, oid, data) => request("PUT", `/api/contracts/${id}/offers/${oid}`, data),
+  deleteOffer: (id, oid) => request("DELETE", `/api/contracts/${id}/offers/${oid}`),
+  evaluate: (id, params) => request("GET", `/api/contracts/${id}/offers/evaluate${qs(params)}`),
+  switchOffer: (id, oid, data) => request("POST", `/api/contracts/${id}/offers/${oid}/switch`, data),
+
+  upcoming: (params) => request("GET", `/api/reminders/upcoming${qs(params)}`),
+  reminders: (params) => request("GET", `/api/reminders${qs(params)}`),
+  createReminder: (data) => request("POST", "/api/reminders", data),
+  updateReminder: (id, data) => request("PUT", `/api/reminders/${id}`, data),
+  completeReminder: (id) => request("POST", `/api/reminders/${id}/done`),
+  deleteReminder: (id) => request("DELETE", `/api/reminders/${id}`),
+  dismissReminder: (key) => request("POST", `/api/reminders/dismiss${qs({ key })}`),
+  testNotification: () => request("POST", "/api/reminders/test"),
+
+  profile: () => request("GET", "/api/profile"),
+  saveProfile: (data) => request("PUT", "/api/profile", data),
+
+  backups: () => request("GET", "/api/backups"),
+  createBackup: (data) => request("POST", "/api/backups", data),
+  uploadBackup: (name) => request("POST", `/api/backups/${encodeURIComponent(name)}/upload`),
+  deleteBackup: (name) => request("DELETE", `/api/backups/${encodeURIComponent(name)}`),
+  restoreBackup: (file, passphrase) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    if (passphrase) fd.append("passphrase", passphrase);
+    return request("POST", "/api/backups/restore", fd);
+  },
+
+  demo: () => request("POST", "/api/demo"),
+};

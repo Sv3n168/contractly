@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Contractly</title>
+    <meta name="description" content="Alle laufenden Verträge im Blick – Kosten, Fristen, Preisverläufe und Wechsel." />
+    <meta name="theme-color" content="#4f46e5" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icon.svg" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <script>
+      try {
+        const t = localStorage.getItem("contractly-theme");
+        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="/static/css/app.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="sidebar" aria-label="Hauptnavigation">
+        <a class="brand" href="#/">
+          <span class="brand-mark" data-icon="layers"></span><span class="label">Contractly</span>
+        </a>
+        <a class="btn btn-primary btn-new" href="#/contracts/new" title="Neuer Vertrag">
+          <span data-icon="plus"></span><span class="label">Neuer Vertrag</span>
+        </a>
+        <button class="search-trigger" data-action="search" title="Suchen (Strg+K)">
+          <span data-icon="search"></span><span>Suchen…</span><kbd>Strg K</kbd>
+        </button>
+        <div class="nav-section">Übersicht</div>
+        <a class="nav-link" href="#/" data-route="dashboard" title="Dashboard"><span data-icon="home"></span><span class="label">Dashboard</span></a>
+        <a class="nav-link" href="#/contracts" data-route="contracts" title="Verträge"><span data-icon="file"></span><span class="label">Verträge</span></a>
+        <a class="nav-link" href="#/timeline" data-route="timeline" title="Zeitstrahl"><span data-icon="timeline"></span><span class="label">Zeitstrahl</span></a>
+        <a class="nav-link" href="#/costs" data-route="costs" title="Kosten & Prognose"><span data-icon="chart"></span><span class="label">Kosten &amp; Prognose</span></a>
+        <div class="nav-section">Organisieren</div>
+        <a class="nav-link" href="#/reminders" data-route="reminders" title="Erinnerungen"><span data-icon="bell"></span><span class="label">Erinnerungen</span><span class="nav-badge hidden" data-due-badge></span></a>
+        <a class="nav-link" href="#/settings" data-route="settings" title="Einstellungen"><span data-icon="settings"></span><span class="label">Einstellungen</span></a>
+        <div class="sidebar-footer">
+          <button class="btn btn-ghost btn-icon" data-action="theme" title="Hell/Dunkel umschalten"><span data-icon="moon"></span></button>
+        </div>
+      </aside>
+
+      <header class="topbar">
+        <a class="brand" href="#/"><span class="brand-mark" data-icon="layers"></span><span>Contractly</span></a>
+        <button class="btn btn-ghost btn-icon" data-action="search" aria-label="Suchen"><span data-icon="search"></span></button>
+        <button class="btn btn-ghost btn-icon" data-action="theme" aria-label="Hell/Dunkel"><span data-icon="moon"></span></button>
+      </header>
+
+      <main class="main" id="view" tabindex="-1"></main>
+
+      <nav class="bottom-nav" aria-label="Navigation">
+        <a href="#/" data-route="dashboard"><span data-icon="home"></span>Start</a>
+        <a href="#/contracts" data-route="contracts"><span data-icon="file"></span>Verträge</a>
+        <a href="#/contracts/new" aria-label="Neuer Vertrag"><span class="fab"><span data-icon="plus"></span></span></a>
+        <a href="#/reminders" data-route="reminders"><span data-icon="bell"></span>Erinnern<span class="nav-badge hidden" data-due-badge></span></a>
+        <a href="#/more" data-route="more"><span data-icon="menu"></span>Mehr</a>
+      </nav>
+    </div>
+
+    <script src="/static/vendor/chart.umd.min.js"></script>
+    <script type="module" src="/static/js/app.js"></script>
+  </body>
+</html>

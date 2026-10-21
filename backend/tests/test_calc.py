@@ -1,0 +1,91 @@
+from datetime import date
+
+from app import calc
+from app.models import Contract, Offer, PriceEntry
+
+
+def make(start, prices, end=None, **kw):
+    c = Contract(name="x", category=kw.pop("category", "mobile"), start_date=start, end_date=end, attributes={}, **kw)
+    for valid_from, amount, interval in prices:
+        c.prices.append(PriceEntry(valid_from=valid_from, amount=amount, interval=interval, details={}))
+    return c
+
+
+def test_add_months_clamps_day():
+    assert calc.add_months(date(2024, 1, 31), 1) == date(2024, 2, 29)
+    assert calc.add_months(date(2024, 3, 15), -3) == date(2023, 12, 15)
+
+
+def test_monthly_equivalent():
+    assert calc.monthly_equivalent(120, "yearly") == 10
+    assert calc.monthly_equivalent(30, "quarterly") == 10
+    assert calc.monthly_equivalent(99, "once") == 0
+
+
+def test_monthly_costs_prorates_and_follows_price_changes():
+    c = make(date(2024, 1, 16), [(date(2024, 1, 16), 31, "monthly"), (date(2024, 3, 1), 62, "monthly")])
+    costs = calc.monthly_costs(c, date(2024, 1, 1), date(2024, 3, 31))
+    assert costs == {"2024-01": 16.0, "2024-02": 31.0, "2024-03": 62.0}
+
+
+def test_monthly_costs_stops_at_end_and_adds_once():
+    c = make(
+        date(2024, 1, 1),
+        [(date(2024, 1, 1), 30, "monthly"), (date(2024, 1, 1), -50, "once")],
+        end=date(2024, 2, 29),
+    )
+    costs = calc.monthly_costs(c, date(2024, 1, 1), date(2024, 4, 30))
+    assert costs == {"2024-01": -20.0, "2024-02": 30.0, "2024-03": 0.0, "2024-04": 0.0}
+
+
+def test_term_info_min_term_then_monthly_renewal():
+    c = make(date(2024, 1, 1), [], min_term_months=24, renewal_months=1, notice_value=1, notice_unit="months")
+    info = calc.term_info(c, date(2024, 6, 1))
+    assert info.next_term_end == date(2025, 12, 31)
+    assert info.cancellation_deadline == date(2025, 11, 30)
+    later = calc.term_info(c, date(2026, 3, 10))
+    assert later.next_term_end == date(2026, 4, 30)
+    assert later.cancellation_deadline == date(2026, 3, 31)
+
+
+def test_term_info_yearly_insurance_with_three_months_notice():
+    c = make(date(2023, 1, 1), [], min_term_months=12, renewal_months=12, notice_value=3, notice_unit="months")
+    info = calc.term_info(c, date(2024, 10, 2))
+    assert info.next_term_end == date(2025, 12, 31)
+    assert info.cancellation_deadline == date(2025, 9, 30)
+
+
+def test_chain_order():
+    a = make(date(2022, 1, 1), [])
+    b = make(date(2023, 1, 1), [])
+    a.id, b.id = 1, 2
+    b.predecessor = a
+    assert [x.id for x in calc.contract_chain(b)] == [1, 2]
+    assert [x.id for x in calc.contract_chain(a)] == [1, 2]
+
+
+def test_evaluate_offer_verdicts():
+    c = make(date(2024, 1, 1), [(date(2024, 1, 1), 40, "monthly")])
+    cheap = Offer(id=1, name="a", monthly_price=25, one_time_costs=30, bonus=0, attributes={})
+    r = calc.evaluate_offer(cheap, c, date(2024, 6, 1), 24, 20)
+    assert r["savings_total"] == 40 * 24 - (25 * 24 + 30)
+    assert r["verdict"] == "worth_it"
+    assert r["break_even_month"] == 3
+    pricey = Offer(id=2, name="b", monthly_price=45, one_time_costs=0, bonus=0, attributes={})
+    assert calc.evaluate_offer(pricey, c, date(2024, 6, 1), 24, 20)["verdict"] == "not_worth_it"
+
+
+def test_energy_offer_uses_consumption():
+    c = make(date(2024, 1, 1), [(date(2024, 1, 1), 100, "monthly")], category="electricity")
+    c.attributes = {"base_price_month": 10, "unit_price_ct": 40, "consumption_kwh": 3000}
+    assert calc.contract_reference_monthly(c, date(2024, 6, 1)) == 110
+    offer = Offer(id=1, name="o", base_price_month=12, unit_price_ct=30, one_time_costs=0, bonus=0, attributes={})
+    assert calc.offer_monthly(offer, c) == 12 + 75
+
+
+def test_monthly_cancellable_after_min_term():
+    c = make(date(2024, 1, 1), [], min_term_months=12, renewal_months=1, notice_value=1, notice_unit="months")
+    assert not calc.term_info(c, date(2024, 6, 1)).flexible
+    assert calc.term_info(c, date(2025, 6, 1)).flexible
+    yearly = make(date(2020, 1, 1), [], min_term_months=12, renewal_months=12, notice_value=3, notice_unit="months")
+    assert not calc.term_info(yearly, date(2025, 6, 1)).flexible

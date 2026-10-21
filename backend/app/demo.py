@@ -62,8 +62,10 @@ def seed(db: Session, ref: date | None = None) -> int:
             name="Allnet 50 GB",
             provider="Freenet",
             monthly_price=24.99,
+            promo_price=12.99,
+            promo_months=6,
             one_time_costs=39.99,
-            bonus=0,
+            bonuses=[{"type": "number_porting", "amount": 50, "paid_after_months": 2}],
             min_term_months=24,
             attributes={"data_volume_gb": 50, "network": "Vodafone", "five_g": True},
         )
@@ -135,6 +137,19 @@ def seed(db: Session, ref: date | None = None) -> int:
             (_m(ref, -14), 74, "monthly", "Abschlag", {"base_price_month": 11.9, "unit_price_ct": 28.4}),
             (_m(ref, -14), -60, "once", "Neukundenbonus"),
         ],
+    )
+    power.offers.append(
+        Offer(
+            name="Strom Bonus 12",
+            provider="Billigstrom AG",
+            base_price_month=9.9,
+            unit_price_ct=33.5,
+            bonuses=[
+                {"type": "new_customer", "amount": 150, "paid_after_months": 12},
+                {"type": "instant", "amount": 30, "paid_after_months": 1},
+            ],
+            min_term_months=12,
+        )
     )
     for months, value in ((-14, 10250), (-8, 11610), (-2, 12890)):
         power.meter_readings.append(MeterReading(reading_date=_m(ref, months) + timedelta(days=3), value=value))

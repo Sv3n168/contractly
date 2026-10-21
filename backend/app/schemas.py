@@ -145,6 +145,17 @@ class CancelIn(BaseModel):
 # --------------------------------------------------------------------------- offers
 
 
+BonusType = Literal["instant", "new_customer", "switch", "number_porting", "cashback"]
+
+
+class BonusIn(BaseModel):
+    type: BonusType = "switch"
+    amount: float = Field(ge=0)
+    # Months after the switch until the bonus is paid out (0 = immediately)
+    paid_after_months: int = Field(default=0, ge=0, le=60)
+    note: str | None = None
+
+
 class OfferIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     provider: str | None = None
@@ -153,9 +164,17 @@ class OfferIn(BaseModel):
     unit_price_ct: float | None = None
     one_time_costs: float = 0
     bonus: float = 0
+    bonuses: list[BonusIn] = Field(default_factory=list)
+    promo_price: float | None = Field(default=None, ge=0)
+    promo_months: int | None = Field(default=None, ge=0, le=60)
     min_term_months: int | None = Field(default=None, ge=0)
     attributes: dict[str, Any] = Field(default_factory=dict)
     notes: str | None = None
+
+    @field_validator("bonuses", mode="before")
+    @classmethod
+    def _bonuses(cls, v):
+        return v or []
 
 
 class OfferOut(OfferIn, ORM):

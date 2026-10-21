@@ -289,57 +289,122 @@ def offer_monthly(offer: Offer, contract: Contract) -> float:
     return energy or 0.0
 
 
+BONUS_LABELS = {
+    "instant": "Sofortbonus",
+    "new_customer": "Neukundenbonus",
+    "switch": "Wechselbonus",
+    "number_porting": "Bonus Rufnummernmitnahme",
+    "cashback": "Cashback / Prämie",
+}
+
+
+def offer_bonuses(offer: Offer) -> list[dict]:
+    """Bonuses of an offer; the legacy single ``bonus`` counts as an instant bonus."""
+    items = [b for b in (offer.bonuses or []) if b.get("amount")]
+    if not items and offer.bonus:
+        items = [{"type": "instant", "amount": offer.bonus, "paid_after_months": 0}]
+    return items
+
+
+def offer_price_in_month(offer: Offer, contract: Contract, index: int) -> float:
+    """Price of the offer in its ``index``-th month (0-based), honouring an introductory price."""
+    if offer.promo_price is not None and offer.promo_months and index < offer.promo_months:
+        return offer.promo_price
+    return offer_monthly(offer, contract)
+
+
+def _verdict(savings_year: float, min_saving_year: float) -> str:
+    if savings_year >= min_saving_year:
+        return "worth_it"
+    if savings_year > 0:
+        return "marginal"
+    return "not_worth_it"
+
+
 def evaluate_offer(
     offer: Offer,
     contract: Contract,
     today: date,
     horizon_months: int,
     min_saving_year: float,
+    include_bonus: bool = True,
 ) -> dict:
     current = contract_reference_monthly(contract, today)
     monthly = offer_monthly(offer, contract)
     one_time = offer.one_time_costs or 0
-    bonus = offer.bonus or 0
+    bonuses = offer_bonuses(offer)
+    horizon = max(horizon_months, 1)
 
-    current_total = current * horizon_months
-    offer_total = monthly * horizon_months + one_time - bonus
+    # Bonuses are credited in the month they are paid out; later ones are outside the horizon.
+    bonus_by_month: dict[int, float] = {}
+    for b in bonuses:
+        idx = int(b.get("paid_after_months") or 0)
+        bonus_by_month[idx] = bonus_by_month.get(idx, 0.0) + float(b["amount"])
+    bonus_in_horizon = sum(v for k, v in bonus_by_month.items() if k < horizon)
+    bonus_outside = sum(v for k, v in bonus_by_month.items() if k >= horizon)
+    counted_bonus = bonus_in_horizon if include_bonus else 0.0
+
+    prices = [offer_price_in_month(offer, contract, i) for i in range(horizon)]
+    current_total = current * horizon
+    base_total = sum(prices) + one_time
+    offer_total = base_total - counted_bonus
     savings = current_total - offer_total
-    savings_year = savings / horizon_months * 12 if horizon_months else 0
+    savings_year = savings / horizon * 12
+    savings_without_bonus = current_total - base_total
+    savings_year_without_bonus = savings_without_bonus / horizon * 12
 
-    first_year_offer = monthly * 12 + one_time - bonus
-    first_year_current = current * 12
+    first_year_offer = sum(offer_price_in_month(offer, contract, i) for i in range(12)) + one_time
+    if include_bonus:
+        first_year_offer -= sum(v for k, v in bonus_by_month.items() if k < 12)
 
-    # Month from which the offer is cumulatively cheaper (and stays cheaper).
+    # Month-by-month cumulative advantage (positive = offer cheaper so far).
     break_even = None
-    cumulative = bonus - one_time
-    for month in range(1, max(horizon_months, 1) * 3 + 1):
-        cumulative += current - monthly
-        if cumulative > 0 and current >= monthly:
-            break_even = month
-            break
+    advantage_ends = None
+    cumulative = -one_time
+    was_ahead = False
+    for i in range(max(horizon * 3, 36)):
+        cumulative += current - offer_price_in_month(offer, contract, i)
+        if include_bonus:
+            cumulative += bonus_by_month.get(i, 0.0)
+        ahead = cumulative > 0
+        if ahead and break_even is None and current >= monthly:
+            break_even = i + 1
+        if was_ahead and not ahead:
+            # Bonus/promo is used up - the offer is now more expensive overall. A later
+            # bonus may put it ahead again, so the last such month counts.
+            advantage_ends = i + 1
+        elif ahead:
+            advantage_ends = None
+        was_ahead = ahead
 
-    if savings_year >= min_saving_year:
-        verdict = "worth_it"
-    elif savings_year > 0:
-        verdict = "marginal"
-    else:
-        verdict = "not_worth_it"
+    verdict = _verdict(savings_year, min_saving_year)
+    verdict_without_bonus = _verdict(savings_year_without_bonus, min_saving_year)
 
     return {
         "offer_id": offer.id,
         "monthly": round(monthly, 2),
         "monthly_diff": round(current - monthly, 2),
         "current_monthly": round(current, 2),
+        "promo_price": offer.promo_price,
+        "promo_months": offer.promo_months,
         "horizon_months": horizon_months,
         "current_total": round(current_total, 2),
         "offer_total": round(offer_total, 2),
         "savings_total": round(savings, 2),
         "savings_year": round(savings_year, 2),
-        "first_year_current": round(first_year_current, 2),
+        "savings_total_without_bonus": round(savings_without_bonus, 2),
+        "bonus_total": round(sum(bonus_by_month.values()), 2),
+        "bonus_in_horizon": round(bonus_in_horizon, 2),
+        "bonus_outside_horizon": round(bonus_outside, 2),
+        "bonus_counted": include_bonus,
+        "bonus_dependent": include_bonus and verdict == "worth_it" and verdict_without_bonus != "worth_it",
+        "first_year_current": round(current * 12, 2),
         "first_year_offer": round(first_year_offer, 2),
-        "effective_monthly": round(offer_total / horizon_months, 2) if horizon_months else monthly,
+        "effective_monthly": round(offer_total / horizon, 2),
         "break_even_month": break_even,
+        "advantage_ends_month": advantage_ends,
         "verdict": verdict,
+        "verdict_without_bonus": verdict_without_bonus,
     }
 
 

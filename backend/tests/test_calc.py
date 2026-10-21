@@ -113,3 +113,42 @@ def test_projection_with_average_extras():
     c.prices.append(PriceEntry(valid_from=date(2024, 5, 3), amount=24, interval="once", details={"kind": "extra"}))
     costs = calc.monthly_costs(c, date(2025, 1, 1), date(2025, 1, 31), today=date(2024, 12, 10), extra_monthly=2)
     assert costs == {"2025-01": 42.0}
+
+
+def _offer(**kw):
+    base = {"id": 1, "name": "o", "one_time_costs": 0, "bonus": 0, "attributes": {}, "bonuses": []}
+    base.update(kw)
+    return Offer(**base)
+
+
+def test_switch_bonus_timing_and_dependency():
+    c = make(date(2024, 1, 1), [(date(2024, 1, 1), 30, "monthly")])
+    # 2 €/month more expensive, but 120 € new-customer bonus after 12 months
+    o = _offer(monthly_price=32, bonuses=[{"type": "new_customer", "amount": 120, "paid_after_months": 12}])
+    r = calc.evaluate_offer(o, c, date(2024, 6, 1), 24, 20)
+    assert r["bonus_in_horizon"] == 120
+    assert r["savings_total"] == 30 * 24 - (32 * 24 - 120)  # 72
+    assert r["savings_total_without_bonus"] == -48
+    assert r["bonus_dependent"] is True
+    assert r["verdict"] == "worth_it" and r["verdict_without_bonus"] == "not_worth_it"
+    # 120 € bonus covers 2 €/month extra for 60 months in total
+    assert r["advantage_ends_month"] == 60
+    assert r["break_even_month"] is None  # never cheaper on a monthly basis
+
+    no_bonus = calc.evaluate_offer(o, c, date(2024, 6, 1), 24, 20, include_bonus=False)
+    assert no_bonus["savings_total"] == -48
+    assert no_bonus["bonus_dependent"] is False
+
+    short = calc.evaluate_offer(o, c, date(2024, 6, 1), 12, 20)
+    assert short["bonus_in_horizon"] == 0
+    assert short["bonus_outside_horizon"] == 120
+
+
+def test_promo_price_and_legacy_bonus():
+    c = make(date(2024, 1, 1), [(date(2024, 1, 1), 30, "monthly")])
+    o = _offer(monthly_price=25, promo_price=10, promo_months=6, bonus=20)
+    r = calc.evaluate_offer(o, c, date(2024, 6, 1), 12, 20)
+    assert r["offer_total"] == 6 * 10 + 6 * 25 - 20  # 190
+    assert r["savings_total"] == 360 - 190
+    assert r["bonus_in_horizon"] == 20
+    assert r["break_even_month"] == 1

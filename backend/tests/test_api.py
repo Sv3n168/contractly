@@ -161,3 +161,35 @@ def test_extra_charges(client):
     # 12.5 € spread as Ø per month over 12 months (rounded per month)
     assert with_extras["sum"] - without["sum"] == pytest.approx(12.5, abs=0.1)
     assert client.get("/api/stats/summary").json()["extras_12m"] == 12.5
+
+
+def test_switch_with_bonus_and_promo(client):
+    c = _create(client, name="Handy", category="mobile")
+    o = client.post(
+        f"/api/contracts/{c['id']}/offers",
+        json={
+            "name": "Aktion",
+            "provider": "X",
+            "monthly_price": 30,
+            "promo_price": 15,
+            "promo_months": 3,
+            "bonuses": [{"type": "switch", "amount": 50, "paid_after_months": 2}],
+        },
+    ).json()
+    assert o["bonuses"][0]["amount"] == 50
+    ev = client.get(f"/api/contracts/{c['id']}/offers/evaluate?horizon_months=12").json()["results"][0]
+    assert ev["offer_total"] == 3 * 15 + 9 * 30 - 50
+    ev_nb = client.get(f"/api/contracts/{c['id']}/offers/evaluate?horizon_months=12&include_bonus=false").json()
+    assert ev_nb["results"][0]["offer_total"] == 3 * 15 + 9 * 30
+
+    switch = date.today() + timedelta(days=5)
+    new = client.post(
+        f"/api/contracts/{c['id']}/offers/{o['id']}/switch", json={"switch_date": switch.isoformat()}
+    ).json()
+    prices = sorted(new["prices"], key=lambda p: (p["valid_from"], p["amount"]))
+    assert [(p["amount"], p["interval"]) for p in prices] == [(15, "monthly"), (-50, "once"), (30, "monthly")]
+    assert prices[1]["valid_from"] == add_months(switch, 2).isoformat()
+    assert prices[2]["valid_from"] == add_months(switch, 3).isoformat()
+    titles = [r["title"] for r in new["reminders"]]
+    assert any("Wechselbonus" in t for t in titles)
+    assert any("Aktionspreis" in t for t in titles)

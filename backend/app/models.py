@@ -105,7 +105,13 @@ class Offer(Base):
     base_price_month: Mapped[float | None] = mapped_column(Float)
     unit_price_ct: Mapped[float | None] = mapped_column(Float)
     one_time_costs: Mapped[float] = mapped_column(Float, default=0)
+    # Legacy single bonus (paid immediately); superseded by ``bonuses``.
     bonus: Mapped[float] = mapped_column(Float, default=0)
+    # [{"type": "switch", "amount": 50, "paid_after_months": 2, "note": "..."}]
+    bonuses: Mapped[list | None] = mapped_column(JSON, default=list)
+    # Introductory price for the first ``promo_months`` months
+    promo_price: Mapped[float | None] = mapped_column(Float)
+    promo_months: Mapped[int | None] = mapped_column(Integer)
     min_term_months: Mapped[int | None] = mapped_column(Integer)
     attributes: Mapped[dict] = mapped_column(JSON, default=dict)
     notes: Mapped[str | None] = mapped_column(Text)

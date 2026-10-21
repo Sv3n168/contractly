@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from .. import calc
 from ..categories import is_energy
 from ..db import get_db
-from ..models import Contract, Offer, PriceEntry
+from ..models import Contract, Offer, PriceEntry, Reminder
 from ..schemas import ContractOut, OfferIn, OfferOut, SwitchIn
 from ..services import contract_detail, today
 from .contracts import get_contract
@@ -58,17 +58,19 @@ def evaluate_offers(
     contract_id: int,
     horizon_months: int = Query(24, ge=1, le=120),
     min_saving_year: float = Query(20, ge=0),
+    include_bonus: bool = Query(True, description="Count bonuses paid out within the horizon"),
     db: Session = Depends(get_db),
 ):
     c = get_contract(db, contract_id)
     ref = today()
     terms = calc.term_info(c, ref)
-    results = [calc.evaluate_offer(o, c, ref, horizon_months, min_saving_year) for o in c.offers]
+    results = [calc.evaluate_offer(o, c, ref, horizon_months, min_saving_year, include_bonus) for o in c.offers]
     results.sort(key=lambda r: r["savings_total"], reverse=True)
     return {
         "current_monthly": round(calc.contract_reference_monthly(c, ref), 2),
         "horizon_months": horizon_months,
         "min_saving_year": min_saving_year,
+        "include_bonus": include_bonus,
         "earliest_switch": (terms.next_term_end + timedelta(days=1)) if terms.next_term_end else None,
         "cancellation_deadline": terms.cancellation_deadline,
         "results": results,
@@ -108,15 +110,49 @@ def switch_to_offer(contract_id: int, offer_id: int, data: SwitchIn, db: Session
         notes=offer.notes,
         predecessor_id=old.id,
     )
+    regular_from = data.switch_date
+    if offer.promo_price is not None and offer.promo_months:
+        regular_from = calc.add_months(data.switch_date, offer.promo_months)
+        new.prices.append(
+            PriceEntry(valid_from=data.switch_date, amount=offer.promo_price, interval="monthly", note="Aktionspreis")
+        )
+        new.reminders.append(
+            Reminder(
+                title=f"Aktionspreis {new.name} endet – Tarif prüfen",
+                due_date=regular_from,
+                lead_days=30,
+                note=f"Ab {regular_from:%d.%m.%Y} gilt der reguläre Preis von {monthly:.2f} €".replace(
+                    f"{monthly:.2f}", f"{monthly:.2f}".replace(".", ",")
+                ),
+            )
+        )
     new.prices.append(
-        PriceEntry(valid_from=data.switch_date, amount=round(monthly, 2), interval="monthly", details=details)
+        PriceEntry(valid_from=regular_from, amount=round(monthly, 2), interval="monthly", details=details)
     )
     if offer.one_time_costs:
         new.prices.append(
             PriceEntry(valid_from=data.switch_date, amount=offer.one_time_costs, interval="once", note="Einmalkosten")
         )
-    if offer.bonus:
-        new.prices.append(PriceEntry(valid_from=data.switch_date, amount=-offer.bonus, interval="once", note="Bonus"))
+    # Bonuses become credits in their payout month plus a reminder to check they actually arrive.
+    for b in calc.offer_bonuses(offer):
+        paid = calc.add_months(data.switch_date, int(b.get("paid_after_months") or 0))
+        label = calc.BONUS_LABELS.get(b.get("type"), "Bonus")
+        new.prices.append(
+            PriceEntry(
+                valid_from=paid,
+                amount=-float(b["amount"]),
+                interval="once",
+                note=b.get("note") or label,
+                details={"kind": "bonus", "bonus_type": b.get("type")},
+            )
+        )
+        new.reminders.append(
+            Reminder(
+                title=f"{label} ({float(b['amount']):.0f} €) von {offer.provider or new.name} erhalten?",
+                due_date=paid + timedelta(days=14),
+                note="Falls nicht gutgeschrieben: beim Anbieter nachfragen.",
+            )
+        )
     db.add(new)
 
     new_end = data.switch_date - timedelta(days=1)

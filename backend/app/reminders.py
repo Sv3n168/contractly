@@ -13,7 +13,7 @@ import os
 import smtplib
 import ssl
 import urllib.request
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from email.message import EmailMessage
 from pathlib import Path
 from urllib.parse import urlparse
@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 
 from . import calc
 from . import db as database
-from .categories import CATEGORY_MAP
+from .categories import CATEGORY_MAP, SUBSCRIPTION_CATEGORIES
 from .config import settings
 from .models import Contract, NotificationLog, Reminder
 from .security import vault
@@ -89,6 +89,8 @@ def collect(db: Session, ref: date, horizon_days: int = 60, include_dismissed: b
                     }
                 )
 
+        items.extend(_scenario_items(c, ref, horizon))
+
     for r in db.scalars(select(Reminder).where(Reminder.done_at.is_(None))):
         notify = r.due_date - timedelta(days=r.lead_days or 0)
         if notify <= horizon:
@@ -119,6 +121,96 @@ def collect(db: Session, ref: date, horizon_days: int = 60, include_dismissed: b
         result.append(item)
     result.sort(key=lambda i: (i["date"], i["title"]))
     return result
+
+
+def _item(c: Contract, kind: str, key_date: date, title: str, notify: date, detail: str) -> dict:
+    return {
+        "key": f"{kind}:{c.id}:{key_date.isoformat()}",
+        "kind": kind,
+        "title": title,
+        "date": key_date,
+        "notify_date": notify,
+        "contract_id": c.id,
+        "contract_name": c.name,
+        "category": c.category,
+        "detail": detail,
+    }
+
+
+def _scenario_items(c: Contract, ref: date, horizon: date) -> list[dict]:
+    """Automatic reminders for everyday situations around a contract."""
+    out = []
+    running = c.end_date is None or c.end_date >= ref
+    # Right of withdrawal (14 days after signing a new contract)
+    if c.withdrawal_until and c.withdrawal_until >= ref:
+        notify = c.withdrawal_until - timedelta(days=3)
+        if notify <= horizon:
+            title = f"Widerrufsfrist endet: {c.name}"
+            out.append(
+                _item(
+                    c,
+                    "withdrawal",
+                    c.withdrawal_until,
+                    title,
+                    notify,
+                    "Bis dahin kannst du ohne Angabe von Gründen widerrufen.",
+                )
+            )
+    # Price guarantee ends (energy)
+    guarantee = (c.attributes or {}).get("price_guarantee_until")
+    if guarantee and running:
+        try:
+            until = date.fromisoformat(str(guarantee)[:10])
+        except ValueError:
+            until = None
+        if until and until >= ref and until - timedelta(days=30) <= horizon:
+            title = f"Preisgarantie endet: {c.name}"
+            out.append(
+                _item(
+                    c,
+                    "price_guarantee",
+                    until,
+                    title,
+                    until - timedelta(days=30),
+                    "Danach sind Preiserhöhungen möglich – guter Zeitpunkt zum Vergleichen.",
+                )
+            )
+    # Announced price increase -> special right of cancellation until it takes effect
+    prices = calc.recurring_prices(c)
+    for prev, cur in zip(prices, prices[1:], strict=False):
+        old_m = calc.monthly_equivalent(prev.amount, prev.interval)
+        new_m = calc.monthly_equivalent(cur.amount, cur.interval)
+        if running and new_m > old_m + 0.005 and cur.valid_from > ref:
+            deadline = cur.valid_from - timedelta(days=1)
+            notify = deadline - timedelta(days=14)
+            if notify <= horizon:
+                diff = f"{new_m - old_m:.2f}".replace(".", ",")
+                title = f"Preiserhöhung: {c.name} (+{diff} €/Monat)"
+                out.append(
+                    _item(
+                        c,
+                        "price_increase",
+                        deadline,
+                        title,
+                        notify,
+                        "Sonderkündigungsrecht prüfen – meist bis zum Inkrafttreten möglich.",
+                    )
+                )
+    # Cancellation sent but not confirmed yet
+    if c.cancelled_on and not c.cancellation_confirmed_on and running:
+        due = c.cancelled_on + timedelta(days=14)
+        if due <= horizon:
+            title = f"Kündigungsbestätigung fehlt: {c.name}"
+            out.append(
+                _item(c, "confirmation", due, title, due, "Beim Anbieter nachhaken, falls noch keine Bestätigung kam.")
+            )
+    # Yearly "do I still use this?" for subscriptions
+    if c.category in SUBSCRIPTION_CATEGORIES and c.end_date is None and c.start_date <= ref:
+        due = calc.add_months(c.last_checked_on or c.start_date, 12)
+        if due <= horizon:
+            title = f"Abo-Check: {c.name} noch genutzt?"
+            out.append(_item(c, "subscription_check", due, title, due, "Wenn nicht: kündigen spart Geld."))
+    return out
 
 
 # --------------------------------------------------------------------------- outbox
@@ -158,6 +250,15 @@ def _neutral_title(item: dict) -> str:
         return f"Kündigungsfrist {what}"
     if item["kind"] == "contract_end":
         return f"Vertragsende {what}"
+    neutral = {
+        "withdrawal": "Widerrufsfrist endet",
+        "price_guarantee": "Preisgarantie endet",
+        "price_increase": "Preiserhöhung – Sonderkündigung prüfen",
+        "confirmation": "Kündigungsbestätigung fehlt",
+        "subscription_check": "Abo-Check",
+    }
+    if item["kind"] in neutral:
+        return f"{neutral[item['kind']]} ({what})"
     return f"Erinnerung ({what})" if item.get("contract_id") else "Eigene Erinnerung"
 
 
@@ -183,7 +284,33 @@ def refresh_outbox(user_id: str) -> None:
         for i in items
     ]
     data["generated_at"] = date.today().isoformat()
+    # Numbers for the Home Assistant integration – only kept when the user created an API token.
+    if vault.user(user_id).get("api_token"):
+        data["summary"] = _summary(user_id, data["items"])
+    else:
+        data.pop("summary", None)
     _save_outbox(user_id, data)
+
+
+def _summary(user_id: str, items: list[dict]) -> dict:
+    from .services import contract_summary, load_contracts
+
+    ref = date.today()
+    with database.session(user_id) as db:
+        summaries = [contract_summary(c, ref) for c in load_contracts(db)]
+    running = [s for s in summaries if s.state in ("active", "cancelled")]
+    monthly = round(sum(s.monthly_cost for s in running), 2)
+    upcoming = [i for i in items if i["date"] >= ref.isoformat()]
+    nxt = min(upcoming, key=lambda i: i["date"]) if upcoming else None
+    return {
+        "monthly_total": monthly,
+        "yearly_total": round(monthly * 12, 2),
+        "active_contracts": len(running),
+        "due_reminders": sum(1 for i in items if i["notify_date"] <= ref.isoformat()),
+        "next_date": nxt["date"] if nxt else None,
+        "next_title": nxt["title"] if nxt else None,
+        "updated_at": datetime.now().isoformat(timespec="seconds"),
+    }
 
 
 # --------------------------------------------------------------------------- delivery

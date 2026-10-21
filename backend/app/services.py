@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from . import calc
-from .categories import is_energy
+from .categories import is_energy, tax_relevant
 from .models import Contract, PriceEntry
 from .schemas import (
     ContractOut,
@@ -46,6 +46,14 @@ def document_out(d) -> DocumentOut:
     return out
 
 
+def _full_monthly(c: Contract, ref: date) -> float:
+    """Monthly price of the whole contract, regardless of the own share."""
+    if not calc.is_active_on(c, ref):
+        return 0.0
+    p = calc.price_at(c, ref) or (calc.recurring_prices(c) or [None])[0]
+    return calc.monthly_equivalent(p.amount, p.interval) if p else 0.0
+
+
 def _summary_fields(c: Contract, ref: date) -> dict:
     monthly = calc.current_monthly_cost(c, ref)
     terms = calc.term_info(c, ref)
@@ -70,6 +78,10 @@ def _summary_fields(c: Contract, ref: date) -> dict:
         "next_term_end": terms.next_term_end,
         "cancellation_deadline": terms.cancellation_deadline,
         "monthly_cancellable": terms.flexible,
+        "share_percent": c.share_percent,
+        "full_monthly_cost": round(_full_monthly(c, ref), 2),
+        "tax_relevant": tax_relevant(c.category, c.tax_relevant),
+        "cancellation_confirmed_on": c.cancellation_confirmed_on,
         "document_count": len(c.documents),
         "offer_count": len(c.offers),
         "attributes": c.attributes or {},
@@ -97,6 +109,8 @@ def contract_detail(c: Contract, ref: date | None = None) -> ContractOut:
     ref = ref or today()
     return ContractOut(
         **_summary_fields(c, ref),
+        withdrawal_until=c.withdrawal_until,
+        last_checked_on=c.last_checked_on,
         provider_address=c.provider_address,
         customer_number=c.customer_number,
         contract_number=c.contract_number,

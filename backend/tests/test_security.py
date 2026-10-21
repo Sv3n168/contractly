@@ -296,3 +296,43 @@ def test_backup_restore_all_users(client):
     with make_client() as p:
         assert _login(p, "partner", "partner-pw-123").status_code == 200
         assert [c["name"] for c in p.get("/api/contracts").json()] == ["Vertrag Partner"]
+
+
+def test_two_factor_login(client):
+    from app.security import totp_code
+
+    setup = client.post("/api/auth/2fa/setup").json()
+    assert setup["uri"].startswith("otpauth://totp/Contractly:admin") and "<svg" in setup["qr_svg"]
+    assert client.post("/api/auth/2fa/enable", json={"code": "000000"}).status_code == 400
+    assert client.post("/api/auth/2fa/enable", json={"code": totp_code(setup["secret"])}).json()["totp_enabled"]
+    client.post("/api/auth/logout")
+    r = _login(client)
+    assert r.status_code == 401 and r.json()["detail"] == "totp_required"
+    assert not vault.unlocked_users()  # password alone does not unlock
+    bad = client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": "123456"})
+    assert bad.status_code == 401
+    ok = client.post(
+        "/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": totp_code(setup["secret"])}
+    )
+    assert ok.status_code == 200
+    # recovery key disables 2FA (lost phone)
+    client.post("/api/auth/logout")
+    client.post(
+        "/api/auth/recover",
+        json={"username": "admin", "recovery_key": client.recovery_key, "new_password": "neu-passwort-99"},
+    )
+    assert client.get("/api/auth/me").json()["totp_enabled"] is False
+
+
+def test_home_assistant_summary(client):
+    _contract(client)
+    with make_client() as ha:
+        assert ha.get("/api/ha/summary").status_code == 401
+    token = client.post("/api/auth/api-token").json()["token"]
+    client.post("/api/auth/logout")  # works while logged out
+    with make_client() as ha:
+        r = ha.get("/api/ha/summary", headers={"Authorization": f"Bearer {token}"})
+        assert r.status_code == 200, r.text
+        data = r.json()
+        assert data["monthly_total"] == 19.99 and data["active_contracts"] == 1
+        assert SECRET_NAME not in r.text

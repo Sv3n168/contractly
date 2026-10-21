@@ -1,5 +1,6 @@
 """Setup, login/logout, invitations, password management and (admin) user management."""
 
+import io
 import logging
 import shutil
 from typing import Literal
@@ -9,7 +10,15 @@ from pydantic import BaseModel, Field
 
 from .. import db as database
 from ..config import settings
-from ..security import MIN_PASSWORD_LENGTH, InvalidCredentials, VaultError, public_user, vault
+from ..security import (
+    MIN_PASSWORD_LENGTH,
+    InvalidCredentials,
+    TotpRequired,
+    VaultError,
+    new_totp_secret,
+    public_user,
+    vault,
+)
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 users_router = APIRouter(prefix="/api/users", tags=["users"])
@@ -26,7 +35,12 @@ class SetupIn(BaseModel):
 class LoginIn(BaseModel):
     username: str = Field(max_length=60)
     password: str = Field(max_length=500)
+    totp: str | None = Field(default=None, max_length=12)
     remember: bool = False
+
+
+class CodeIn(BaseModel):
+    code: str = Field(max_length=12)
 
 
 class ActivateIn(BaseModel):
@@ -128,7 +142,12 @@ def _rate_limited(request: Request) -> str:
 
 def me(user_id: str) -> dict:
     u = vault.user(user_id)
-    return {**public_user(u), "settings": u.get("settings", {})}
+    return {
+        **public_user(u),
+        "settings": u.get("settings", {}),
+        "totp_enabled": bool(u.get("totp")),
+        "api_token": bool(u.get("api_token")),
+    }
 
 
 # --------------------------------------------------------------------------- public
@@ -163,7 +182,9 @@ def setup(data: SetupIn, request: Request, response: Response):
 def login(data: LoginIn, request: Request, response: Response):
     client = _rate_limited(request)
     try:
-        user = vault.authenticate(data.username, data.password)
+        user = vault.authenticate(data.username, data.password, data.totp)
+    except TotpRequired as exc:
+        raise HTTPException(401, "totp_required") from exc
     except InvalidCredentials as exc:
         vault.record_failure(client)
         log.warning("failed login from %s", client)
@@ -254,6 +275,65 @@ def new_recovery_key(data: PasswordIn, user_id: str = Depends(current_user_id)):
         return {"recovery_key": vault.regenerate_recovery_key(user_id, data.password)}
     except InvalidCredentials as exc:
         raise HTTPException(400, "Passwort ist falsch") from exc
+
+
+_pending_totp: dict[str, str] = {}
+
+
+@router.post("/2fa/setup")
+def totp_setup(user_id: str = Depends(current_user_id)):
+    """Start 2FA setup: returns the secret as QR code for an authenticator app."""
+    import segno
+
+    secret = new_totp_secret()
+    _pending_totp[user_id] = secret
+    name = vault.user(user_id)["username"]
+    uri = f"otpauth://totp/Contractly:{name}?secret={secret}&issuer=Contractly&digits=6&period=30"
+    qr = segno.make(uri, error="m")
+    buf = io.BytesIO()
+    qr.save(buf, kind="svg", scale=5, dark="#111827", light="#ffffff", border=2)
+    return {"secret": secret, "uri": uri, "qr_svg": buf.getvalue().decode()}
+
+
+@router.post("/2fa/enable")
+def totp_enable(data: CodeIn, user_id: str = Depends(current_user_id)):
+    secret = _pending_totp.get(user_id)
+    if not secret:
+        raise HTTPException(400, "Bitte die Einrichtung neu starten")
+    try:
+        vault.enable_totp(user_id, secret, data.code)
+    except InvalidCredentials as exc:
+        raise HTTPException(400, "Der Code stimmt nicht – Uhrzeit des Handys prüfen und neuen Code eingeben") from exc
+    _pending_totp.pop(user_id, None)
+    return me(user_id)
+
+
+@router.post("/2fa/disable")
+def totp_disable(data: PasswordIn, user_id: str = Depends(current_user_id)):
+    try:
+        vault.disable_totp(user_id, data.password)
+    except InvalidCredentials as exc:
+        raise HTTPException(400, "Passwort ist falsch") from exc
+    return me(user_id)
+
+
+@router.post("/api-token")
+def create_api_token(user_id: str = Depends(current_user_id)):
+    """Read-only token for Home Assistant & co. (shown once)."""
+    token = vault.create_api_token(user_id)
+    from ..reminders import refresh_outbox
+
+    refresh_outbox(user_id)  # writes the summary for the integration
+    return {"token": token}
+
+
+@router.delete("/api-token")
+def revoke_api_token(user_id: str = Depends(current_user_id)):
+    vault.revoke_api_token(user_id)
+    from ..reminders import refresh_outbox
+
+    refresh_outbox(user_id)
+    return me(user_id)
 
 
 @router.get("/calendar")

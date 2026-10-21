@@ -117,6 +117,33 @@ def validate_username(username: str) -> str:
     return name
 
 
+# --------------------------------------------------------------------------- TOTP (2FA)
+
+
+def new_totp_secret() -> str:
+    return base64.b32encode(secrets.token_bytes(20)).decode()
+
+
+def totp_code(secret: str, at: float | None = None, step: int = 30) -> str:
+    counter = int((at if at is not None else time.time()) // step)
+    digest = hmac.new(base64.b32decode(secret), counter.to_bytes(8, "big"), hashlib.sha1).digest()
+    offset = digest[-1] & 0x0F
+    value = int.from_bytes(digest[offset : offset + 4], "big") & 0x7FFFFFFF
+    return f"{value % 1_000_000:06d}"
+
+
+def verify_totp(secret: str, code: str, window: int = 1) -> bool:
+    code = "".join(ch for ch in (code or "") if ch.isdigit())
+    now = time.time()
+    return len(code) == 6 and any(
+        hmac.compare_digest(totp_code(secret, now + i * 30), code) for i in range(-window, window + 1)
+    )
+
+
+class TotpRequired(VaultError):
+    pass
+
+
 # --------------------------------------------------------------------------- file encryption
 
 
@@ -337,13 +364,20 @@ class Vault:
 
     # ----------------------------------------------------------------- login
 
-    def authenticate(self, username: str, password: str) -> dict:
+    def authenticate(self, username: str, password: str, totp: str | None = None) -> dict:
         user = self.find(username)
         if not user or user.get("status") != "active":
             # Spend the KDF time anyway so usernames can't be probed by timing.
             _kdf(password or "", b"0" * 16)
             raise InvalidCredentials()
         dek = _unwrap(user["password"], password)
+        if user.get("totp"):
+            # The 2FA secret itself is encrypted with the data key.
+            secret = decrypt_bytes(_unb64(user["totp"]), subkey(dek, "totp")).decode()
+            if not totp:
+                raise TotpRequired("totp_required")
+            if not verify_totp(secret, totp):
+                raise InvalidCredentials("invalid totp")
         self._keys[user["id"]] = dek
         self._update(user["id"], lambda u: u.__setitem__("last_login", int(time.time())))
         return user
@@ -360,6 +394,7 @@ class Vault:
         def fn(u):
             u["password"] = _wrap(dek, new_password)
             u["recovery"] = _wrap(dek, new_recovery)
+            u.pop("totp", None)  # the recovery key also helps when the 2FA phone is lost
 
         self.lock_user(user["id"])  # end sessions that used the old password
         self._update(user["id"], fn)
@@ -377,6 +412,35 @@ class Vault:
         recovery = new_recovery_key()
         self._update(user_id, lambda u: u.__setitem__("recovery", _wrap(dek, recovery)))
         return recovery
+
+    # ----------------------------------------------------------------- 2FA
+
+    def enable_totp(self, user_id: str, secret: str, code: str) -> None:
+        if not verify_totp(secret, code):
+            raise InvalidCredentials("invalid totp")
+        enc = _b64(encrypt_bytes(secret.encode(), self.key(user_id, "totp")))
+        self._update(user_id, lambda u: u.__setitem__("totp", enc))
+
+    def disable_totp(self, user_id: str, password: str) -> None:
+        _unwrap(self.user(user_id)["password"], password)
+        self._update(user_id, lambda u: u.pop("totp", None))
+
+    # ----------------------------------------------------------------- API token (Home Assistant)
+
+    def create_api_token(self, user_id: str) -> str:
+        token = "ctly_" + secrets.token_urlsafe(32)
+        self._update(user_id, lambda u: u.__setitem__("api_token", _hash(token)))
+        return token
+
+    def revoke_api_token(self, user_id: str) -> None:
+        self._update(user_id, lambda u: u.pop("api_token", None))
+
+    def user_for_api_token(self, token: str) -> str | None:
+        h = _hash(token or "")
+        for u in self.users():
+            if u.get("api_token") and hmac.compare_digest(u["api_token"], h):
+                return u["id"]
+        return None
 
     # ----------------------------------------------------------------- calendar token
 

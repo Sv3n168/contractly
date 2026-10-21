@@ -182,3 +182,13 @@ INTERVALS = {
 
 def is_energy(category: str) -> bool:
     return bool(CATEGORY_MAP.get(category, {}).get("energy"))
+
+
+# Typically deductible in a German tax return (Vorsorgeaufwendungen etc.); adjustable per contract.
+TAX_RELEVANT_DEFAULT = {"liability", "legal_protection", "car_insurance", "insurance"}
+# Subscriptions worth a yearly "do I still use this?" check.
+SUBSCRIPTION_CATEGORIES = {"streaming", "fitness"}
+
+
+def tax_relevant(category: str, explicit: bool | None) -> bool:
+    return explicit if explicit is not None else category in TAX_RELEVANT_DEFAULT

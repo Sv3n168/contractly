@@ -107,8 +107,14 @@ def is_active_on(contract: Contract, day: date) -> bool:
     return contract.start_date <= day and (contract.end_date is None or contract.end_date >= day)
 
 
+def share(contract: Contract) -> float:
+    """Own share of the costs (e.g. 0.5 when a partner pays half)."""
+    pct = contract.share_percent
+    return 1.0 if pct is None else max(0, min(pct, 100)) / 100
+
+
 def current_monthly_cost(contract: Contract, today: date) -> float:
-    """Monthly equivalent of the recurring price effective today (0 if inactive)."""
+    """Own monthly equivalent of the recurring price effective today (0 if inactive)."""
     if not is_active_on(contract, today):
         return 0.0
     p = price_at(contract, today)
@@ -116,7 +122,7 @@ def current_monthly_cost(contract: Contract, today: date) -> float:
         # Contract not started billing yet but active: use the first known price.
         prices = recurring_prices(contract)
         p = prices[0] if prices else None
-    return monthly_equivalent(p.amount, p.interval) if p else 0.0
+    return monthly_equivalent(p.amount, p.interval) * share(contract) if p else 0.0
 
 
 def _segments(contract: Contract, until: date):
@@ -146,7 +152,7 @@ def monthly_costs(
     clip: bool = False,
     extra_monthly: float = 0.0,
 ) -> dict[str, float]:
-    """Cost per month (prorated by days) between the months of ``first`` and ``last``.
+    """Own cost per month (prorated by days, times the own share) between ``first`` and ``last``.
 
     ``increase_pct`` applies a compounding yearly increase to months after ``today``
     (used for projections), ``extra_monthly`` adds expected additional charges to those
@@ -175,7 +181,8 @@ def monthly_costs(
             key = month_key(p.valid_from)
             if key in result:
                 result[key] += p.amount
-    return {k: round(v, 2) for k, v in result.items()}
+    factor = share(contract)
+    return {k: round(v * factor, 2) for k, v in result.items()}
 
 
 # --------------------------------------------------------------------------- terms
@@ -421,7 +428,7 @@ def switch_savings(contract: Contract, today: date) -> float | None:
     old_price = price_at(pred, pred.end_date or contract.start_date)
     if old_price is None:
         return None
-    old_monthly = monthly_equivalent(old_price.amount, old_price.interval)
+    old_monthly = monthly_equivalent(old_price.amount, old_price.interval) * share(pred)
     until = min(contract.end_date or today, today)
     if until < contract.start_date:
         return None

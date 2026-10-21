@@ -14,7 +14,7 @@ from .backup import backup_loop
 from .config import settings
 from .models import Contract
 from .reminders import notifier_loop, refresh_outbox
-from .routers import auth, backups, contracts, documents, offers, reminders, stats
+from .routers import auth, backups, contracts, documents, imports, offers, reminders, stats
 from .routers.auth import COOKIE
 from .security import vault
 
@@ -44,6 +44,7 @@ def is_public(path: str) -> bool:
         or path in PUBLIC_API
         or path.startswith("/static/")
         or (path.startswith("/api/calendar/") and path.endswith(".ics"))
+        or path == "/api/ha/summary"  # own Bearer token
     )
 
 
@@ -111,6 +112,7 @@ def create_app(background: bool = True) -> FastAPI:
         stats.router,
         reminders.router,
         backups.router,
+        imports.router,
     ):
         app.include_router(r)
 

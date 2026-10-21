@@ -201,3 +201,104 @@ def test_meta(client):
     meta = client.get("/api/meta").json()
     assert {c["key"] for c in meta["categories"]} >= {"mobile", "electricity", "fitness"}
     assert "smtp" in meta and "ocr" in meta
+
+
+def _kinds(client):
+    return {i["kind"]: i for i in client.get("/api/reminders/upcoming?horizon_days=400").json()["items"]}
+
+
+def test_cost_share(client):
+    c = _create(client, share_percent=50)  # partner pays half of 35 €
+    assert c["monthly_cost"] == 17.5
+    assert c["full_monthly_cost"] == 35
+    assert client.get("/api/stats/summary").json()["monthly_total"] == 17.5
+
+
+def test_pause_contract(client):
+    start = add_months(date.today(), -6).replace(day=1)
+    c = _create(
+        client,
+        min_term_months=12,
+        start_date=start.isoformat(),
+        initial_price={"valid_from": start.isoformat(), "amount": 30},
+    )
+    p_from = add_months(date.today(), -2).replace(day=1)
+    p_until = add_months(p_from, 1) - timedelta(days=1)  # one month
+    r = client.post(
+        f"/api/contracts/{c['id']}/pause", json={"from_date": p_from.isoformat(), "until": p_until.isoformat()}
+    )
+    assert r.status_code == 200, r.text
+    assert r.json()["min_term_months"] == 13  # term extended by the pause
+    hist = client.get(f"/api/contracts/{c['id']}/history").json()
+    by_month = dict(zip(hist["months"], hist["totals"], strict=False))
+    assert by_month[f"{p_from:%Y-%m}"] == 0
+    assert by_month[f"{add_months(p_from, 1):%Y-%m}"] == 30
+
+
+def test_scenario_reminders(client):
+    soon = date.today() + timedelta(days=5)
+    c = _create(
+        client,
+        name="Neuer Vertrag",
+        notice_value=3,
+        withdrawal_until=soon.isoformat(),
+        attributes={"price_guarantee_until": (date.today() + timedelta(days=20)).isoformat()},
+    )
+    kinds = _kinds(client)
+    assert kinds["withdrawal"]["date"] == soon.isoformat()
+    assert "price_guarantee" in kinds
+
+    # price increase announced for next month -> special cancellation right
+    nxt = add_months(date.today(), 1).replace(day=1)
+    client.post(f"/api/contracts/{c['id']}/prices", json={"valid_from": nxt.isoformat(), "amount": 40})
+    inc = _kinds(client)["price_increase"]
+    assert "+5,00" in inc["title"] and inc["date"] == (nxt - timedelta(days=1)).isoformat()
+
+    # cancellation sent 20 days ago without confirmation
+    sent = date.today() - timedelta(days=20)
+    client.post(f"/api/contracts/{c['id']}/cancel", json={"cancelled_on": sent.isoformat()})
+    assert _kinds(client)["confirmation"]["due"] is True
+    client.post(f"/api/contracts/{c['id']}/cancellation-confirmed", json={})
+    assert "confirmation" not in _kinds(client)
+
+
+def test_subscription_check(client):
+    old = add_months(date.today(), -14)
+    c = _create(
+        client,
+        name="Netflix",
+        category="streaming",
+        start_date=old.isoformat(),
+        initial_price={"valid_from": old.isoformat(), "amount": 13.99},
+    )
+    assert _kinds(client)["subscription_check"]["contract_id"] == c["id"]
+    client.post(f"/api/contracts/{c['id']}/still-used")
+    assert "subscription_check" not in {i["kind"] for i in client.get("/api/reminders/upcoming").json()["items"]}
+
+
+def test_yearly_report_and_tax_export(client):
+    y = date.today().year - 1
+    client.post(
+        "/api/contracts",
+        json={
+            "name": "Haftpflicht",
+            "category": "liability",
+            "start_date": f"{y - 1}-01-01",
+            "initial_price": {"valid_from": f"{y - 1}-01-01", "amount": 60, "interval": "yearly"},
+        },
+    )
+    client.post(
+        "/api/contracts",
+        json={
+            "name": "Netflix",
+            "category": "streaming",
+            "start_date": f"{y}-07-01",
+            "initial_price": {"valid_from": f"{y}-07-01", "amount": 10},
+        },
+    )
+    r = client.get(f"/api/stats/report?year={y}").json()
+    assert r["total"] == 60 + 60 and r["complete"] is True
+    assert r["tax_total"] == 60
+    assert {c["name"]: c["tax_relevant"] for c in r["contracts"]} == {"Haftpflicht": True, "Netflix": False}
+    csv = client.get(f"/api/stats/tax.csv?year={y}").text
+    assert '"Haftpflicht"' in csv and "Netflix" not in csv and '"Summe";;;;;60,00;' in csv

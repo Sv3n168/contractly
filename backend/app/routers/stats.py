@@ -2,12 +2,12 @@ import json
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from .. import calc, ocr
-from ..categories import CATEGORIES, CATEGORY_MAP, INTERVALS
+from ..categories import CATEGORIES, CATEGORY_MAP, INTERVALS, tax_relevant
 from ..config import settings
 from ..db import get_db
 from ..models import AppSetting
@@ -308,3 +308,132 @@ def export_all(db: Session = Depends(get_db)):
     headers = {"Content-Disposition": f'attachment; filename="contractly-export-{ref.isoformat()}.json"'}
     body = json.dumps({"exported_at": ref.isoformat(), "contracts": data}, indent=2, ensure_ascii=False)
     return Response(body, media_type="application/json", headers=headers)
+
+
+@router.get("/ha/summary")
+def home_assistant_summary(request: Request):
+    """Read-only key figures for Home Assistant (Bearer API token). Works while logged out."""
+    header = request.headers.get("authorization", "")
+    token = header[7:] if header.lower().startswith("bearer ") else request.query_params.get("token", "")
+    user_id = vault.user_for_api_token(token)
+    if not user_id:
+        raise HTTPException(401, "Ungültiger API-Token")
+    summary = load_outbox(user_id).get("summary")
+    if not summary:
+        raise HTTPException(404, "Noch keine Daten – einmal in Contractly anmelden")
+    return summary
+
+
+# --------------------------------------------------------------------------- yearly report & tax export
+
+
+def _year_report(db: Session, year: int) -> dict:
+    first, last = date(year, 1, 1), date(year, 12, 31)
+    ref = today()
+    rows = []
+    months = [calc.month_key(m) for m in calc.iter_months(first, last)]
+    monthly = dict.fromkeys(months, 0.0)
+    switches, price_changes = [], []
+    extras_total = 0.0
+    for c in load_contracts(db):
+        costs = calc.monthly_costs(c, first, min(last, ref) if year == ref.year else last, clip=True)
+        total = round(sum(costs.values()), 2)
+        for m, v in costs.items():
+            monthly[m] += v
+        extras = sum(calc.extras_by_month(c, first, last).values()) * calc.share(c)
+        extras_total += extras
+        if total:
+            rows.append(
+                {
+                    "id": c.id,
+                    "name": c.name,
+                    "provider": c.provider,
+                    "category": c.category,
+                    "total": total,
+                    "extras": round(extras, 2),
+                    "share_percent": c.share_percent,
+                    "tax_relevant": tax_relevant(c.category, c.tax_relevant),
+                    "contract_number": c.contract_number,
+                }
+            )
+        if c.predecessor and first <= c.start_date <= last:
+            switches.append(
+                {
+                    "date": c.start_date,
+                    "from": c.predecessor.name,
+                    "to": c.name,
+                    "category": c.category,
+                    "savings": calc.switch_savings(c, ref),
+                }
+            )
+        prices = calc.recurring_prices(c)
+        for prev, cur in zip(prices, prices[1:], strict=False):
+            if first <= cur.valid_from <= last:
+                old_m = calc.monthly_equivalent(prev.amount, prev.interval)
+                new_m = calc.monthly_equivalent(cur.amount, cur.interval)
+                if abs(new_m - old_m) > 0.005:
+                    price_changes.append(
+                        {"date": cur.valid_from, "name": c.name, "old": round(old_m, 2), "new": round(new_m, 2)}
+                    )
+    rows.sort(key=lambda r: -r["total"])
+    by_cat: dict[str, float] = defaultdict(float)
+    for r in rows:
+        by_cat[r["category"]] += r["total"]
+    total = round(sum(r["total"] for r in rows), 2)
+    return {
+        "year": year,
+        "complete": year < ref.year,
+        "total": total,
+        "monthly_average": round(total / (12 if year < ref.year else max(ref.month, 1)), 2),
+        "months": months,
+        "monthly": [round(monthly[m], 2) for m in months],
+        "by_category": sorted(
+            ({"category": k, "total": round(v, 2)} for k, v in by_cat.items()), key=lambda e: -e["total"]
+        ),
+        "contracts": rows,
+        "tax_total": round(sum(r["total"] for r in rows if r["tax_relevant"]), 2),
+        "extras_total": round(extras_total, 2),
+        "switches": sorted(switches, key=lambda s: s["date"]),
+        "price_changes": sorted(price_changes, key=lambda p: p["date"]),
+    }
+
+
+@router.get("/stats/report")
+def yearly_report(
+    year: int = Query(default_factory=lambda: today().year, ge=2000, le=2100), db: Session = Depends(get_db)
+):
+    return _year_report(db, year)
+
+
+@router.get("/stats/tax.csv")
+def tax_export(
+    year: int = Query(default_factory=lambda: today().year, ge=2000, le=2100),
+    all_contracts: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Yearly sums for the tax return (Excel-friendly CSV, German number format)."""
+    report = _year_report(db, year)
+    lines = [
+        "Vertrag;Anbieter;Kategorie;Vertragsnummer;Eigener Anteil;Betrag " + str(year) + " (EUR);Steuerlich relevant"
+    ]
+    total = 0.0
+    for r in report["contracts"]:
+        if not (all_contracts or r["tax_relevant"]):
+            continue
+        total += r["total"]
+        cells = [
+            r["name"],
+            r["provider"] or "",
+            CATEGORY_MAP.get(r["category"], {}).get("label", r["category"]),
+            r["contract_number"] or "",
+            f"{r['share_percent'] or 100} %",
+            f"{r['total']:.2f}".replace(".", ","),
+            "ja" if r["tax_relevant"] else "nein",
+        ]
+        lines.append(";".join('"' + str(c).replace('"', '""') + '"' for c in cells))
+    lines.append(f'"Summe";;;;;{total:.2f};'.replace(".", ","))
+    body = "﻿" + "\r\n".join(lines) + "\r\n"
+    name = f"contractly-steuer-{year}.csv" if not all_contracts else f"contractly-kosten-{year}.csv"
+    return Response(
+        body, media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f'attachment; filename="{name}"'}
+    )

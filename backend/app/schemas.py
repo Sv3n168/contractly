@@ -70,6 +70,11 @@ class ContractBase(BaseModel):
     attributes: dict[str, Any] = Field(default_factory=dict)
     notes: str | None = None
     reminder_days: int | None = Field(default=30, ge=0, le=365)
+    share_percent: int | None = Field(default=None, ge=0, le=100)
+    cancellation_confirmed_on: date | None = None
+    tax_relevant: bool | None = None
+    withdrawal_until: date | None = None
+    last_checked_on: date | None = None
 
     @field_validator("category")
     @classmethod
@@ -109,12 +114,18 @@ class ContractSummary(ORM):
     next_term_end: date | None
     cancellation_deadline: date | None
     monthly_cancellable: bool = False
+    share_percent: int | None = None
+    full_monthly_cost: float = 0
+    tax_relevant: bool = False
+    cancellation_confirmed_on: date | None = None
     document_count: int = 0
     offer_count: int = 0
     attributes: dict[str, Any] = {}
 
 
 class ContractOut(ContractSummary):
+    withdrawal_until: date | None = None
+    last_checked_on: date | None = None
     provider_address: str | None
     customer_number: str | None
     contract_number: str | None
@@ -232,3 +243,14 @@ class ProfileIn(BaseModel):
     email: str | None = None
     phone: str | None = None
     city_for_letters: str | None = None
+
+
+class PauseIn(BaseModel):
+    from_date: date
+    until: date | None = None
+    extend_term: bool = True
+    note: str | None = None
+
+
+class ConfirmIn(BaseModel):
+    confirmed_on: date | None = None

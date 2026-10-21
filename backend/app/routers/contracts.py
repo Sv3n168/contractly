@@ -8,12 +8,14 @@ from ..db import documents_dir, get_db
 from ..models import Contract, Document, MeterReading, PriceEntry
 from ..schemas import (
     CancelIn,
+    ConfirmIn,
     ContractCreate,
     ContractOut,
     ContractSummary,
     ContractUpdate,
     MeterReadingIn,
     MeterReadingOut,
+    PauseIn,
     PriceIn,
     PriceOut,
 )
@@ -264,3 +266,62 @@ def delete_reading(contract_id: int, reading_id: int, db: Session = Depends(get_
     db.delete(r)
     db.commit()
     return Response(status_code=204)
+
+
+# --------------------------------------------------------------------------- everyday actions
+
+
+@router.post("/{contract_id}/pause", response_model=ContractOut)
+def pause_contract(contract_id: int, data: PauseIn, db: Session = Depends(get_db)):
+    """Pause (e.g. gym during illness): costs 0 for the period, then the previous price again."""
+    c = get_contract(db, contract_id)
+    if data.until and data.until < data.from_date:
+        raise HTTPException(400, "Das Ende der Pause liegt vor dem Beginn")
+    before = calc.price_at(c, data.from_date - timedelta(days=1)) or calc.price_at(c, data.from_date)
+    c.prices.append(
+        PriceEntry(
+            valid_from=data.from_date,
+            amount=0,
+            interval="monthly",
+            note=data.note or "Pausiert",
+            details={"kind": "pause"},
+        )
+    )
+    if data.until and before is not None:
+        c.prices.append(
+            PriceEntry(
+                valid_from=data.until + timedelta(days=1),
+                amount=before.amount,
+                interval=before.interval,
+                note="Pause beendet",
+                details=dict(before.details or {}),
+            )
+        )
+        if data.extend_term and c.min_term_months:
+            # Many contracts (e.g. gyms) extend the minimum term by the pause.
+            months = max(1, round((data.until - data.from_date).days / 30.44))
+            c.min_term_months += months
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)
+
+
+@router.post("/{contract_id}/cancellation-confirmed", response_model=ContractOut)
+def confirm_cancellation(contract_id: int, data: ConfirmIn, db: Session = Depends(get_db)):
+    c = get_contract(db, contract_id)
+    if not c.cancelled_on:
+        raise HTTPException(400, "Der Vertrag ist nicht gekündigt")
+    c.cancellation_confirmed_on = data.confirmed_on or today()
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)
+
+
+@router.post("/{contract_id}/still-used", response_model=ContractOut)
+def still_used(contract_id: int, db: Session = Depends(get_db)):
+    """Answer to the subscription check: keep it, ask again in a year."""
+    c = get_contract(db, contract_id)
+    c.last_checked_on = today()
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)

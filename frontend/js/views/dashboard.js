@@ -101,7 +101,9 @@ export async function renderDashboard(view) {
       <div class="card kpi">
         <div class="kpi-label"><span class="kpi-icon">${icon("calendar")}</span>Pro Jahr</div>
         <div class="kpi-value num">${money(summary.yearly_total, true)}</div>
-        <div class="kpi-sub">${money(summary.ytd_total, true)} bisher in ${now.getFullYear()}</div>
+        <div class="kpi-sub">${money(summary.ytd_total, true)} bisher in ${now.getFullYear()}${
+          summary.extras_12m ? ` · + ${money(summary.extras_12m, true)} Zusatzkosten (12 M.)` : ""
+        }</div>
       </div>
       <div class="card kpi">
         <div class="kpi-label"><span class="kpi-icon">${icon("file")}</span>Laufende Verträge</div>

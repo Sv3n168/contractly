@@ -179,6 +179,10 @@ def contract_history(
             }
         )
     totals = [round(sum((s["values"][i] or 0) for s in series), 2) for i in range(len(months))]
+    extras: dict[str, float] = {}
+    for x in chain:
+        for m, v in calc.extras_by_month(x, first, calc.month_end(last)).items():
+            extras[m] = round(extras.get(m, 0.0) + v, 2)
     events = []
     for x in chain:
         for p in x.prices:
@@ -186,7 +190,7 @@ def contract_history(
                 {
                     "date": p.valid_from,
                     "contract_id": x.id,
-                    "type": "once" if p.interval == "once" else "price",
+                    "type": "extra" if calc.is_extra(p) else "once" if p.interval == "once" else "price",
                     "amount": p.amount,
                     "interval": p.interval,
                     "monthly_equivalent": round(calc.monthly_equivalent(p.amount, p.interval), 2),
@@ -199,6 +203,7 @@ def contract_history(
         "current_month": calc.month_key(ref),
         "series": series,
         "totals": totals,
+        "extras": [extras.get(m, 0.0) for m in months],
         "events": events,
         "chain": [contract_summary(x, ref) for x in chain],
     }

@@ -49,7 +49,12 @@ def seed(db: Session, ref: date | None = None) -> int:
             "minutes": "Allnet-Flat",
             "eu_roaming": True,
         },
-        prices=[(_m(ref, -30), 39.95, "monthly"), (_m(ref, -8), 42.95, "monthly", "Preisanpassung")],
+        prices=[
+            (_m(ref, -30), 39.95, "monthly"),
+            (_m(ref, -8), 42.95, "monthly", "Preisanpassung"),
+            (_m(ref, -14) + timedelta(days=14), 18.40, "once", "Auslandstelefonate", {"kind": "extra"}),
+            (_m(ref, -3) + timedelta(days=9), 12.99, "once", "Roaming (Schweiz)", {"kind": "extra"}),
+        ],
     )
     db.flush()
     mobile.offers.append(

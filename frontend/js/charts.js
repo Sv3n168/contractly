@@ -95,7 +95,7 @@ export function stackedBars(canvas, months, series, { highlightFrom = null } = {
  * chain total, so a provider switch continues the curve instead of restarting it; the
  * segment color shows which contract was active.
  */
-export function chainLine(canvas, months, series, colors, { currentMonth } = {}) {
+export function chainLine(canvas, months, series, colors, { currentMonth, extras = [] } = {}) {
   const opts = base();
   const todayIdx = months.indexOf(currentMonth);
   const activeAt = (i) => {
@@ -110,6 +110,7 @@ export function chainLine(canvas, months, series, colors, { currentMonth } = {})
   opts.plugins.tooltip.callbacks.label = (ctx) => {
     const i = ctx.dataIndex;
     const parts = series.filter((s) => s.values[i]).map((s) => ` ${s.name}: ${money(s.values[i])}`);
+    if (extras[i]) parts.push(` davon Zusatzkosten: ${money(extras[i])}`);
     return parts.length ? parts : " –";
   };
   opts.plugins.tooltip.filter = () => true;
@@ -126,7 +127,11 @@ export function chainLine(canvas, months, series, colors, { currentMonth } = {})
           fill: true,
           stepped: "before",
           borderWidth: 2,
-          pointRadius: 0,
+          // Months with additional charges get a visible marker.
+          pointRadius: (ctx) => (extras[ctx.dataIndex] ? 4 : 0),
+          pointBackgroundColor: (ctx) => colors[activeAt(ctx.dataIndex)],
+          pointBorderColor: cssVar("--surface"),
+          pointBorderWidth: 2,
           pointHoverRadius: 5,
           pointHoverBorderWidth: 2,
           pointHoverBorderColor: cssVar("--surface"),

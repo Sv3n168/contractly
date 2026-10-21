@@ -1,5 +1,7 @@
 from datetime import date
 
+import pytest
+
 from app import calc
 from app.models import Contract, Offer, PriceEntry
 
@@ -89,3 +91,25 @@ def test_monthly_cancellable_after_min_term():
     assert calc.term_info(c, date(2025, 6, 1)).flexible
     yearly = make(date(2020, 1, 1), [], min_term_months=12, renewal_months=12, notice_value=3, notice_unit="months")
     assert not calc.term_info(yearly, date(2025, 6, 1)).flexible
+
+
+def test_extra_charge_only_affects_its_month():
+    """Calls abroad make one month more expensive; the next month is back to the base price."""
+    c = make(date(2024, 1, 1), [(date(2024, 1, 1), 40, "monthly")])
+    c.prices.append(
+        PriceEntry(
+            valid_from=date(2024, 3, 12), amount=15.5, interval="once", note="Ausland", details={"kind": "extra"}
+        )
+    )
+    costs = calc.monthly_costs(c, date(2024, 2, 1), date(2024, 4, 30))
+    assert costs == {"2024-02": 40.0, "2024-03": 55.5, "2024-04": 40.0}
+    assert calc.current_monthly_cost(c, date(2024, 3, 20)) == 40
+    assert calc.extras_by_month(c, date(2024, 1, 1), date(2024, 12, 31)) == {"2024-03": 15.5}
+    assert calc.average_extras(c, date(2024, 12, 15)) == pytest.approx(15.5 / 12)
+
+
+def test_projection_with_average_extras():
+    c = make(date(2024, 1, 1), [(date(2024, 1, 1), 40, "monthly")])
+    c.prices.append(PriceEntry(valid_from=date(2024, 5, 3), amount=24, interval="once", details={"kind": "extra"}))
+    costs = calc.monthly_costs(c, date(2025, 1, 1), date(2025, 1, 31), today=date(2024, 12, 10), extra_monthly=2)
+    assert costs == {"2025-01": 42.0}

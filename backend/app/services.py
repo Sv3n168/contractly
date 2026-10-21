@@ -87,6 +87,12 @@ def total_paid(c: Contract, ref: date) -> float:
     return round(sum(calc.monthly_costs(c, c.start_date, last, clip=True).values()), 2)
 
 
+def _extras_fields(c: Contract, ref: date) -> dict:
+    first = calc.month_start(calc.add_months(ref, -11))
+    extras = calc.extras_by_month(c, first, ref)
+    return {"extras_12m": round(sum(extras.values()), 2), "extras_months_12m": sum(1 for v in extras.values() if v)}
+
+
 def contract_detail(c: Contract, ref: date | None = None) -> ContractOut:
     ref = ref or today()
     return ContractOut(
@@ -107,6 +113,7 @@ def contract_detail(c: Contract, ref: date | None = None) -> ContractOut:
         meter_readings=[MeterReadingOut.model_validate(m) for m in c.meter_readings],
         reminders=[ReminderOut.model_validate(r) for r in c.reminders if r.done_at is None],
         total_paid=total_paid(c, ref),
+        **_extras_fields(c, ref),
         switch_savings=calc.switch_savings(c, ref),
         energy=calc.energy_analysis(c, ref) if is_energy(c.category) else None,
     )

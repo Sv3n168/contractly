@@ -1,5 +1,7 @@
 from datetime import date, timedelta
 
+import pytest
+
 from app.calc import add_months
 
 
@@ -129,3 +131,33 @@ def test_demo_and_projection(client):
 def test_profile(client):
     assert client.put("/api/profile", json={"name": "Max Mustermann", "zip_city": "12345 Berlin"}).status_code == 200
     assert client.get("/api/profile").json()["name"] == "Max Mustermann"
+
+
+def test_extra_charges(client):
+    c = _create(client, name="Handy", category="mobile")
+    month = add_months(date.today(), -1).replace(day=15)
+    r = client.post(
+        f"/api/contracts/{c['id']}/prices",
+        json={
+            "valid_from": month.isoformat(),
+            "amount": 12.5,
+            "interval": "once",
+            "note": "Roaming",
+            "details": {"kind": "extra"},
+        },
+    )
+    assert r.status_code == 201
+    detail = client.get(f"/api/contracts/{c['id']}").json()
+    assert detail["monthly_cost"] == 35  # base price unchanged
+    assert detail["extras_12m"] == 12.5
+    assert detail["extras_months_12m"] == 1
+    hist = client.get(f"/api/contracts/{c['id']}/history").json()
+    idx = hist["months"].index(f"{month.year:04d}-{month.month:02d}")
+    assert hist["totals"][idx] == 47.5
+    assert hist["extras"][idx] == 12.5
+    assert hist["totals"][idx + 1] == 35
+    with_extras = client.get("/api/stats/projection?months=12&include_extras=true").json()
+    without = client.get("/api/stats/projection?months=12").json()
+    # 12.5 € spread as Ø per month over 12 months (rounded per month)
+    assert with_extras["sum"] - without["sum"] == pytest.approx(12.5, abs=0.1)
+    assert client.get("/api/stats/summary").json()["extras_12m"] == 12.5

@@ -5,7 +5,7 @@ import { legendHtml, lines, stackedBars } from "../charts.js";
 import { GROUPS, catColor, catIcon, catLabel, cssVar, groupOf, slotColor } from "../store.js";
 import { $, esc, fmtMonth, icon, isoDate, money } from "../ui.js";
 
-const prefs = { range: 24, group: "category", months: 24, increase: 3 };
+const prefs = { range: 24, group: "category", months: 24, increase: 3, extras: true };
 
 function fold(series, months) {
   const grouped = GROUPS.map((g) => ({ ...g, color: slotColor(g.slot), values: months.map(() => 0) }));
@@ -38,6 +38,8 @@ export async function renderCosts(view) {
           <input type="range" class="range" id="months" min="6" max="120" step="6" value="${prefs.months}"/></label>
         <label class="field"><span>Preissteigerung: <b id="i-out">${prefs.increase}</b> % pro Jahr</span>
           <input type="range" class="range" id="increase" min="0" max="15" step="0.5" value="${prefs.increase}"/></label>
+        <label class="check span-2" style="align-self:end"><input type="checkbox" id="extras" ${prefs.extras ? "checked" : ""}/>
+          Ø Zusatzkosten der letzten 12 Monate einrechnen <span class="muted small" id="x-out"></span></label>
       </div>
       <div class="kpis" id="proj-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
       <div class="chart-box"><canvas id="proj"></canvas></div>
@@ -79,16 +81,17 @@ export async function renderCosts(view) {
   };
 
   const drawProjection = async () => {
-    const p = await api.projection({ months: prefs.months, increase_pct: prefs.increase, group: "contract" });
+    const p = await api.projection({ months: prefs.months, increase_pct: prefs.increase, group: "contract", include_extras: prefs.extras });
+    $("#x-out", view).textContent = p.extras_monthly ? `(≈ ${money(p.extras_monthly)}/Monat)` : "(bisher keine)";
     const extra = p.sum - p.sum_without_increase;
     $("#proj-kpis", view).innerHTML = `
       <div class="card kpi hero"><div class="kpi-label">Gesamt in ${prefs.months} Monaten</div><div class="kpi-value num">${money(p.sum, true)}</div>
-        <div class="kpi-sub">Ø ${money(p.sum / prefs.months)} pro Monat</div></div>
+        <div class="kpi-sub">Ø ${money(p.sum / prefs.months)} pro Monat${prefs.extras && p.extras_monthly ? " inkl. Zusatzkosten" : ""}</div></div>
       <div class="card kpi"><div class="kpi-label">Davon Preissteigerung</div><div class="kpi-value num">${money(extra, true)}</div>
         <div class="kpi-sub">bei ${prefs.increase} % p.a.</div></div>
       <div class="card kpi"><div class="kpi-label">Letzter Monat</div><div class="kpi-value num">${money(p.totals[p.totals.length - 1])}</div>
         <div class="kpi-sub">${fmtMonth(p.months[p.months.length - 1])}</div></div>`;
-    const base = await api.projection({ months: prefs.months, increase_pct: 0, group: "contract" });
+    const base = await api.projection({ months: prefs.months, increase_pct: 0, group: "contract", include_extras: prefs.extras });
     lines($("#proj", view), p.months, [
       { label: `Mit ${prefs.increase} % Steigerung`, values: p.totals, color: slotColor(1), fill: true },
       { label: "Ohne Steigerung", values: base.totals, color: cssVar("--muted"), dash: true },
@@ -147,6 +150,10 @@ export async function renderCosts(view) {
     prefs.increase = Number(e.target.value);
     $("#i-out", view).textContent = prefs.increase.toLocaleString("de-DE");
     debounced();
+  });
+  $("#extras", view).addEventListener("change", (e) => {
+    prefs.extras = e.target.checked;
+    drawProjection();
   });
   await Promise.all([drawHistory(), drawProjection()]);
 }

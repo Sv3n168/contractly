@@ -125,6 +125,7 @@ def summary(
     price_changes.sort(key=lambda p: p["date"], reverse=True)
 
     savings = [v for v in (calc.switch_savings(c, ref) for c in contracts) if v is not None]
+    extras_12m = round(sum(calc.average_extras(c, ref) * 12 for c in contracts), 2)
 
     top = sorted(running, key=lambda s: s.monthly_cost, reverse=True)[:5]
     return {
@@ -137,6 +138,7 @@ def summary(
         "ytd_total": round(ytd, 2),
         "switch_savings": round(sum(savings), 2),
         "switch_count": len(savings),
+        "extras_12m": extras_12m,
         "by_category": categories,
         "deadlines": deadlines,
         "price_changes": price_changes[:8],
@@ -144,11 +146,20 @@ def summary(
     }
 
 
-def _series(contracts, first: date, last: date, group: str, increase_pct: float = 0.0, ref: date | None = None):
+def _series(
+    contracts,
+    first: date,
+    last: date,
+    group: str,
+    increase_pct: float = 0.0,
+    ref: date | None = None,
+    include_extras: bool = False,
+):
     months = [calc.month_key(m) for m in calc.iter_months(first, last)]
     grouped: dict[str, dict] = {}
     for c in contracts:
-        costs = calc.monthly_costs(c, first, last, increase_pct=increase_pct, today=ref)
+        extra = calc.average_extras(c, ref) if include_extras and ref else 0.0
+        costs = calc.monthly_costs(c, first, last, increase_pct=increase_pct, today=ref, extra_monthly=extra)
         if not any(costs.values()):
             continue
         if group == "category":
@@ -197,6 +208,7 @@ def projection(
     months: int = Query(24, ge=1, le=120),
     increase_pct: float = Query(0.0, ge=-50, le=100),
     group: str = Query("category", pattern="^(category|contract)$"),
+    include_extras: bool = Query(False, description="Add the average additional charges of the last 12 months"),
     db: Session = Depends(get_db),
 ):
     """Forecast of future costs based on current prices, known end dates and an optional yearly increase."""
@@ -204,8 +216,8 @@ def projection(
     contracts = load_contracts(db)
     first = calc.add_months(calc.month_start(ref), 1)
     last = calc.month_end(calc.add_months(first, months - 1))
-    labels, series, totals = _series(contracts, first, last, group, increase_pct, ref)
-    _, _, base_totals = _series(contracts, first, last, group, 0.0, ref)
+    labels, series, totals = _series(contracts, first, last, group, increase_pct, ref, include_extras)
+    _, _, base_totals = _series(contracts, first, last, group, 0.0, ref, include_extras)
     yearly: dict[str, float] = defaultdict(float)
     for m, v in zip(labels, totals, strict=False):
         yearly[m[:4]] += v
@@ -217,6 +229,8 @@ def projection(
         "sum_without_increase": round(sum(base_totals), 2),
         "yearly": {k: round(v, 2) for k, v in sorted(yearly.items())},
         "increase_pct": increase_pct,
+        "include_extras": include_extras,
+        "extras_monthly": round(sum(calc.average_extras(c, ref) for c in contracts if c.end_date is None), 2),
     }
 
 

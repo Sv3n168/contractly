@@ -29,6 +29,7 @@ import { contractPayload, suggestionPicker } from "./ocr.js";
 import { openLetter } from "./letter.js";
 import { navigate, refreshBadge } from "../app.js";
 import { reminderForm } from "./reminders.js";
+import { basePriceAt, extraModal, isExtra, monthLabel } from "./extras.js";
 
 export async function renderContractDetail(view, id, query = {}) {
   const c = await api.contract(id);
@@ -56,6 +57,7 @@ export async function renderContractDetail(view, id, query = {}) {
         <div class="menu">
           <button class="btn btn-icon" data-menu aria-label="Mehr Aktionen">${icon("more")}</button>
           <div class="menu-pop">
+            <button data-act="extra">${icon("plus")} Zusatzkosten erfassen</button>
             <button data-act="price">${icon("euro")} Preisänderung erfassen</button>
             ${
               c.state === "active"
@@ -93,6 +95,7 @@ export async function renderContractDetail(view, id, query = {}) {
     const act = e.target.closest("[data-act]")?.dataset.act;
     if (!act) return;
     if (act === "price") priceModal(c, null, () => reload("prices"));
+    if (act === "extra") extraModal(c, null, () => reload());
     if (act === "cancel") cancelModal(c, () => reload());
     if (act === "reactivate") {
       await api.reactivateContract(id);
@@ -151,7 +154,9 @@ async function overviewTab(el, c, reload) {
         <div class="kpi-sub">${c.current_price && c.current_price.interval !== "monthly" ? `${money(c.current_price.amount)} ${intervalLabel(c.current_price.interval)}` : "aktueller Preis"}</div>
       </div>
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("calendar")}</span>Pro Jahr</div>
-        <div class="kpi-value num">${money(c.yearly_cost)}</div><div class="kpi-sub">hochgerechnet</div></div>
+        <div class="kpi-value num">${money(c.yearly_cost)}</div><div class="kpi-sub">${
+          c.extras_12m ? `+ ${money(c.extras_12m)} Zusatzkosten (12 M.)` : "hochgerechnet"
+        }</div></div>
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("layers")}</span>Bisher bezahlt</div>
         <div class="kpi-value num">${money(c.total_paid, true)}</div><div class="kpi-sub">in ${durationText(Math.max(runtime, 0))} Laufzeit</div></div>
       ${
@@ -166,8 +171,9 @@ async function overviewTab(el, c, reload) {
     </div>
 
     <div class="card" style="margin-bottom:20px">
-      <div class="card-head"><div><h2>Kostenverlauf</h2>
-        <p>${chain.length > 1 ? `Durchgehend über alle Wechsel: ${chain.map((x) => esc(x.name)).join(" → ")}` : "Monatliche Kosten · gestrichelt = Vorschau"}</p></div></div>
+      <div class="card-head" style="align-items:flex-start"><div><h2>Kostenverlauf</h2>
+        <p>${chain.length > 1 ? `Durchgehend über alle Wechsel: ${chain.map((x) => esc(x.name)).join(" → ")}` : "Monatliche Kosten · gestrichelt = Vorschau"}${hist.extras.some((v) => v) ? " · Punkte = Monate mit Zusatzkosten" : ""}</p></div>
+        ${c.state !== "ended" ? `<button class="btn btn-sm" id="extra-btn">${icon("plus")} Zusatzkosten</button>` : ""}</div>
       <div class="chart-box"><canvas id="hist"></canvas></div>
       ${hist.series.length > 1 ? legendHtml(hist.series.map((s, i) => ({ label: esc(s.name), color: colors[i] }))) : ""}
       ${
@@ -237,7 +243,8 @@ async function overviewTab(el, c, reload) {
       </div>
     </div>`;
 
-  chainLine($("#hist", el), hist.months, hist.series, colors, { currentMonth: hist.current_month });
+  chainLine($("#hist", el), hist.months, hist.series, colors, { currentMonth: hist.current_month, extras: hist.extras });
+  $("#extra-btn", el)?.addEventListener("click", () => extraModal(c, null, () => reload()));
   $("#cancel-btn", el)?.addEventListener("click", () => cancelModal(c, () => reload()));
   $("#letter-btn", el)?.addEventListener("click", () => openLetter(c));
 }
@@ -304,46 +311,87 @@ function progressPct(a, b) {
 // ------------------------------------------------------------------ prices
 
 function pricesTab(el, c, reload) {
-  const rows = [...c.prices].sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+  const recurring = c.prices.filter((p) => p.interval !== "once").sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+  const once = c.prices.filter((p) => p.interval === "once").sort((a, b) => b.valid_from.localeCompare(a.valid_from));
+  const actions = (p) => `<td class="r" style="white-space:nowrap">
+      <button class="btn btn-ghost btn-sm" data-edit="${p.id}" aria-label="Bearbeiten">${icon("edit")}</button>
+      <button class="btn btn-ghost btn-sm btn-danger" data-del="${p.id}" aria-label="Löschen">${icon("trash")}</button></td>`;
   el.innerHTML = `
-    <div class="card">
-      <div class="card-head"><div><h2>Preishistorie</h2><p>Jede Preisänderung gilt ab ihrem Datum bis zur nächsten.</p></div>
-        <div class="page-actions">
-          <button class="btn btn-sm" data-add="once">${icon("plus")} Einmalzahlung / Bonus</button>
-          <button class="btn btn-sm btn-primary" data-add="price">${icon("plus")} Preisänderung</button>
-        </div></div>
+    <div class="card" style="margin-bottom:20px">
+      <div class="card-head"><div><h2>Preishistorie</h2><p>Der reguläre Preis – jede Änderung gilt ab ihrem Datum bis zur nächsten.</p></div>
+        <button class="btn btn-sm btn-primary" data-add="price">${icon("plus")} Preisänderung</button></div>
       ${
-        rows.length
+        recurring.length
           ? `<div class="table-wrap"><table class="table"><thead><tr>
               <th>Gültig ab</th><th class="r">Betrag</th><th>Zahlweise</th><th class="r">pro Monat</th><th class="r">Änderung</th><th>Notiz</th><th></th></tr></thead><tbody>
-              ${rows
-                .map((p) => {
-                  const prev = rows.find((x) => x.interval !== "once" && x.valid_from < p.valid_from);
-                  const diff = p.interval !== "once" && prev ? p.monthly_equivalent - prev.monthly_equivalent : null;
+              ${recurring
+                .map((p, i) => {
+                  const prev = recurring[i + 1];
+                  const diff = prev ? p.monthly_equivalent - prev.monthly_equivalent : null;
                   return `<tr>
                     <td class="num">${fmtDate(p.valid_from)}</td>
                     <td class="r num"><b>${money(p.amount)}</b></td>
-                    <td>${p.interval === "once" ? `<span class="badge ${p.amount < 0 ? "good" : ""}">${p.amount < 0 ? "Gutschrift" : "einmalig"}</span>` : intervalLabel(p.interval)}</td>
-                    <td class="r num">${p.interval === "once" ? "–" : money(p.monthly_equivalent)}</td>
+                    <td>${intervalLabel(p.interval)}</td>
+                    <td class="r num">${money(p.monthly_equivalent)}</td>
                     <td class="r num">${diff ? `<span class="${diff > 0 ? "worse" : "better"}">${signedMoney(diff)}</span>` : ""}</td>
                     <td class="muted">${esc(p.note || "")}${p.details?.unit_price_ct ? ` <span class="small">(${num(p.details.base_price_month)} €/M + ${num(p.details.unit_price_ct)} ct)</span>` : ""}</td>
-                    <td class="r" style="white-space:nowrap"><button class="btn btn-ghost btn-sm" data-edit="${p.id}" aria-label="Bearbeiten">${icon("edit")}</button>
-                      <button class="btn btn-ghost btn-sm btn-danger" data-del="${p.id}" aria-label="Löschen">${icon("trash")}</button></td></tr>`;
+                    ${actions(p)}</tr>`;
                 })
                 .join("")}</tbody></table></div>`
           : `<p class="muted">Noch keine Preise erfasst.</p>`
+      }
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>Zusatzkosten & Einmalzahlungen</h2>
+        <p>Teurere Monate (z. B. Auslandstelefonate), Gebühren, Boni und Gutschriften – ändern den regulären Preis nicht.</p></div>
+        <div class="page-actions">
+          <button class="btn btn-sm" data-add="once">${icon("plus")} Einmalzahlung / Bonus</button>
+          <button class="btn btn-sm btn-primary" data-add="extra">${icon("plus")} Zusatzkosten</button>
+        </div></div>
+      ${
+        c.extras_12m
+          ? `<div class="callout" style="margin-bottom:14px">${icon("info")}<div>Letzte 12 Monate: <b>${money(c.extras_12m)}</b> Zusatzkosten in
+             ${c.extras_months_12m} Monat${c.extras_months_12m === 1 ? "" : "en"} – im Schnitt <b>${money(c.extras_12m / 12)}</b> pro Monat zusätzlich.</div></div>`
+          : ""
+      }
+      ${
+        once.length
+          ? `<div class="table-wrap"><table class="table"><thead><tr><th>Monat</th><th>Art</th><th>Grund</th><th class="r">Betrag</th><th class="r">Rechnung gesamt</th><th></th></tr></thead><tbody>
+              ${once
+                .map((p) => {
+                  const extra = isExtra(p);
+                  const ym = p.valid_from.slice(0, 7);
+                  const kind = extra
+                    ? `<span class="badge warn">Zusatzkosten</span>`
+                    : `<span class="badge ${p.amount < 0 ? "good" : ""}">${p.amount < 0 ? "Gutschrift" : "einmalig"}</span>`;
+                  return `<tr>
+                    <td class="num">${extra ? esc(monthLabel(ym)) : fmtDate(p.valid_from)}</td>
+                    <td>${kind}</td>
+                    <td class="muted">${esc(p.note || "")}</td>
+                    <td class="r num"><b class="${p.amount > 0 ? "" : "better"}">${signedMoney(p.amount)}</b></td>
+                    <td class="r num muted">${extra ? money(basePriceAt(c, ym) + p.amount) : "–"}</td>
+                    ${actions(p)}</tr>`;
+                })
+                .join("")}</tbody></table></div>`
+          : `<p class="muted" style="margin:0">Keine Zusatzkosten erfasst. War eine Rechnung mal höher als sonst? Einfach oben eintragen.</p>`
       }
     </div>`;
   el.addEventListener("click", async (e) => {
     const add = e.target.closest("[data-add]");
     const edit = e.target.closest("[data-edit]");
     const del = e.target.closest("[data-del]");
-    if (add) priceModal(c, add.dataset.add === "once" ? { interval: "once" } : null, () => reload("prices"));
-    if (edit) priceModal(c, c.prices.find((p) => p.id === Number(edit.dataset.edit)), () => reload("prices"));
-    if (del && (await confirmDialog("Diesen Preiseintrag löschen?"))) {
+    const done = () => reload("prices");
+    if (add?.dataset.add === "extra") extraModal(c, null, done);
+    else if (add) priceModal(c, add.dataset.add === "once" ? { interval: "once" } : null, done);
+    if (edit) {
+      const p = c.prices.find((x) => x.id === Number(edit.dataset.edit));
+      if (isExtra(p)) extraModal(c, p, done);
+      else priceModal(c, p, done);
+    }
+    if (del && (await confirmDialog("Diesen Eintrag löschen?"))) {
       await api.deletePrice(c.id, del.dataset.del);
       toast("Gelöscht");
-      reload("prices");
+      done();
     }
   });
 }

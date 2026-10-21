@@ -66,6 +66,29 @@ def energy_monthly_cost(base_price_month, unit_price_ct, consumption_kwh) -> flo
     return base + work
 
 
+EXTRA = "extra"
+
+
+def is_extra(p: PriceEntry) -> bool:
+    """One-off additional charge for a single month (e.g. roaming, calls abroad)."""
+    return p.interval == "once" and (p.details or {}).get("kind") == EXTRA
+
+
+def extras_by_month(contract: Contract, first: date, last: date) -> dict[str, float]:
+    result: dict[str, float] = {}
+    for p in contract.prices:
+        if is_extra(p) and first <= p.valid_from <= last:
+            key = month_key(p.valid_from)
+            result[key] = round(result.get(key, 0.0) + p.amount, 2)
+    return result
+
+
+def average_extras(contract: Contract, today: date, months: int = 12) -> float:
+    """Average additional charges per month over the last ``months`` months."""
+    first = month_start(add_months(today, -(months - 1)))
+    return sum(extras_by_month(contract, first, today).values()) / months
+
+
 def recurring_prices(contract: Contract) -> list[PriceEntry]:
     return sorted((p for p in contract.prices if p.interval != "once"), key=lambda p: p.valid_from)
 
@@ -121,12 +144,13 @@ def monthly_costs(
     increase_pct: float = 0.0,
     today: date | None = None,
     clip: bool = False,
+    extra_monthly: float = 0.0,
 ) -> dict[str, float]:
     """Cost per month (prorated by days) between the months of ``first`` and ``last``.
 
     ``increase_pct`` applies a compounding yearly increase to months after ``today``
-    (used for projections). With ``clip`` the costs stop exactly at ``last`` instead of
-    covering its whole month.
+    (used for projections), ``extra_monthly`` adds expected additional charges to those
+    months. With ``clip`` the costs stop exactly at ``last`` instead of covering its whole month.
     """
     result = {month_key(m): 0.0 for m in iter_months(first, last)}
     horizon_end = last if clip else month_end(last)
@@ -138,9 +162,11 @@ def monthly_costs(
                 continue
             factor = overlap / m_last.day
             amount = monthly * factor
-            if increase_pct and today and m_first > today:
-                years = (m_first - today).days / 365.25
-                amount *= (1 + increase_pct / 100) ** years
+            if today and m_first > today:
+                if increase_pct:
+                    years = (m_first - today).days / 365.25
+                    amount *= (1 + increase_pct / 100) ** years
+                amount += extra_monthly * factor
             key = month_key(m)
             if key in result:
                 result[key] += amount

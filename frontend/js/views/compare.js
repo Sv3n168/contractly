@@ -149,7 +149,9 @@ function currentCard(c, ev) {
     <dl>
       <dt>${ev.horizon_months} Monate gesamt</dt><dd class="num">${money(ev.current_monthly * ev.horizon_months)}</dd>
       <dt>Pro Jahr</dt><dd class="num">${money(ev.current_monthly * 12)}</dd>
+      ${c.extras_12m ? `<dt>Ø Zusatzkosten</dt><dd class="num">${money(c.extras_12m / 12)}/M</dd>` : ""}
     </dl>
+    ${c.extras_12m ? `<p class="small muted" style="margin:0">Zusatzkosten (z. B. Ausland) sind im Vergleich nicht eingerechnet – prüfe, ob das neue Angebot sie abdeckt.</p>` : ""}
   </div>`;
 }
 

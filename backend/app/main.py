@@ -37,6 +37,10 @@ CSP = (
     "connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
 )
 
+# The camera is used via <input capture>, which needs no permission; everything else is off.
+PERMISSIONS = "camera=(self), microphone=(), geolocation=(), payment=(), usb=()"
+SAFE_METHODS = {"GET", "HEAD", "OPTIONS"}
+
 
 def is_public(path: str) -> bool:
     return (
@@ -74,6 +78,7 @@ def _session_user(token: str | None) -> str:
 async def lifespan(app: FastAPI):
     # All user databases stay closed (encrypted) until their owner logs in.
     settings.ensure_dirs()
+    auth.log_setup_code()
     tasks = []
     if app.state.background:
         tasks = [asyncio.create_task(notifier_loop()), asyncio.create_task(backup_loop())]
@@ -96,6 +101,9 @@ def create_app(background: bool = True) -> FastAPI:
     async def require_login(request: Request, call_next):
         path = request.url.path
         request.state.user_id = None
+        # Browsers mark requests from other sites; changing data that way is never legitimate (CSRF).
+        if request.method not in SAFE_METHODS and request.headers.get("sec-fetch-site") in ("cross-site", "same-site"):
+            return JSONResponse(status_code=403, content={"detail": "Anfrage von fremder Seite abgelehnt"})
         if not is_public(path):
             # File and database access (users.json, sessions.db, opening the area) off the event loop.
             user_id = await asyncio.to_thread(_session_user, request.cookies.get(COOKIE))
@@ -107,6 +115,11 @@ def create_app(background: bool = True) -> FastAPI:
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
         response.headers.setdefault("Referrer-Policy", "no-referrer")
+        response.headers.setdefault("Permissions-Policy", PERMISSIONS)
+        response.headers.setdefault("Cross-Origin-Opener-Policy", "same-origin")
+        response.headers.setdefault("Cross-Origin-Resource-Policy", "same-origin")
+        if request.url.scheme == "https":  # behind a TLS proxy (X-Forwarded-Proto from a trusted proxy)
+            response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
         if response.headers.get("content-type", "").startswith("text/html"):
             response.headers.setdefault("Content-Security-Policy", CSP)
         if path.startswith("/api/"):

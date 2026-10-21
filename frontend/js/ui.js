@@ -138,7 +138,7 @@ export function formData(form) {
 
 // ------------------------------------------------------------------ toast
 
-export function toast(message, type = "ok") {
+export function toast(message, type = "ok", duration = null) {
   let root = $(".toasts");
   if (!root) {
     root = document.createElement("div");
@@ -153,7 +153,7 @@ export function toast(message, type = "ok") {
     el.style.transition = "opacity .3s";
     el.style.opacity = "0";
     setTimeout(() => el.remove(), 300);
-  }, type === "error" ? 5000 : 2600);
+  }, duration ?? (type === "error" ? 5000 : 2600));
 }
 
 // ------------------------------------------------------------------ modal

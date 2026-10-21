@@ -101,6 +101,10 @@ def new_recovery_key() -> str:
     return _random_code(25)
 
 
+def new_setup_code() -> str:
+    return _random_code(10)
+
+
 def normalize_code(text: str) -> str:
     raw = "".join(ch for ch in (text or "").upper() if ch.isalnum())
     return "-".join(raw[i : i + 5] for i in range(0, len(raw), 5))
@@ -110,9 +114,60 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def validate_password(password: str) -> None:
-    if len(password or "") < MIN_PASSWORD_LENGTH:
+# Frequently used passwords of the minimum length (from public leak statistics) and obvious patterns.
+COMMON_PASSWORDS = {
+    "1234567890",
+    "12345678910",
+    "123456789012",
+    "0987654321",
+    "1111111111",
+    "0000000000",
+    "qwertzuiop",
+    "qwertyuiop",
+    "asdfghjkl1",
+    "passwort123",
+    "password123",
+    "passwort1234",
+    "password1234",
+    "hallo12345",
+    "hallo123456",
+    "schatz1234",
+    "geheim1234",
+    "iloveyou12",
+    "willkommen1",
+    "willkommen123",
+    "fussball123",
+    "sommer2024",
+    "sommer2025",
+    "sommer2026",
+    "winter2025",
+    "winter2026",
+    "contractly1",
+    "contractly123",
+    "administrator",
+    "admin12345",
+    "abcdefghij",
+    "abc1234567",
+    "1q2w3e4r5t",
+    "1qay2wsx3edc",
+    "qwertz1234",
+    "qwerty1234",
+}
+
+
+def validate_password(password: str, username: str | None = None) -> None:
+    password = password or ""
+    if len(password) < MIN_PASSWORD_LENGTH:
         raise VaultError(f"Das Passwort muss mindestens {MIN_PASSWORD_LENGTH} Zeichen lang sein")
+    lowered = password.lower()
+    name = (username or "").strip().lower()
+    if (
+        lowered in COMMON_PASSWORDS
+        or len(set(lowered)) < 4
+        or (len(name) >= 3 and name in lowered)
+        or "contractly" in lowered
+    ):
+        raise VaultError("Dieses Passwort ist zu leicht zu erraten – bitte ein anderes wählen")
 
 
 def validate_username(username: str) -> str:
@@ -137,12 +192,20 @@ def totp_code(secret: str, at: float | None = None, step: int = 30) -> str:
     return f"{value % 1_000_000:06d}"
 
 
-def verify_totp(secret: str, code: str, window: int = 1) -> bool:
+def totp_step(secret: str, code: str, window: int = 1) -> int | None:
+    """Time step the code belongs to (None if invalid); lets callers reject a reused code."""
     code = "".join(ch for ch in (code or "") if ch.isdigit())
+    if len(code) != 6:
+        return None
     now = time.time()
-    return len(code) == 6 and any(
-        hmac.compare_digest(totp_code(secret, now + i * 30), code) for i in range(-window, window + 1)
-    )
+    for i in range(-window, window + 1):
+        if hmac.compare_digest(totp_code(secret, now + i * 30), code):
+            return int((now + i * 30) // 30)
+    return None
+
+
+def verify_totp(secret: str, code: str, window: int = 1) -> bool:
+    return totp_step(secret, code, window) is not None
 
 
 class TotpRequired(VaultError):
@@ -179,7 +242,6 @@ class Vault:
         self._path = path
         self._keys: dict[str, bytes] = {}
         self._lock = threading.RLock()
-        self._failures: dict[str, list[float]] = {}
         # Called with a user id when that user's key is dropped (closes the database).
         self.on_lock: Callable[[str], None] | None = None
 
@@ -281,7 +343,7 @@ class Vault:
 
     def _activate(self, user: dict, password: str) -> str:
         """Create the user's data key. Returns the recovery key."""
-        validate_password(password)
+        validate_password(password, user["username"])
         dek = secrets.token_bytes(32)
         recovery = new_recovery_key()
         calendar_token = secrets.token_urlsafe(24)
@@ -375,24 +437,45 @@ class Vault:
             # Spend the KDF time anyway so usernames can't be probed by timing.
             _kdf(password or "", b"0" * 16)
             raise InvalidCredentials()
-        dek = _unwrap(user["password"], password)
-        if user.get("totp"):
-            # The 2FA secret itself is encrypted with the data key.
-            secret = decrypt_bytes(_unb64(user["totp"]), subkey(dek, "totp")).decode()
-            if not totp:
-                raise TotpRequired("totp_required")
-            if not verify_totp(secret, totp):
-                raise InvalidCredentials("invalid totp")
+        step = None
+        try:
+            dek = _unwrap(user["password"], password)
+            if user.get("totp"):
+                # The 2FA secret itself is encrypted with the data key.
+                secret = decrypt_bytes(_unb64(user["totp"]), subkey(dek, "totp")).decode()
+                if not totp:
+                    raise TotpRequired("totp_required")
+                step = totp_step(secret, totp)
+                if step is None or step <= user.get("totp_step", 0):  # each code works only once
+                    raise InvalidCredentials("invalid totp")
+        except InvalidCredentials:
+            self._note_failed_login(user["id"])
+            raise
         self._keys[user["id"]] = dek
-        self._update(user["id"], lambda u: u.__setitem__("last_login", int(time.time())))
-        return user
+
+        def fn(u):
+            u["last_login"] = int(time.time())
+            u.pop("failed_logins", None)
+            u.pop("last_failed_login", None)
+            if step is not None:
+                u["totp_step"] = step
+
+        self._update(user["id"], fn)
+        return user  # as before the login: still carries the failed-login counters for the notice
+
+    def _note_failed_login(self, user_id: str) -> None:
+        def fn(u):
+            u["failed_logins"] = u.get("failed_logins", 0) + 1
+            u["last_failed_login"] = int(time.time())
+
+        self._update(user_id, fn)
 
     def recover(self, username: str, recovery_key: str, new_password: str) -> tuple[dict, str]:
         """Forgotten password: set a new one with the recovery key. Returns a fresh recovery key."""
-        validate_password(new_password)
         user = self.find(username)
         if not user or user.get("status") != "active":
             raise InvalidCredentials()
+        validate_password(new_password, user["username"])
         dek = _unwrap(user["recovery"], normalize_code(recovery_key))
         new_recovery = new_recovery_key()
 
@@ -400,6 +483,7 @@ class Vault:
             u["password"] = _wrap(dek, new_password)
             u["recovery"] = _wrap(dek, new_recovery)
             u.pop("totp", None)  # the recovery key also helps when the 2FA phone is lost
+            u.pop("totp_step", None)
 
         self.lock_user(user["id"])  # end sessions that used the old password
         self._update(user["id"], fn)
@@ -407,7 +491,7 @@ class Vault:
         return user, new_recovery
 
     def change_password(self, user_id: str, old: str, new: str) -> None:
-        validate_password(new)
+        validate_password(new, self.user(user_id)["username"])
         dek = _unwrap(self.user(user_id)["password"], old)
         self._update(user_id, lambda u: u.__setitem__("password", _wrap(dek, new)))
         self._end_sessions_of(user_id)  # other devices have to log in again
@@ -421,14 +505,15 @@ class Vault:
     # ----------------------------------------------------------------- 2FA
 
     def enable_totp(self, user_id: str, secret: str, code: str) -> None:
-        if not verify_totp(secret, code):
+        step = totp_step(secret, code)
+        if step is None:
             raise InvalidCredentials("invalid totp")
         enc = _b64(encrypt_bytes(secret.encode(), self.key(user_id, "totp")))
-        self._update(user_id, lambda u: u.__setitem__("totp", enc))
+        self._update(user_id, lambda u: u.update({"totp": enc, "totp_step": step}))
 
     def disable_totp(self, user_id: str, password: str) -> None:
         _unwrap(self.user(user_id)["password"], password)
-        self._update(user_id, lambda u: u.pop("totp", None))
+        self._update(user_id, lambda u: [u.pop(k, None) for k in ("totp", "totp_step")])
 
     # ----------------------------------------------------------------- API token (Home Assistant)
 
@@ -486,6 +571,8 @@ class Vault:
             "CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, "
             "expires REAL NOT NULL, ttl REAL NOT NULL, wrapped BLOB NOT NULL, created REAL NOT NULL)"
         )
+        conn.execute("CREATE TABLE IF NOT EXISTS login_attempts (key TEXT NOT NULL, ts REAL NOT NULL)")
+        conn.execute("CREATE INDEX IF NOT EXISTS login_attempts_key ON login_attempts (key)")
         return conn
 
     @staticmethod
@@ -579,30 +666,37 @@ class Vault:
     def check_rate_limit(self, client: str, username: str | None = None) -> list[str]:
         """Count a login-type attempt up front (also parallel ones) per client and per username.
 
-        The username limit still applies when the client address can be spoofed or is shared
-        (reverse proxy). Returns the keys to pass to clear_failures/record_failure.
+        Stored in sessions.db, so the limit survives restarts and holds across instances. The
+        username limit still applies when the client address is shared (reverse proxy) or spoofed.
+        Returns the keys to pass to clear_failures/record_failure.
         """
         now = time.time()
         keys = [f"ip:{client}"]
         if username:
             keys.append(f"user:{username.strip().lower()}")
-        with self._lock:
+        with self._lock, closing(self._sdb()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            db.execute("DELETE FROM login_attempts WHERE ts<?", (now - 900,))
             for key in keys:
-                self._failures[key] = [t for t in self._failures.get(key, []) if now - t < 900]
-            if any(len(self._failures[k]) >= (10 if k.startswith("ip:") else 20) for k in keys):
-                raise VaultError("too many attempts")
-            for key in keys:
-                self._failures[key].append(now)
+                (count,) = db.execute("SELECT COUNT(*) FROM login_attempts WHERE key=?", (key,)).fetchone()
+                if count >= (10 if key.startswith("ip:") else 20):
+                    db.execute("COMMIT")
+                    raise VaultError("too many attempts")
+            db.executemany("INSERT INTO login_attempts VALUES (?, ?)", [(k, now) for k in keys])
+            db.execute("COMMIT")
         return keys
 
     def record_failure(self, keys: list[str]) -> None:
         """The attempt was already counted; slow the caller down a little."""
-        time.sleep(min(max(len(self._failures.get(k, [])) for k in keys), 5) * 0.4)
+        with closing(self._sdb()) as db:
+            (count,) = db.execute(
+                f"SELECT COUNT(*) FROM login_attempts WHERE key IN ({','.join('?' * len(keys))})", keys
+            ).fetchone()
+        time.sleep(min(count, 5) * 0.4)
 
     def clear_failures(self, keys: list[str]) -> None:
-        with self._lock:
-            for key in keys:
-                self._failures.pop(key, None)
+        with closing(self._sdb()) as db:
+            db.executemany("DELETE FROM login_attempts WHERE key=?", [(k,) for k in keys])
 
 
 def public_user(u: dict) -> dict:

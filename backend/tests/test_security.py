@@ -1,6 +1,7 @@
 """Encryption at rest, login, separate user areas and backups."""
 
 import sqlite3
+import time
 from datetime import date, timedelta
 
 from app import db as database
@@ -130,12 +131,12 @@ def test_separate_user_areas(client, app_env):
     with make_client() as partner:
         assert (
             partner.post(
-                "/api/auth/activate", json={"username": "partner", "code": "FALSCH", "password": "partner-passwort"}
+                "/api/auth/activate", json={"username": "partner", "code": "FALSCH", "password": "Lindenbaum-2026"}
             ).status_code
             == 401
         )
         r = partner.post(
-            "/api/auth/activate", json={"username": "partner", "code": code.lower(), "password": "partner-passwort"}
+            "/api/auth/activate", json={"username": "partner", "code": code.lower(), "password": "Lindenbaum-2026"}
         )
         assert r.status_code == 200, r.text
         assert r.json()["recovery_key"]
@@ -282,7 +283,9 @@ def test_backup_restore_all_users(client):
     _contract(client, name="Vertrag A")
     invite = client.post("/api/users", json={"username": "partner"}).json()
     with make_client() as p:
-        p.post("/api/auth/activate", json={"username": "partner", "code": invite["code"], "password": "partner-pw-123"})
+        p.post(
+            "/api/auth/activate", json={"username": "partner", "code": invite["code"], "password": "Kastanie-pw-123"}
+        )
         _contract(p, name="Vertrag Partner")
         # backup while the partner is still logged in (open database)
         name = client.post("/api/backups", json={}).json()["name"]
@@ -299,7 +302,7 @@ def test_backup_restore_all_users(client):
     assert _login(client).status_code == 200
     assert [c["name"] for c in client.get("/api/contracts").json()] == ["Vertrag A"]
     with make_client() as p:
-        assert _login(p, "partner", "partner-pw-123").status_code == 200
+        assert _login(p, "partner", "Kastanie-pw-123").status_code == 200
         assert [c["name"] for c in p.get("/api/contracts").json()] == ["Vertrag Partner"]
 
 
@@ -316,10 +319,19 @@ def test_two_factor_login(client):
     assert not vault.unlocked_users()  # password alone does not unlock
     bad = client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": "123456"})
     assert bad.status_code == 401
-    ok = client.post(
+    # the code used for activation is spent; the next one works exactly once
+    reused = client.post(
         "/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": totp_code(setup["secret"])}
     )
+    assert reused.status_code == 401
+    code = totp_code(setup["secret"], time.time() + 30)
+    ok = client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": code})
     assert ok.status_code == 200
+    assert ok.json()["failed_logins"] == 2  # wrong code + reused code, reported after login
+    client.post("/api/auth/logout")
+    again = client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": code})
+    assert again.status_code == 401
+    client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": code})
     # recovery key disables 2FA (lost phone)
     client.post("/api/auth/logout")
     client.post(
@@ -343,7 +355,7 @@ def test_home_assistant_summary(client):
         assert SECRET_NAME not in r.text
 
 
-def test_rate_limit_per_username_and_parallel_attempts():
+def test_rate_limit_per_username_and_parallel_attempts(app_env):
     """Changing client addresses (spoofed X-Forwarded-For) doesn't lift the per-account limit."""
     import pytest
 
@@ -389,3 +401,46 @@ def test_member_cannot_target_internal_network(client, monkeypatch):
         assert partner.put("/api/auth/me/settings", json={"ntfy_url": "https://ntfy.sh/topic"}).status_code == 200
     # the admin may use a self-hosted ntfy in the home network
     assert client.put("/api/auth/me/settings", json={"ntfy_url": "http://router.fritz.box/ntfy"}).status_code == 200
+
+
+def test_setup_from_outside_needs_code(app_env):
+    """A fresh instance reachable from the internet can't be claimed by a stranger."""
+    from fastapi.testclient import TestClient
+
+    from app.main import create_app
+
+    remote = TestClient(create_app(background=False), client=("203.0.113.7", 40000))
+    assert remote.get("/api/auth/status").json()["setup_code_required"] is True
+    body = {"username": "admin", "password": PASSWORD}
+    assert remote.post("/api/auth/setup", json=body).status_code == 403
+    assert remote.post("/api/auth/setup", json={**body, "setup_code": "AAAAA-BBBBB"}).status_code == 403
+    code = (app_env / "setup-code.txt").read_text()
+    assert remote.post("/api/auth/setup", json={**body, "setup_code": code.lower()}).status_code == 200
+    assert not (app_env / "setup-code.txt").exists()
+
+
+def test_cross_site_requests_and_headers(anon_client):
+    r = anon_client.post(
+        "/api/auth/login", json={"username": "admin", "password": "x"}, headers={"Sec-Fetch-Site": "cross-site"}
+    )
+    assert r.status_code == 403
+    page = anon_client.get("/")
+    for header in ("Content-Security-Policy", "Permissions-Policy", "Cross-Origin-Opener-Policy", "X-Frame-Options"):
+        assert header in page.headers
+    assert "Strict-Transport-Security" not in page.headers  # only over https
+    assert "Strict-Transport-Security" in anon_client.get("https://testserver/").headers
+
+
+def test_weak_passwords_rejected(anon_client):
+    for pw in ("passwort123", "aaaaaaaaaaaa", "mein-admin-konto", "1234567890"):
+        r = anon_client.post("/api/auth/setup", json={"username": "admin", "password": pw})
+        assert r.status_code == 400, pw
+
+
+def test_login_limit_survives_restart(client):
+    client.post("/api/auth/logout")
+    for _ in range(10):
+        _login(client, password="falsch-falsch")
+    _restart()
+    with make_client() as other:  # same address, new process state
+        assert _login(other).status_code == 429

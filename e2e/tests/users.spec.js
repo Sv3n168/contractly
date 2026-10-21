@@ -15,8 +15,8 @@ test("invite a user who gets a separate, empty area", async ({ page, browser }) 
   await other.click("[data-mode=activate]");
   await other.fill("[name=username]", "partnerin");
   await other.fill("[name=code]", code);
-  await other.fill("[name=password]", "partnerin-passwort");
-  await other.fill("[name=password2]", "partnerin-passwort");
+  await other.fill("[name=password]", "Wiesenweg-2026-x");
+  await other.fill("[name=password2]", "Wiesenweg-2026-x");
   await other.click("button[type=submit]");
   await other.check("#ack");
   await other.click("#go");

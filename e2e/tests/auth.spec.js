@@ -15,6 +15,8 @@ test("login, wrong password, logout", async ({ page }) => {
   await page.fill("[name=password]", ADMIN.password);
   await page.click("button[type=submit]");
   await expect(page.locator(".kpis")).toBeVisible();
+  // the failed attempt before is reported after the login
+  await expect(page.locator(".toast.error").last()).toContainText("1 fehlgeschlagene Anmeldeversuche");
   await page.locator(".sidebar [data-action=logout]").click();
   await expect(page.getByRole("heading", { name: "Anmelden" })).toBeVisible();
   // data is locked again

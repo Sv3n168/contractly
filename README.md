@@ -86,6 +86,33 @@ Alle Daten (Datenbank, Dokumente, Backups) liegen im Ordner `./data`.
 - **Wichtig:** Betreibe Contractly außerhalb des Heimnetzes nur hinter HTTPS (z. B. Reverse Proxy
   mit Let's Encrypt), damit Passwörter verschlüsselt übertragen werden.
 
+**Schutz der Anmeldeseite**
+
+- **Einrichtung nur durch dich:** Wird ein frisch gestartetes Contractly von außerhalb des eigenen
+  Netzes aufgerufen, verlangt die Einrichtung einen **Einrichtungscode**. Er steht im Container-Log
+  (`docker logs contractly`). Aus dem Heimnetz geht es ohne Code.
+- **Gegen Passwort-Raten:** höchstens 10 Fehlversuche pro Adresse und 20 pro Benutzername in
+  15 Minuten. Das gilt auch für Einladungscodes und Wiederherstellungsschlüssel, übersteht Neustarts
+  und gilt für alle Container gemeinsam. Jeder Fehlversuch verzögert die Antwort zusätzlich, und die
+  Passwortprüfung (scrypt) ist absichtlich langsam.
+- **Fehlversuche werden gemeldet:** Nach der Anmeldung zeigt Contractly, wie oft seit dem letzten
+  Mal ein falsches Passwort oder ein falscher 2FA-Code eingegeben wurde.
+- **Zwei-Faktor-Anmeldung** (Authenticator-App); jeder Code gilt nur einmal.
+- Leicht zu erratende Passwörter (z. B. `passwort123` oder der eigene Benutzername) werden abgelehnt.
+- Anfragen von fremden Webseiten, die Daten ändern wollen, werden abgewiesen (CSRF). Dazu kommen
+  Cookies mit `SameSite=Strict` und `HttpOnly`, eine strenge Content-Security-Policy, Schutz vor
+  Einbettung (Clickjacking) und HSTS über HTTPS.
+- **Reverse Proxy:** Die echte Adresse eines Besuchers (`X-Forwarded-For`) wird nur von Proxys aus
+  privaten Netzen übernommen (Docker-Netz, LAN). So kann sich niemand aus dem Internet eine falsche
+  Adresse geben. Läuft dein Proxy woanders, setze `FORWARDED_ALLOW_IPS` auf seine Adresse.
+- **fail2ban (optional):** Fehlversuche stehen im Log als `failed login from <IP>`. Ein Filter dafür:
+
+  ```ini
+  # /etc/fail2ban/filter.d/contractly.conf
+  [Definition]
+  failregex = failed login from <HOST>$
+  ```
+
 **Update von einer Version ohne Verschlüsselung:** Beim Einrichten des Admin-Kontos werden die
 vorhandenen Daten aus `./data` in den Bereich des Admins übernommen, verschlüsselt, und die
 unverschlüsselten Originale werden gelöscht. Die frühere Variable `CONTRACTLY_PASSWORD` wird nicht
@@ -102,6 +129,7 @@ Alle Einstellungen werden über Umgebungsvariablen gesetzt (siehe `docker-compos
 | `CONTRACTLY_PUBLIC_URL` | – | Externe URL, wird für Links in Benachrichtigungen verwendet |
 | `CONTRACTLY_MAX_UPLOAD_MB` | `25` | Maximale Dateigröße für Dokumente |
 | `PUID` / `PGID` | `1000` | Benutzer- und Gruppen-ID, der die Dateien in `./data` gehören |
+| `FORWARDED_ALLOW_IPS` | private Netze | Proxys, deren `X-Forwarded-For`/`-Proto` übernommen wird |
 | `TZ` | `Europe/Berlin` | Zeitzone |
 
 ### Erinnerungen per Push oder E-Mail

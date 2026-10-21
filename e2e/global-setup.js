@@ -2,7 +2,7 @@
 const { request } = require("@playwright/test");
 const path = require("path");
 
-const ADMIN = { username: "admin", password: "e2e-admin-passwort" };
+const ADMIN = { username: "admin", password: "e2e-Lindenblatt-42" };
 module.exports = async (config) => {
   const baseURL = config.projects[0].use.baseURL;
   const ctx = await request.newContext({ baseURL });

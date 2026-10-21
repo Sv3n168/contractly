@@ -18,7 +18,6 @@ def app_env(tmp_path, monkeypatch):
     monkeypatch.setattr("app.security.time.sleep", lambda _s: None)
     vault.lock_all()
     database.close_all()
-    vault._failures.clear()
     yield tmp_path
     vault.lock_all()
     database.close_all()
@@ -29,7 +28,7 @@ def make_client():
     """A second browser/device: own cookies, same server (no extra app lifespan)."""
     from app.main import create_app
 
-    yield TestClient(create_app(background=False))
+    yield TestClient(create_app(background=False), client=("127.0.0.1", 50000))
 
 
 @pytest.fixture()
@@ -37,7 +36,7 @@ def anon_client(app_env):
     """Client for a fresh, not yet set up installation."""
     from app.main import create_app
 
-    with TestClient(create_app(background=False)) as c:
+    with TestClient(create_app(background=False), client=("127.0.0.1", 50000)) as c:
         yield c
 
 

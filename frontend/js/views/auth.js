@@ -67,11 +67,18 @@ function render(mode) {
           : ""
       }
       <form class="stack" id="f" style="gap:14px;margin-top:18px">
+        ${
+          status.setup_code_required
+            ? `<label class="field"><span>${icon("shield", "inline")} Einrichtungscode</span>
+                <input name="setup_code" class="mono" autocomplete="off" required placeholder="XXXXX-XXXXX-XXXXX-X"/>
+                <small>Du rufst Contractly von außerhalb deines Heimnetzes auf. Zum Schutz vor Fremden steht der Code im Container-Log: <code>docker logs contractly</code></small></label>`
+            : ""
+        }
         <label class="field"><span>Benutzername</span><input name="username" autocomplete="username" required value="admin"/></label>
         ${passwordFields()}
         <button class="btn btn-primary btn-block" type="submit">${icon("lock")} Konto anlegen & verschlüsseln</button>
       </form>`);
-    bind("setup", (d) => api.setup({ username: d.username, password: d.password }), true);
+    bind("setup", (d) => api.setup({ username: d.username, password: d.password, setup_code: d.setup_code || null }), true);
   } else if (mode === "login") {
     frame(`
       <h1>Anmelden</h1>
@@ -152,6 +159,7 @@ function bind(mode, call, withNewPassword = false) {
     busy(btn);
     try {
       const res = await call(d);
+      if (res?.failed_logins) warnFailedLogins(res);
       if (res?.recovery_key) showRecoveryKey(res.recovery_key, mode);
       else finish();
     } catch (err) {
@@ -216,6 +224,15 @@ function showRecoveryKey(key, mode) {
   bindRecoveryKey(root, key);
   $("#ack", root).addEventListener("change", (e) => ($("#go", root).disabled = !e.target.checked));
   $("#go", root).addEventListener("click", finish);
+}
+
+function warnFailedLogins(res) {
+  const when = res.last_failed_login ? `, zuletzt am ${new Date(res.last_failed_login * 1000).toLocaleString("de-DE")}` : "";
+  toast(
+    `Seit deiner letzten Anmeldung gab es ${res.failed_logins} fehlgeschlagene Anmeldeversuche${when}. Warst du das nicht, ändere dein Passwort und aktiviere die Zwei-Faktor-Anmeldung.`,
+    "error",
+    12000,
+  );
 }
 
 function finish() {

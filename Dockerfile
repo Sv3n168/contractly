@@ -8,7 +8,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     CONTRACTLY_DATA_DIR=/data \
     CONTRACTLY_STATIC_DIR=/app/frontend \
     RCLONE_CONFIG=/data/rclone/rclone.conf \
-    TZ=Europe/Berlin
+    TZ=Europe/Berlin \
+    FORWARDED_ALLOW_IPS="127.0.0.1,::1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7"
 
 # OCR (Tesseract + German language data), PDF text extraction (poppler) and rclone for cloud backups
 RUN apt-get update \
@@ -43,4 +44,6 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -fsS http://localhost:8000/healthz || exit 1
 
 WORKDIR /app/backend
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]
+# X-Forwarded-For/-Proto are only trusted from proxies in private networks (FORWARDED_ALLOW_IPS),
+# so clients on the internet can't fake their address to dodge the login limits.
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--no-server-header"]

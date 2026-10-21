@@ -1,7 +1,10 @@
 """Setup, login/logout, invitations, password management and (admin) user management."""
 
+import hmac
 import io
+import ipaddress
 import logging
+import os
 import shutil
 from typing import Literal
 
@@ -15,7 +18,9 @@ from ..security import (
     InvalidCredentials,
     TotpRequired,
     VaultError,
+    new_setup_code,
     new_totp_secret,
+    normalize_code,
     public_user,
     vault,
 )
@@ -30,6 +35,7 @@ COOKIE = "contractly_session"
 class SetupIn(BaseModel):
     username: str = Field(min_length=1, max_length=60)
     password: str = Field(max_length=500)
+    setup_code: str | None = Field(default=None, max_length=40)
 
 
 class LoginIn(BaseModel):
@@ -86,6 +92,54 @@ def client_id(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+LOCAL_NETWORKS = [
+    ipaddress.ip_network(n)
+    for n in (
+        "127.0.0.0/8",
+        "10.0.0.0/8",
+        "172.16.0.0/12",
+        "192.168.0.0/16",
+        "169.254.0.0/16",
+        "::1/128",
+        "fc00::/7",
+        "fe80::/10",
+    )
+]
+
+
+def is_local_client(request: Request) -> bool:
+    """Request from the own network (LAN, Docker network, localhost)?"""
+    try:
+        ip = ipaddress.ip_address(client_id(request))
+    except ValueError:
+        return False
+    if ip.version == 6 and ip.ipv4_mapped:
+        ip = ip.ipv4_mapped
+    return any(ip in net for net in LOCAL_NETWORKS)
+
+
+def setup_code() -> str:
+    """One-time code for the first setup from outside the own network (shown in the container log).
+
+    Without it, whoever reaches a freshly started, internet-facing instance first would become admin.
+    """
+    path = settings.data_dir / "setup-code.txt"
+    if not path.is_file():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(new_setup_code())
+        os.chmod(path, 0o600)
+    return path.read_text().strip()
+
+
+def log_setup_code() -> None:
+    if not vault.initialized:
+        log.warning(
+            "Contractly ist noch nicht eingerichtet. Einrichtungscode für den Zugriff von außerhalb "
+            "des eigenen Netzwerks: %s",
+            setup_code(),
+        )
+
+
 def current_user_id(request: Request) -> str:
     uid = getattr(request.state, "user_id", None)
     if not uid:
@@ -131,11 +185,17 @@ def open_user_area(user_id: str) -> None:
             database.current_user.reset(token)
 
 
-def _rate_limited(request: Request, username: str) -> list[str]:
+def _rate_limited(request: Request, username: str | None) -> list[str]:
     try:
         return vault.check_rate_limit(client_id(request), username)
     except VaultError as exc:
         raise HTTPException(429, "Zu viele Fehlversuche – bitte in 15 Minuten erneut versuchen") from exc
+
+
+def _failed(request: Request, attempt: list[str]) -> None:
+    # Same line for login, invitation, recovery and setup code: one fail2ban filter covers all.
+    log.warning("failed login from %s", client_id(request))
+    vault.record_failure(attempt)
 
 
 def me(user_id: str) -> dict:
@@ -159,6 +219,7 @@ def status(request: Request):
         "authenticated": uid is not None,
         "user": me(uid) if uid else None,
         "legacy_data": not vault.initialized and database.is_plaintext(settings.data_dir / "contractly.db"),
+        "setup_code_required": not vault.initialized and not is_local_client(request),
         "min_password_length": MIN_PASSWORD_LENGTH,
     }
 
@@ -168,10 +229,16 @@ def setup(data: SetupIn, request: Request, response: Response):
     """Create the first (admin) account."""
     if vault.initialized:
         raise HTTPException(409, "Contractly ist bereits eingerichtet")
+    if not is_local_client(request):
+        attempt = _rate_limited(request, None)
+        if not hmac.compare_digest(normalize_code(data.setup_code or ""), normalize_code(setup_code())):
+            _failed(request, attempt)
+            raise HTTPException(403, "Einrichtungscode falsch – er steht im Container-Log (docker logs contractly)")
     try:
         user, recovery = vault.setup(data.username, data.password)
     except VaultError as exc:
         raise HTTPException(400, str(exc)) from exc
+    (settings.data_dir / "setup-code.txt").unlink(missing_ok=True)
     _start_session(request, response, user, remember=False)
     return {"recovery_key": recovery}
 
@@ -184,12 +251,16 @@ def login(data: LoginIn, request: Request, response: Response):
     except TotpRequired as exc:
         raise HTTPException(401, "totp_required") from exc
     except InvalidCredentials as exc:
-        vault.record_failure(attempt)
-        log.warning("failed login from %s", client_id(request))
+        _failed(request, attempt)
         raise HTTPException(401, "Benutzername oder Passwort falsch") from exc
     vault.clear_failures(attempt)
     _start_session(request, response, user, data.remember)
-    return {"ok": True}
+    # Tell the user about failed attempts since the last login (someone guessing the password?).
+    return {
+        "ok": True,
+        "failed_logins": user.get("failed_logins", 0),
+        "last_failed_login": user.get("last_failed_login"),
+    }
 
 
 @router.post("/activate")
@@ -199,7 +270,7 @@ def activate(data: ActivateIn, request: Request, response: Response):
     try:
         user, recovery = vault.accept_invite(data.username, data.code, data.password)
     except InvalidCredentials as exc:
-        vault.record_failure(attempt)
+        _failed(request, attempt)
         raise HTTPException(401, "Benutzername oder Einladungscode falsch") from exc
     except VaultError as exc:
         raise HTTPException(400, str(exc)) from exc
@@ -215,7 +286,7 @@ def recover(data: RecoverIn, request: Request, response: Response):
     try:
         user, recovery = vault.recover(data.username, data.recovery_key, data.new_password)
     except InvalidCredentials as exc:
-        vault.record_failure(attempt)
+        _failed(request, attempt)
         raise HTTPException(401, "Benutzername oder Wiederherstellungsschlüssel falsch") from exc
     except VaultError as exc:
         raise HTTPException(400, str(exc)) from exc

@@ -85,8 +85,11 @@ def create_app(background: bool = True) -> FastAPI:
             if not vault.initialized:
                 return JSONResponse(status_code=401, content={"detail": "setup_required"})
             user_id = vault.session_user(request.cookies.get(COOKIE))
-            if not user_id or not database.is_open(user_id):
+            if not user_id:
                 return JSONResponse(status_code=401, content={"detail": "auth_required"})
+            if not database.is_open(user_id):
+                # Valid session after a restart or on another instance: open the area with its key.
+                await asyncio.to_thread(auth.open_user_area, user_id)
             request.state.user_id = user_id
             database.current_user.set(user_id)
         response = await call_next(request)

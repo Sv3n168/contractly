@@ -32,8 +32,8 @@ def _login(client, username="admin", password=PASSWORD):
 
 
 def _restart():
-    """Simulate a container restart: all keys and sessions are gone."""
-    vault.lock_all()
+    """Simulate a container restart: in-memory keys are gone, stored sessions remain."""
+    vault.forget_keys()
     database.close_all()
 
 
@@ -93,12 +93,31 @@ def test_logout_wipes_key_and_relogin_decrypts(client):
     assert client.get(f"/api/documents/{detail['documents'][0]['id']}").content == PDF
 
 
-def test_restart_locks_until_login(client):
+def test_restart_keeps_session_but_server_alone_cannot_decrypt(client, app_env):
     _contract(client)
     _restart()
-    assert client.get("/api/contracts").status_code == 401
-    assert _login(client).status_code == 200
+    assert not vault.unlocked_users() and not database.open_users()
+    # The browser's session cookie unlocks the area again (no re-login needed) ...
     assert client.get("/api/contracts").json()[0]["name"] == SECRET_NAME
+    # ... but the stored session alone is useless: it only holds the key wrapped with the cookie token.
+    stored = (app_env / "sessions.db").read_bytes()
+    assert SECRET_NAME.encode() not in stored
+    with make_client() as stranger:
+        assert stranger.get("/api/contracts").status_code == 401
+        stranger.cookies.set("contractly_session", "erfundenes-token")
+        assert stranger.get("/api/contracts").status_code == 401
+
+
+def test_session_works_across_instances(client):
+    """Two app instances on the same data volume share sessions (e.g. behind a load balancer)."""
+    _contract(client)
+    token = client.cookies.get("contractly_session")
+    _restart()  # "other instance": no keys in memory
+    with make_client() as other:
+        other.cookies.set("contractly_session", token)
+        assert other.get("/api/contracts").json()[0]["name"] == SECRET_NAME
+        other.post("/api/auth/logout")
+    assert client.get("/api/contracts").status_code == 401
 
 
 def test_separate_user_areas(client, app_env):
@@ -213,22 +232,29 @@ def test_rate_limit(client):
 
 def test_legacy_plaintext_data_is_migrated(app_env):
     """Data from the version without encryption moves into the first admin's encrypted area."""
-    from sqlalchemy import create_engine
-    from sqlalchemy.orm import Session
+    from alembic import command
+    from sqlalchemy import create_engine, text
 
-    from app.db import Base
-    from app.models import Contract, Document
+    from app.migrate import alembic_config
 
     (app_env / "documents").mkdir()
     plain = create_engine(f"sqlite:///{app_env / 'contractly.db'}")
-    Base.metadata.create_all(plain)
-    with Session(plain) as s:
-        c = Contract(name="Alter Vertrag", category="other", start_date=date(2024, 1, 1), attributes={})
-        c.documents.append(
-            Document(original_name="a.pdf", stored_name="abc.pdf", content_type="application/pdf", size=5)
+    # Schema of the first version: baseline tables, no migration bookkeeping.
+    with plain.begin() as conn:
+        command.upgrade(alembic_config(conn), "0001")
+        conn.execute(text("DROP TABLE alembic_version"))
+        conn.execute(
+            text(
+                "INSERT INTO contracts (name, category, start_date, notice_unit, attributes, created_at, updated_at) "
+                "VALUES ('Alter Vertrag', 'other', '2024-01-01', 'months', '{}', '2024-01-01', '2024-01-01')"
+            )
         )
-        s.add(c)
-        s.commit()
+        conn.execute(
+            text(
+                "INSERT INTO documents (contract_id, original_name, stored_name, content_type, size, uploaded_at) "
+                "VALUES (1, 'a.pdf', 'abc.pdf', 'application/pdf', 5, '2024-01-01')"
+            )
+        )
     plain.dispose()
     (app_env / "documents" / "abc.pdf").write_bytes(PDF)
 

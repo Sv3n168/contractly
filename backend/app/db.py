@@ -12,10 +12,11 @@ from pathlib import Path
 
 import sqlcipher3.dbapi2 as sqlcipher
 from fastapi import Request
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy.pool import QueuePool
 
+from . import migrate
 from .config import settings
 
 SQLITE_HEADER = b"SQLite format 3\x00"
@@ -124,8 +125,7 @@ def open_database(user_id: str, key: bytes) -> None:
             return conn
 
         engine = create_engine("sqlite://", creator=creator, poolclass=QueuePool, pool_size=5, max_overflow=10)
-        Base.metadata.create_all(engine)
-        _add_missing_columns(engine)
+        migrate.upgrade(engine)
         _engines[user_id] = engine
         _makers[user_id] = sessionmaker(bind=engine, autoflush=False, expire_on_commit=False)
 
@@ -161,18 +161,6 @@ def session(user_id: str | None = None) -> Session:
     if maker is None:
         raise DatabaseLocked()
     return maker()
-
-
-def _add_missing_columns(engine) -> None:
-    """Minimal forward migration: add columns introduced by newer versions."""
-    insp = inspect(engine)
-    with engine.begin() as conn:
-        for table in Base.metadata.sorted_tables:
-            existing = {c["name"] for c in insp.get_columns(table.name)}
-            for column in table.columns:
-                if column.name not in existing:
-                    ddl = column.type.compile(dialect=engine.dialect)
-                    conn.execute(text(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {ddl}'))
 
 
 def get_db(request: Request) -> Iterator[Session]:

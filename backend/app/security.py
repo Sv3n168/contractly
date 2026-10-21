@@ -21,11 +21,12 @@ import hmac
 import json
 import os
 import secrets
+import sqlite3
 import threading
 import time
 import uuid
 from collections.abc import Callable
-from dataclasses import dataclass
+from contextlib import closing
 from pathlib import Path
 
 from cryptography.exceptions import InvalidTag
@@ -141,18 +142,10 @@ def is_encrypted_file(path: Path) -> bool:
 # --------------------------------------------------------------------------- store
 
 
-@dataclass
-class Session:
-    user_id: str
-    expires: float
-    ttl: float
-
-
 class Vault:
     def __init__(self, path: Path | None = None):
         self._path = path
         self._keys: dict[str, bytes] = {}
-        self._sessions: dict[str, Session] = {}
         self._lock = threading.RLock()
         self._failures: dict[str, list[float]] = {}
         # Called with a user id when that user's key is dropped (closes the database).
@@ -227,16 +220,15 @@ class Vault:
         """Forget the user's key and end all their sessions."""
         with self._lock:
             self._keys.pop(user_id, None)
-            for token in [t for t, s in self._sessions.items() if s.user_id == user_id]:
-                del self._sessions[token]
+        self._end_sessions_of(user_id)
         if self.on_lock:
             self.on_lock(user_id)
 
     def lock_all(self) -> None:
         for uid in list(self._keys):
             self.lock_user(uid)
-        with self._lock:
-            self._sessions.clear()
+        with closing(self._sdb()) as db:
+            db.execute("DELETE FROM sessions")
 
     # ----------------------------------------------------------------- accounts
 
@@ -378,9 +370,7 @@ class Vault:
         validate_password(new)
         dek = _unwrap(self.user(user_id)["password"], old)
         self._update(user_id, lambda u: u.__setitem__("password", _wrap(dek, new)))
-        with self._lock:
-            for token in [t for t, s in self._sessions.items() if s.user_id == user_id]:
-                del self._sessions[token]
+        self._end_sessions_of(user_id)  # other devices have to log in again
 
     def regenerate_recovery_key(self, user_id: str, password: str) -> str:
         dek = _unwrap(self.user(user_id)["password"], password)
@@ -413,61 +403,107 @@ class Vault:
         return token
 
     # ----------------------------------------------------------------- sessions
+    #
+    # Sessions live in ``sessions.db`` so they survive restarts and can be shared by several
+    # app instances on the same data volume. Each row holds the user's data key wrapped with a
+    # key derived from the session token – and the token exists only in the browser cookie
+    # (the table stores its hash). Without the cookie the server cannot unwrap anything.
+
+    def _sdb(self) -> sqlite3.Connection:
+        path = settings.data_dir / "sessions.db"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(path, timeout=10, isolation_level=None)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL, "
+            "expires REAL NOT NULL, ttl REAL NOT NULL, wrapped BLOB NOT NULL, created REAL NOT NULL)"
+        )
+        return conn
+
+    @staticmethod
+    def _token_key(token: str) -> bytes:
+        return HKDF(algorithm=hashes.SHA256(), length=32, salt=None, info=b"contractly-session").derive(token.encode())
 
     def create_session(self, user_id: str, remember: bool) -> tuple[str, int]:
+        dek = self._keys.get(user_id)
+        if dek is None:
+            raise VaultError("locked")
         ttl = settings.session_days_remember * 86400 if remember else settings.session_hours * 3600
         token = secrets.token_urlsafe(32)
-        with self._lock:
-            self._sessions[_hash(token)] = Session(user_id, time.time() + ttl, ttl)
+        nonce = os.urandom(12)
+        wrapped = nonce + AESGCM(self._token_key(token)).encrypt(nonce, dek, user_id.encode())
+        now = time.time()
+        with closing(self._sdb()) as db:
+            db.execute(
+                "INSERT INTO sessions VALUES (?, ?, ?, ?, ?, ?)", (_hash(token), user_id, now + ttl, ttl, wrapped, now)
+            )
         return token, int(ttl) if remember else 0
 
     def session_user(self, token: str | None) -> str | None:
-        """User id of a valid session (sliding expiry); None if invalid or the key is gone."""
+        """User id of a valid session (sliding expiry); loads the user's key if needed."""
         if not token:
             return None
         key = _hash(token)
-        expired_user = None
-        with self._lock:
-            s = self._sessions.get(key)
-            if s is None:
+        now = time.time()
+        with closing(self._sdb()) as db:
+            row = db.execute(
+                "SELECT user_id, expires, ttl, wrapped FROM sessions WHERE token_hash=?", (key,)
+            ).fetchone()
+            if row is None:
                 return None
-            now = time.time()
-            if s.expires < now:
-                del self._sessions[key]
-                expired_user = s.user_id
-            elif s.user_id in self._keys:
-                s.expires = now + s.ttl
-                return s.user_id
-            else:
+            user_id, expires, ttl, wrapped = row
+            if expires < now:
+                db.execute("DELETE FROM sessions WHERE token_hash=?", (key,))
+                self._drop_key_if_no_sessions(user_id)
                 return None
-        self._drop_key_if_no_sessions(expired_user)
-        return None
+            if expires - now < ttl - 60:  # sliding expiry, written at most once a minute
+                db.execute("UPDATE sessions SET expires=? WHERE token_hash=?", (now + ttl, key))
+        if user_id not in self._keys:
+            try:
+                self._keys[user_id] = AESGCM(self._token_key(token)).decrypt(
+                    wrapped[:12], wrapped[12:], user_id.encode()
+                )
+            except InvalidTag:
+                return None
+        return user_id
 
     def end_session(self, token: str | None) -> None:
         """Logout: end the session; the last session of a user also removes their key."""
         if not token:
             return
-        with self._lock:
-            s = self._sessions.pop(_hash(token), None)
-        if s:
-            self._drop_key_if_no_sessions(s.user_id)
+        with closing(self._sdb()) as db:
+            row = db.execute("SELECT user_id FROM sessions WHERE token_hash=?", (_hash(token),)).fetchone()
+            db.execute("DELETE FROM sessions WHERE token_hash=?", (_hash(token),))
+        if row:
+            self._drop_key_if_no_sessions(row[0])
+
+    def _end_sessions_of(self, user_id: str) -> None:
+        with closing(self._sdb()) as db:
+            db.execute("DELETE FROM sessions WHERE user_id=?", (user_id,))
+
+    def _has_sessions(self, user_id: str) -> bool:
+        with closing(self._sdb()) as db:
+            return (
+                db.execute("SELECT 1 FROM sessions WHERE user_id=? AND expires>=?", (user_id, time.time())).fetchone()
+                is not None
+            )
 
     def _drop_key_if_no_sessions(self, user_id: str | None) -> None:
-        if user_id is None:
-            return
-        with self._lock:
-            if any(s.user_id == user_id for s in self._sessions.values()):
-                return
-        self.lock_user(user_id)
+        if user_id is not None and not self._has_sessions(user_id):
+            self.lock_user(user_id)
 
     def expire_sessions(self) -> None:
-        now = time.time()
-        with self._lock:
-            expired = {s.user_id for s in self._sessions.values() if s.expires < now}
-            for t in [t for t, s in self._sessions.items() if s.expires < now]:
-                del self._sessions[t]
-        for uid in expired:
+        """Remove expired sessions and forget keys of users without a session (also ended elsewhere)."""
+        with closing(self._sdb()) as db:
+            db.execute("DELETE FROM sessions WHERE expires<?", (time.time(),))
+        for uid in list(self._keys):
             self._drop_key_if_no_sessions(uid)
+
+    def forget_keys(self) -> None:
+        """Drop the in-memory keys only (what a process restart does); sessions stay valid."""
+        for uid in list(self._keys):
+            self._keys.pop(uid, None)
+            if self.on_lock:
+                self.on_lock(uid)
 
     # ----------------------------------------------------------------- brute force protection
 

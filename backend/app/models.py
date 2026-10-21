@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from sqlalchemy import JSON, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .db import Base
@@ -32,6 +32,16 @@ class Contract(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     # Days before the cancellation deadline to remind; None disables the reminder.
     reminder_days: Mapped[int | None] = mapped_column(Integer, default=30)
+    # Own share of the costs in percent (e.g. 50 when a partner pays half); None = 100.
+    share_percent: Mapped[int | None] = mapped_column(Integer)
+    # Provider confirmed the cancellation (cancelled_on = cancellation sent).
+    cancellation_confirmed_on: Mapped[date | None] = mapped_column(Date)
+    # Relevant for the tax return; None = default of the category.
+    tax_relevant: Mapped[bool | None] = mapped_column(Boolean)
+    # End of the 14-day right of withdrawal of a newly signed contract.
+    withdrawal_until: Mapped[date | None] = mapped_column(Date)
+    # Last "do I still use this?" check (subscriptions).
+    last_checked_on: Mapped[date | None] = mapped_column(Date)
     predecessor_id: Mapped[int | None] = mapped_column(ForeignKey("contracts.id", ondelete="SET NULL"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)

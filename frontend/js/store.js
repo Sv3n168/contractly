@@ -2,7 +2,7 @@
 
 import { api } from "./api.js";
 
-export const state = { meta: null, profile: null, dueCount: 0 };
+export const state = { meta: null, profile: null, dueCount: 0, user: null };
 
 // Fixed category -> color-slot mapping (color follows the entity, never its rank).
 // Twelve categories share eight validated slots; related categories share a hue family.

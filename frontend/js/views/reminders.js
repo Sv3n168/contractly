@@ -63,10 +63,10 @@ export async function reminderForm(existing = {}, done) {
 }
 
 export async function renderReminders(view) {
-  const [up, all] = await Promise.all([api.upcoming({ horizon_days: 365 }), api.reminders()]);
+  const [up, all, cal] = await Promise.all([api.upcoming({ horizon_days: 365 }), api.reminders(), api.calendarToken()]);
   const due = up.items.filter((i) => i.due);
   const later = up.items.filter((i) => !i.due);
-  const calUrl = `${location.origin}/api/calendar.ics`;
+  const calUrl = `${location.origin}/api/calendar/${cal.token}.ics`;
   const ch = up.channels;
 
   view.innerHTML = `
@@ -105,9 +105,13 @@ export async function renderReminders(view) {
       <div class="stack">
         <div class="card">
           <div class="card-head"><div><h2>${icon("calendar")} Kalender-Abo</h2></div></div>
-          <p class="small text-2" style="margin-top:0">Abonniere alle Fristen & Erinnerungen in deinem Handy- oder Outlook-Kalender. Updates kommen automatisch.</p>
+          <p class="small text-2" style="margin-top:0">Abonniere deine Fristen & Erinnerungen im Handy- oder Outlook-Kalender. Der Link ist geheim und persönlich –
+            Einträge heißen neutral (z. B. „Kündigungsfrist Mobilfunk-Vertrag“), außer du schaltest Vertragsnamen in den Einstellungen ein.</p>
           <div class="input-group"><input class="input" readonly value="${esc(calUrl)}" id="cal"/><button class="btn" id="copy-cal" style="border-radius:0 var(--radius-sm) var(--radius-sm) 0">${icon("copy")}</button></div>
-          <a class="btn btn-block" style="margin-top:10px" href="${calUrl.replace(/^https?/, "webcal")}">${icon("link")} Im Kalender öffnen</a>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <a class="btn" style="flex:1;justify-content:center" href="${calUrl.replace(/^https?/, "webcal")}">${icon("link")} Im Kalender öffnen</a>
+            <button class="btn btn-ghost" id="new-cal" title="Alten Link ungültig machen">${icon("refresh")} Neuer Link</button>
+          </div>
         </div>
         <div class="card">
           <div class="card-head"><div><h2>${icon("bell")} Push & E-Mail</h2></div></div>
@@ -118,7 +122,7 @@ export async function renderReminders(view) {
           ${
             ch.ntfy || ch.email
               ? `<button class="btn btn-block" id="test" style="margin-top:12px">${icon("sparkles")} Testnachricht senden</button>`
-              : `<p class="small muted" style="margin-bottom:0">Einrichtung über Umgebungsvariablen im Docker-Container (siehe README: <code>CONTRACTLY_NTFY_URL</code> bzw. <code>CONTRACTLY_SMTP_*</code>).</p>`
+              : `<a class="btn btn-block" href="#/settings" style="margin-top:12px">${icon("settings")} In den Einstellungen einrichten</a>`
           }
         </div>
       </div>
@@ -134,6 +138,12 @@ export async function renderReminders(view) {
   $("#own", view).addEventListener("click", (e) => {
     const b = e.target.closest("[data-edit]");
     if (b) reminderForm(all.find((r) => r.id === Number(b.dataset.edit)), refresh);
+  });
+  $("#new-cal", view).addEventListener("click", async () => {
+    if (await confirmDialog("Der bisherige Kalender-Link funktioniert dann nicht mehr. Neuen Link erzeugen?", { okLabel: "Neuer Link", danger: false })) {
+      await api.newCalendarToken();
+      refresh("Neuer Kalender-Link erstellt");
+    }
   });
   $("#copy-cal", view).addEventListener("click", async () => {
     await navigator.clipboard.writeText(calUrl);

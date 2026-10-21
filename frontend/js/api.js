@@ -8,6 +8,10 @@ async function request(method, url, body, { raw = false } = {}) {
     opts.body = JSON.stringify(body);
   }
   const res = await fetch(url, opts);
+  if (res.status === 401 && !url.startsWith("/api/auth/")) {
+    // Session ended (logout elsewhere, expiry, server restart): back to the login screen.
+    window.dispatchEvent(new CustomEvent("auth-required"));
+  }
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -33,6 +37,24 @@ const qs = (params = {}) => {
 };
 
 export const api = {
+  authStatus: () => request("GET", "/api/auth/status"),
+  setup: (data) => request("POST", "/api/auth/setup", data),
+  login: (data) => request("POST", "/api/auth/login", data),
+  activate: (data) => request("POST", "/api/auth/activate", data),
+  recover: (data) => request("POST", "/api/auth/recover", data),
+  logout: () => request("POST", "/api/auth/logout"),
+  me: () => request("GET", "/api/auth/me"),
+  saveAccountSettings: (data) => request("PUT", "/api/auth/me/settings", data),
+  changePassword: (data) => request("POST", "/api/auth/change-password", data),
+  newRecoveryKey: (password) => request("POST", "/api/auth/recovery-key", { password }),
+  calendarToken: () => request("GET", "/api/auth/calendar"),
+  newCalendarToken: () => request("POST", "/api/auth/calendar"),
+  users: () => request("GET", "/api/users"),
+  inviteUser: (data) => request("POST", "/api/users", data),
+  renewInvite: (id) => request("POST", `/api/users/${id}/invite`),
+  setRole: (id, role) => request("PUT", `/api/users/${id}/role`, { role }),
+  deleteUser: (id) => request("DELETE", `/api/users/${id}`),
+
   meta: () => request("GET", "/api/meta"),
   summary: () => request("GET", "/api/stats/summary"),
   timeseries: (params) => request("GET", `/api/stats/timeseries${qs(params)}`),

@@ -1,6 +1,7 @@
 import pytest
 
 from app import backup
+from tests.conftest import PASSWORD
 
 
 def test_encrypt_roundtrip():
@@ -11,7 +12,7 @@ def test_encrypt_roundtrip():
         backup.decrypt(blob, "falsch-falsch")
 
 
-def test_backup_and_restore_encrypted(client):
+def test_backup_with_passphrase(client):
     client.post("/api/demo")
     count = len(client.get("/api/contracts").json())
     c = client.get("/api/contracts").json()[0]
@@ -26,12 +27,13 @@ def test_backup_and_restore_encrypted(client):
     assert len(client.get("/api/contracts").json()) == count - 1
 
     r = client.post("/api/backups/restore", files={"file": ("b.ctly", blob)})
-    assert r.status_code == 400  # key missing
+    assert r.status_code == 400  # backup key missing
     r = client.post("/api/backups/restore", files={"file": ("b.ctly", blob)}, data={"passphrase": "falsch-123"})
     assert r.status_code == 400
     r = client.post("/api/backups/restore", files={"file": ("b.ctly", blob)}, data={"passphrase": "sehr-geheim-123"})
     assert r.status_code == 200, r.text
     assert r.json()["documents"] == 1
+    client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD})
     assert len(client.get("/api/contracts").json()) == count
     names = [b["name"] for b in client.get("/api/backups").json()["backups"]]
     assert any("pre-restore" in n for n in names)

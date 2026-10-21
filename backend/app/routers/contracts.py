@@ -4,8 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 
 from .. import calc
-from ..config import settings
-from ..db import get_db
+from ..db import documents_dir, get_db
 from ..models import Contract, Document, MeterReading, PriceEntry
 from ..schemas import (
     CancelIn,
@@ -105,7 +104,7 @@ def update_contract(contract_id: int, data: ContractUpdate, db: Session = Depend
 @router.delete("/{contract_id}", status_code=204)
 def delete_contract(contract_id: int, db: Session = Depends(get_db)):
     c = get_contract(db, contract_id)
-    files = [settings.documents_dir / d.stored_name for d in c.documents]
+    files = [documents_dir() / d.stored_name for d in c.documents]
     # Keep the chain connected: successors inherit this contract's predecessor.
     for s in list(c.successors):
         s.predecessor_id = c.predecessor_id

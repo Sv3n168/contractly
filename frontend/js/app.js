@@ -12,6 +12,7 @@ import { renderTimeline } from "./views/timeline.js";
 import { renderCosts } from "./views/costs.js";
 import { renderReminders } from "./views/reminders.js";
 import { renderSettings, renderMore } from "./views/settings.js";
+import { hideAuth, showAuth } from "./views/auth.js";
 
 const routes = [
   [/^\/?$/, "dashboard", renderDashboard],
@@ -33,7 +34,9 @@ function parseHash() {
 }
 
 let renderToken = 0;
+let authenticated = false;
 export async function router() {
+  if (!authenticated) return;
   const { path, query } = parseHash();
   const view = $("#view");
   const token = ++renderToken;
@@ -156,6 +159,51 @@ async function openSearch() {
   input.focus();
 }
 
+// ------------------------------------------------------------------ session
+
+function paintUser() {
+  const u = state.user;
+  if (!u) return;
+  $$("[data-user-name]").forEach((el) => (el.textContent = u.username));
+  $$("[data-user-role]").forEach((el) => (el.textContent = u.role === "admin" ? "Administrator" : "Mitglied"));
+  $$("[data-user-initial]").forEach((el) => (el.textContent = u.username.slice(0, 1).toUpperCase()));
+  document.body.classList.toggle("is-admin", u.role === "admin");
+}
+
+let starting = null;
+export function start() {
+  // Several parallel 401s must not open several login screens.
+  starting ||= (async () => {
+    try {
+      const st = await api.authStatus();
+      authenticated = st.authenticated;
+      if (!st.authenticated) {
+        Object.assign(state, { user: null, profile: null, dueCount: 0 });
+        $("#view").innerHTML = "";
+        showAuth(st, () => {
+          starting = null;
+          start();
+        });
+        return;
+      }
+      state.user = st.user;
+      hideAuth();
+      paintUser();
+      router();
+    } finally {
+      starting = null;
+    }
+  })();
+  return starting;
+}
+
+async function logout() {
+  await api.logout();
+  authenticated = false;
+  toast("Abgemeldet – deine Daten sind wieder verschlüsselt 🔒");
+  start();
+}
+
 // ------------------------------------------------------------------ boot
 
 function boot() {
@@ -166,6 +214,7 @@ function boot() {
     if (!a) return;
     if (a.dataset.action === "theme") toggleTheme();
     if (a.dataset.action === "search") openSearch();
+    if (a.dataset.action === "logout") logout();
   });
   document.addEventListener("keydown", (e) => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -177,11 +226,20 @@ function boot() {
     if (!document.documentElement.dataset.theme) router();
   });
   window.addEventListener("hashchange", router);
-  window.addEventListener("unhandledrejection", (e) => toast(e.reason?.message || "Fehler", "error"));
+  window.addEventListener("auth-required", () => {
+    if (authenticated) {
+      authenticated = false;
+      toast("Bitte erneut anmelden", "error");
+      start();
+    }
+  });
+  window.addEventListener("unhandledrejection", (e) => {
+    if (authenticated) toast(e.reason?.message || "Fehler", "error");
+  });
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
-  router();
+  start();
 }
 
 boot();

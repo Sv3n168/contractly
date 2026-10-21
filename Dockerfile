@@ -18,7 +18,15 @@ RUN apt-get update \
 
 WORKDIR /app
 COPY backend/requirements.txt backend/requirements.txt
-RUN pip install -r backend/requirements.txt
+# On ARM (Raspberry Pi, many NAS) SQLCipher is compiled from source (bundled, links OpenSSL);
+# the build tools are removed again afterwards.
+RUN if [ "$(uname -m)" != "x86_64" ]; then \
+        apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev libssl-dev; \
+    fi \
+    && pip install -r backend/requirements.txt \
+    && if [ "$(uname -m)" != "x86_64" ]; then \
+        apt-get purge -y gcc libc6-dev libssl-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY backend/app backend/app
 COPY frontend frontend

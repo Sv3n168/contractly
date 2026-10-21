@@ -28,6 +28,8 @@ Verträge, und alle Daten bleiben auf deinem Server.
 | **Dokumente & OCR** | PDFs und Fotos je Vertrag ablegen. „Erkennen“ liest Kundennummer, Vertragsnummer, Anbieter-Adresse, Preise, Zählernummer, MaLo, IBAN, Vertragsbeginn usw. aus und schlägt sie zur Übernahme vor |
 | **Strom & Gas** | Zählerstände erfassen, daraus Verbrauch hochrechnen, Jahresabrechnung schätzen (Nachzahlung oder Guthaben) und einen passenden Abschlag vorschlagen |
 | **Backup** | Vollbackup (Datenbank und Dokumente), optional **AES-256-verschlüsselt mit eigenem Schlüssel**. Automatisch täglich oder wöchentlich, Upload in **OneDrive, Google Drive, Dropbox, Nextcloud, S3 …** (über rclone), Wiederherstellung in der Oberfläche |
+| **Sicherheit** | Anmeldeseite mit eigenem Konto. **Datenbank, Dokumente (PDFs, Fotos) und Backups sind verschlüsselt gespeichert** (SQLCipher/AES-256). Der Schlüssel entsteht aus dem Passwort und liegt nur während der Anmeldung im Arbeitsspeicher. Nach dem Abmelden ist nichts mehr lesbar. Dazu Wiederherstellungsschlüssel, Schutz vor Passwort-Raten und Sicherheits-Header |
+| **Mehrere Benutzer** | Jede Person hat einen **eigenen, getrennt verschlüsselten Bereich**. Der Admin lädt per Einladungscode ein; das Passwort legt die Person selbst fest, daher kann auch der Admin keine fremden Verträge lesen |
 | **Komfort** | Responsive für Desktop (Seitenleiste), Tablet (Icon-Leiste) und Smartphone (Navigation unten). Hell/Dunkel, Schnellsuche (Strg+K), als App installierbar (PWA), Demo-Daten zum Ausprobieren |
 
 ## Schnellstart
@@ -42,20 +44,54 @@ Danach <http://localhost:8000> öffnen. Bei leerer Datenbank kannst du mit einem
 
 Alle Daten (Datenbank, Dokumente, Backups) liegen im Ordner `./data`.
 
+## Erste Schritte & Sicherheit
+
+1. Beim ersten Aufruf legst du das **Administrator-Konto** an. Danach wird dir ein
+   **Wiederherstellungsschlüssel** angezeigt: gut aufbewahren! Ohne Passwort *und* ohne diesen
+   Schlüssel sind die Daten nicht wiederherstellbar, auch nicht vom Admin.
+2. Weitere Personen lädst du unter *Einstellungen → Benutzer* ein. Sie erhalten einen
+   Einladungscode (7 Tage gültig), wählen „Einladungscode einlösen“ und legen ihr eigenes Passwort fest.
+3. Jede Person sieht nur ihre eigenen Verträge. Der Admin verwaltet Benutzer und Backups.
+
+**So funktioniert die Verschlüsselung**
+
+- Jede Person hat einen zufälligen Datenschlüssel. Damit sind ihre SQLCipher-Datenbank und alle
+  hochgeladenen Dateien verschlüsselt (AES-256). Gespeichert wird der Datenschlüssel nur
+  verschlüsselt: einmal mit dem Passwort (scrypt), einmal mit dem Wiederherstellungsschlüssel.
+- Nach der Anmeldung liegt der Schlüssel nur im Arbeitsspeicher des Servers. **Abmelden** (bzw.
+  Ablauf der Sitzung oder ein Neustart des Containers) löscht ihn. Ab dann sind Datenbank und PDFs
+  auch für den Server unlesbar.
+- PDFs werden beim Ansehen im Arbeitsspeicher entschlüsselt. Für die Texterkennung entsteht kurz eine
+  Kopie in `/dev/shm` (RAM), die danach sofort gelöscht wird.
+- Damit **Erinnerungen und der Kalender** auch im abgemeldeten Zustand funktionieren, merkt sich
+  Contractly pro Person die anstehenden Termine mit neutraler Bezeichnung (z. B. „Kündigungsfrist
+  Mobilfunk-Vertrag“). Vertragsnamen erscheinen dort nur, wenn man das in den Einstellungen einschaltet.
+- **Wichtig:** Betreibe Contractly außerhalb des Heimnetzes nur hinter HTTPS (z. B. Reverse Proxy
+  mit Let's Encrypt), damit Passwörter verschlüsselt übertragen werden.
+
+**Update von einer Version ohne Verschlüsselung:** Beim Einrichten des Admin-Kontos werden die
+vorhandenen Daten aus `./data` in den Bereich des Admins übernommen, verschlüsselt, und die
+unverschlüsselten Originale werden gelöscht. Die frühere Variable `CONTRACTLY_PASSWORD` wird nicht
+mehr verwendet.
+
 ## Konfiguration
 
 Alle Einstellungen werden über Umgebungsvariablen gesetzt (siehe `docker-compose.yml`).
 
 | Variable | Standard | Bedeutung |
 |---|---|---|
-| `CONTRACTLY_PASSWORD` | – | Aktiviert den Zugangsschutz (HTTP Basic Auth). **Empfohlen**, sobald die App außerhalb des Heimnetzes erreichbar ist |
-| `CONTRACTLY_USERNAME` | `admin` | Benutzername für den Zugangsschutz |
+| `CONTRACTLY_SESSION_HOURS` | `12` | Automatische Abmeldung nach so vielen Stunden Inaktivität |
+| `CONTRACTLY_SESSION_DAYS_REMEMBER` | `30` | Sitzungsdauer bei „Angemeldet bleiben“ |
 | `CONTRACTLY_PUBLIC_URL` | – | Externe URL, wird für Links in Benachrichtigungen verwendet |
 | `CONTRACTLY_MAX_UPLOAD_MB` | `25` | Maximale Dateigröße für Dokumente |
 | `PUID` / `PGID` | `1000` | Benutzer- und Gruppen-ID, der die Dateien in `./data` gehören |
 | `TZ` | `Europe/Berlin` | Zeitzone |
 
 ### Erinnerungen per Push oder E-Mail
+
+Jede Person trägt unter *Einstellungen → Benachrichtigungen* ihre E-Mail-Adresse und/oder ihr
+ntfy-Thema ein. Erinnerungen kommen auch dann an, wenn man gerade abgemeldet ist. Die folgenden
+Variablen konfigurieren den Server und gelten für den Admin zusätzlich als Vorgabe.
 
 **ntfy** (Push aufs Handy, z. B. mit der ntfy-App):
 
@@ -78,14 +114,18 @@ CONTRACTLY_SMTP_TO: me@example.org
 Der Container prüft stündlich (`CONTRACTLY_NOTIFY_INTERVAL_MIN`), ob etwas fällig ist, und meldet jede
 Erinnerung genau einmal. Unter *Erinnerungen* gibt es einen Button für eine Testnachricht.
 
-**Kalender:** `http://<server>:8000/api/calendar.ics` lässt sich in iOS, Android/Google oder Outlook
-abonnieren. Fristen erscheinen dort samt Alarm. Bei aktivem Zugangsschutz gibst du die Zugangsdaten in
-der Kalender-App oder in der URL an (`https://user:pass@…`).
+**Kalender:** Unter *Erinnerungen* findet jede Person einen persönlichen, geheimen Kalender-Link
+(`…/api/calendar/<token>.ics`). Er lässt sich in iOS, Android/Google oder Outlook abonnieren und bei
+Bedarf neu erzeugen; der alte Link ist dann ungültig.
 
 ### Backups und Cloud (OneDrive, Google Drive …)
 
-Ein Backup ist ein ZIP-Archiv mit Datenbank und allen Dokumenten. Mit einem Schlüssel wird es mit
-AES-256-GCM verschlüsselt (Dateiendung `.ctly`). **Ohne Schlüssel ist keine Wiederherstellung möglich.**
+Backups erstellt der Admin. Ein Backup enthält alle Benutzer mit ihren Datenbanken und Dokumenten,
+und zwar **weiterhin mit den Schlüsseln der Benutzer verschlüsselt**. Der Admin kann damit also
+nichts lesen. Nach einer Wiederherstellung meldet sich jede Person mit dem Passwort an, das zum
+Zeitpunkt des Backups galt. Optional lässt sich das Backup zusätzlich mit einem Backup-Schlüssel
+verschlüsseln (AES-256-GCM, Endung `.ctly`); das schützt auch die Benutzerliste. Automatische
+Backups laufen auch, wenn niemand angemeldet ist.
 
 ```yaml
 CONTRACTLY_BACKUP_SCHEDULE: daily          # off | daily | weekly
@@ -132,7 +172,8 @@ Für OCR werden lokal `tesseract-ocr`, `tesseract-ocr-deu` und `poppler-utils` b
 
 **Aufbau**
 
-- `backend/app`: FastAPI, SQLAlchemy (SQLite). Berechnungen für Kosten, Fristen und Vergleiche stehen in `calc.py`, Erinnerungen in `reminders.py`, Backups in `backup.py`, die Texterkennung in `ocr.py`.
+- `backend/app`: FastAPI, SQLAlchemy mit SQLCipher (verschlüsseltes SQLite, je Benutzer eine Datei
+  unter `data/users/<id>/`). Benutzer, Sitzungen und Schlüssel stehen in `security.py`. Berechnungen für Kosten, Fristen und Vergleiche stehen in `calc.py`, Erinnerungen in `reminders.py`, Backups in `backup.py`, die Texterkennung in `ocr.py`.
 - `frontend/`: Single-Page-App ohne Build-Schritt (ES-Module, Chart.js mitgeliefert, funktioniert offline).
 - REST-API mit interaktiver Doku unter `/docs`.
 

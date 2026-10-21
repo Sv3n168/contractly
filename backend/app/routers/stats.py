@@ -2,18 +2,20 @@ import json
 from collections import defaultdict
 from datetime import UTC, date, datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import calc, ocr
 from ..categories import CATEGORIES, CATEGORY_MAP, INTERVALS
 from ..config import settings
 from ..db import get_db
-from ..models import AppSetting, Reminder
+from ..models import AppSetting
+from ..reminders import load_outbox, refresh_outbox
 from ..schemas import OfferOut, ProfileIn
+from ..security import vault
 from ..services import contract_detail, contract_summary, load_contracts, today
+from .auth import current_user_id
 
 router = APIRouter(prefix="/api", tags=["stats"])
 
@@ -25,7 +27,7 @@ def meta():
         "intervals": INTERVALS,
         "today": today(),
         "ocr": ocr.available(),
-        "auth": bool(settings.password),
+        "smtp": bool(settings.smtp_host),
     }
 
 
@@ -241,10 +243,8 @@ def _ics_escape(text: str) -> str:
     return text.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
 
 
-@router.get("/calendar.ics")
-def calendar_feed(db: Session = Depends(get_db)):
-    """iCalendar feed with cancellation deadlines and contract end dates."""
-    ref = today()
+def _calendar(user_id: str) -> Response:
+    """iCalendar feed built from the user's reminder outbox, so it also works while logged out."""
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     lines = [
         "BEGIN:VCALENDAR",
@@ -253,53 +253,48 @@ def calendar_feed(db: Session = Depends(get_db)):
         "CALSCALE:GREGORIAN",
         "X-WR-CALNAME:Contractly Fristen",
     ]
-
-    def event(uid: str, day: date, summary: str, description: str, alarm_days: int | None = None):
+    for item in load_outbox(user_id).get("items", []):
+        day = date.fromisoformat(item["date"])
         lines.extend(
             [
                 "BEGIN:VEVENT",
-                f"UID:{uid}@contractly",
+                f"UID:{item['key'].replace(':', '-')}@contractly",
                 f"DTSTAMP:{stamp}",
-                f"DTSTART;VALUE=DATE:{day.strftime('%Y%m%d')}",
-                f"DTEND;VALUE=DATE:{(day + timedelta(days=1)).strftime('%Y%m%d')}",
-                f"SUMMARY:{_ics_escape(summary)}",
-                f"DESCRIPTION:{_ics_escape(description)}",
+                f"DTSTART;VALUE=DATE:{day:%Y%m%d}",
+                f"DTEND;VALUE=DATE:{day + timedelta(days=1):%Y%m%d}",
+                f"SUMMARY:{_ics_escape(item['title'])}",
+                f"DESCRIPTION:{_ics_escape(item.get('detail') or '')}",
             ]
         )
-        if alarm_days:
+        alarm = item.get("alarm_days") or max((day - date.fromisoformat(item["notify_date"])).days, 0)
+        if alarm:
             lines.extend(
                 [
                     "BEGIN:VALARM",
                     "ACTION:DISPLAY",
-                    f"DESCRIPTION:{_ics_escape(summary)}",
-                    f"TRIGGER:-P{alarm_days}D",
+                    f"DESCRIPTION:{_ics_escape(item['title'])}",
+                    f"TRIGGER:-P{alarm}D",
                     "END:VALARM",
                 ]
             )
         lines.append("END:VEVENT")
-
-    for c in load_contracts(db):
-        s = contract_summary(c, ref)
-        if s.cancellation_deadline and not s.monthly_cancellable:
-            event(
-                f"deadline-{c.id}-{s.cancellation_deadline.isoformat()}",
-                s.cancellation_deadline,
-                f"Kündigungsfrist: {c.name}",
-                f"Letzter Tag zur Kündigung. Laufzeitende: {s.next_term_end.strftime('%d.%m.%Y')}",
-                alarm_days=14,
-            )
-        if c.end_date and c.end_date >= ref:
-            event(f"end-{c.id}", c.end_date, f"Vertragsende: {c.name}", f"{c.provider or ''}".strip())
-    for r in db.scalars(select(Reminder).where(Reminder.done_at.is_(None))):
-        event(
-            f"reminder-{r.id}-{r.due_date.isoformat()}",
-            r.due_date,
-            r.title,
-            r.note or "",
-            alarm_days=r.lead_days or None,
-        )
     lines.append("END:VCALENDAR")
     return Response("\r\n".join(lines) + "\r\n", media_type="text/calendar; charset=utf-8")
+
+
+@router.get("/calendar/{token}.ics")
+def calendar_feed_token(token: str):
+    """Calendar subscription for calendar apps (which can't log in): protected by a secret token."""
+    user_id = vault.user_for_calendar_token(token)
+    if not user_id:
+        raise HTTPException(404, "Unbekannter Kalender-Link")
+    return _calendar(user_id)
+
+
+@router.get("/calendar.ics")
+def calendar_feed(user_id: str = Depends(current_user_id)):
+    refresh_outbox(user_id)
+    return _calendar(user_id)
 
 
 @router.get("/export")

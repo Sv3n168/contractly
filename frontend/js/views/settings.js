@@ -1,17 +1,37 @@
 import { api } from "../api.js";
 import { state } from "../store.js";
-import { $, busy, confirmDialog, esc, fileSize, formData, icon, toast } from "../ui.js";
-import { router } from "../app.js";
+import { $, busy, confirmDialog, esc, fileSize, formData, icon, modal, toast } from "../ui.js";
+import { router, start } from "../app.js";
+import { bindRecoveryKey, recoveryKeyHtml } from "./auth.js";
+
+const isAdmin = () => state.user?.role === "admin";
 
 export async function renderSettings(view) {
-  const [profile, backups] = await Promise.all([api.profile(), api.backups()]);
+  const [profile, me, backups, users] = await Promise.all([
+    api.profile(),
+    api.me(),
+    isAdmin() ? api.backups() : Promise.resolve(null),
+    isAdmin() ? api.users() : Promise.resolve(null),
+  ]);
   state.profile = profile;
-  const cloud = backups.cloud;
+  state.user = me;
+  const cfg = me.settings || {};
 
   view.innerHTML = `
-    <div class="page-head"><div><h1>Einstellungen</h1><p>Profil, Datensicherung und Export.</p></div></div>
+    <div class="page-head"><div><h1>Einstellungen</h1><p>Profil, Sicherheit, Benachrichtigungen${isAdmin() ? ", Benutzer und Datensicherung" : ""}.</p></div></div>
     <div class="grid grid-2">
       <div class="stack">
+        <div class="card">
+          <div class="card-head"><div><h2>${icon("lock")} Konto & Sicherheit</h2><p>Angemeldet als <b>${esc(me.username)}</b> · ${me.role === "admin" ? "Administrator" : "Mitglied"}</p></div></div>
+          <div class="callout good">${icon("shield")}<div>Deine Verträge, Dokumente und PDFs sind <b>verschlüsselt gespeichert</b> (AES-256).
+            Beim Abmelden wird dein Schlüssel aus dem Speicher gelöscht – danach kann niemand die Daten lesen, auch kein Admin.</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+            <button class="btn" id="pw">${icon("key")} Passwort ändern</button>
+            <button class="btn" id="rk">${icon("refresh")} Neuer Wiederherstellungsschlüssel</button>
+            <button class="btn btn-ghost" data-action="logout">${icon("logout")} Abmelden</button>
+          </div>
+        </div>
+
         <form class="card" id="profile">
           <div class="card-head"><div><h2>${icon("user")} Dein Profil</h2><p>Für die Begrüßung und als Absender im Kündigungsschreiben.</p></div></div>
           <div class="form-grid">
@@ -24,65 +44,38 @@ export async function renderSettings(view) {
           <div style="display:flex;justify-content:flex-end;margin-top:16px"><button class="btn btn-primary" type="submit">${icon("check")} Speichern</button></div>
         </form>
 
+        <form class="card" id="notify">
+          <div class="card-head"><div><h2>${icon("bell")} Benachrichtigungen</h2><p>Erinnerungen an Fristen – kommen auch, wenn du abgemeldet bist.</p></div></div>
+          <div class="form-grid">
+            <label class="field span-2"><span>E-Mail-Adresse</span><input type="email" name="notify_email" value="${esc(cfg.notify_email ?? "")}" placeholder="${
+              state.meta.smtp ? "du@example.org" : "E-Mail-Versand ist auf dem Server nicht eingerichtet"
+            }"/></label>
+            <label class="field span-2"><span>ntfy-Adresse (Push aufs Handy)</span><input name="ntfy_url" value="${esc(cfg.ntfy_url ?? "")}" placeholder="https://ntfy.sh/dein-geheimes-thema"/>
+              <small>In der ntfy-App ein Thema abonnieren und dessen Adresse hier eintragen.</small></label>
+            <label class="check span-all"><input type="checkbox" name="reveal_names" ${cfg.reveal_names ? "checked" : ""}/>
+              <span>Vertragsnamen in Erinnerungen & Kalender zeigen<br/><small class="muted">Aus: neutral wie „Kündigungsfrist Mobilfunk-Vertrag“. Diese Angaben bleiben für den Versand auch nach dem Abmelden lesbar.</small></span></label>
+          </div>
+          <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;flex-wrap:wrap">
+            <button class="btn" type="button" id="test">${icon("sparkles")} Test senden</button>
+            <button class="btn btn-primary" type="submit">${icon("check")} Speichern</button>
+          </div>
+        </form>
+
         <div class="card">
-          <div class="card-head"><div><h2>${icon("download")} Export</h2><p>Alle Vertragsdaten als JSON (ohne Dateien) – z. B. für Tabellen oder Archiv.</p></div></div>
+          <div class="card-head"><div><h2>${icon("download")} Export</h2><p>Deine Vertragsdaten als JSON (ohne Dateien) – Achtung: unverschlüsselt.</p></div></div>
           <div style="display:flex;gap:10px;flex-wrap:wrap">
             <a class="btn" href="/api/export">${icon("download")} JSON exportieren</a>
             <a class="btn btn-ghost" href="/api/calendar.ics">${icon("calendar")} Kalender (.ics)</a>
           </div>
         </div>
-
-        <div class="card">
-          <div class="card-head"><div><h2>${icon("info")} Über Contractly</h2></div></div>
-          <p class="small text-2" style="margin:0">Selbst gehostete Vertragsverwaltung. Deine Daten bleiben auf deinem Server – kein Vergleichsportal, keine Werbung, kein Tracking.
-          OCR: ${state.meta.ocr?.tesseract ? "verfügbar ✓" : "nicht verfügbar"} · Zugangsschutz: ${state.meta.auth ? "aktiv ✓" : "aus (CONTRACTLY_PASSWORD setzen)"}</p>
-        </div>
       </div>
 
       <div class="stack">
+        ${isAdmin() ? usersCard(users, me) + backupCard(backups) : memberInfo()}
         <div class="card">
-          <div class="card-head"><div><h2>${icon("shield")} Datensicherung</h2><p>Vollständiges Backup: Datenbank + alle Dokumente.</p></div></div>
-          <form id="bk" class="stack" style="gap:12px">
-            <label class="field"><span>${icon("lock")} Verschlüsseln mit Schlüssel <span class="muted">(optional, min. 8 Zeichen)</span></span>
-              <input type="password" name="passphrase" autocomplete="new-password" placeholder="Leer lassen = unverschlüsselt"/>
-              <small>AES-256-GCM. Ohne Schlüssel lässt sich das Backup nicht wiederherstellen – gut aufbewahren!</small></label>
-            ${cloud.configured ? `<label class="check"><input type="checkbox" name="upload" checked/> ${icon("cloud")} Danach in die Cloud hochladen (${esc(cloud.remote)})</label>` : ""}
-            <button class="btn btn-primary" type="submit">${icon("shield")} Backup jetzt erstellen</button>
-          </form>
-          <div class="callout ${cloud.configured ? "good" : ""}" style="margin-top:16px">${icon("cloud")}<div>
-            ${
-              cloud.configured
-                ? `Cloud-Ziel: <b>${esc(cloud.remote)}</b>`
-                : `Cloud-Backup (OneDrive, Google Drive, Dropbox, Nextcloud …) über <b>rclone</b>: Remote einrichten und <code>CONTRACTLY_BACKUP_REMOTE</code> setzen – siehe README.`
-            }
-            <br><span class="small">Automatisch: <b>${{ off: "aus", daily: "täglich", weekly: "wöchentlich" }[backups.schedule] || backups.schedule}</b>${
-              backups.schedule !== "off" ? ` · behält ${backups.keep} · ${backups.auto_encrypted ? "verschlüsselt 🔒" : "unverschlüsselt"}` : ""
-            }</span></div></div>
-          <div class="list" style="margin-top:12px" id="bk-list">
-            ${
-              backups.backups.length
-                ? backups.backups
-                    .map(
-                      (b) => `<div class="list-item">
-                    <span class="cat-icon sm" style="--c:var(--series-${b.encrypted ? 7 : 3})">${b.encrypted ? "🔒" : "📦"}</span>
-                    <div class="grow"><div class="title small">${esc(b.name)}</div>
-                      <div class="sub">${new Date(b.created_at).toLocaleString("de-DE")} · ${fileSize(b.size)}${b.automatic ? " · automatisch" : ""}</div></div>
-                    ${cloud.configured ? `<button class="btn btn-ghost btn-sm" data-up="${esc(b.name)}" title="In Cloud hochladen">${icon("cloud")}</button>` : ""}
-                    <a class="btn btn-ghost btn-sm" href="/api/backups/${encodeURIComponent(b.name)}" title="Herunterladen">${icon("download")}</a>
-                    <button class="btn btn-ghost btn-sm btn-danger" data-del="${esc(b.name)}" title="Löschen">${icon("trash")}</button></div>`,
-                    )
-                    .join("")
-                : `<p class="muted small">Noch keine Backups vorhanden.</p>`
-            }
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><div><h2>${icon("refresh")} Wiederherstellen</h2><p>Ersetzt alle aktuellen Daten. Vorher wird automatisch ein Sicherheits-Backup angelegt.</p></div></div>
-          <form id="restore" class="stack" style="gap:12px">
-            <input type="file" name="file" accept=".zip,.ctly" class="input"/>
-            <input type="password" name="passphrase" class="input" placeholder="Schlüssel (nur bei verschlüsselten Backups)" autocomplete="off"/>
-            <button class="btn" type="submit">${icon("upload")} Backup einspielen</button>
-          </form>
+          <div class="card-head"><div><h2>${icon("info")} Über Contractly</h2></div></div>
+          <p class="small text-2" style="margin:0">Selbst gehostete Vertragsverwaltung. Deine Daten bleiben auf deinem Server – kein Vergleichsportal, keine Werbung, kein Tracking.
+          Texterkennung (OCR): ${state.meta.ocr?.tesseract ? "verfügbar ✓" : "nicht verfügbar"}</p>
         </div>
       </div>
     </div>`;
@@ -92,6 +85,233 @@ export async function renderSettings(view) {
     state.profile = await api.saveProfile(formData(e.target));
     toast("Profil gespeichert");
   });
+  $("#notify", view).addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const d = formData(e.target);
+    try {
+      state.user = await api.saveAccountSettings({ notify_email: d.notify_email || "", ntfy_url: d.ntfy_url || "", reveal_names: !!d.reveal_names });
+      toast("Benachrichtigungen gespeichert");
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  });
+  $("#test", view).addEventListener("click", async (e) => {
+    busy(e.currentTarget);
+    try {
+      const r = await api.testNotification();
+      toast(`Gesendet über ${r.sent.join(" & ")}`);
+    } catch (err) {
+      toast(err.message, "error");
+    } finally {
+      busy(e.currentTarget, false);
+    }
+  });
+  $("#pw", view).addEventListener("click", changePasswordModal);
+  $("#rk", view).addEventListener("click", recoveryKeyModal);
+  if (isAdmin()) {
+    bindUsers(view);
+    bindBackups(view);
+  }
+}
+
+function memberInfo() {
+  return `<div class="card"><div class="card-head"><div><h2>${icon("users")} Mehrere Benutzer</h2></div></div>
+    <p class="small text-2" style="margin:0">Du hast einen eigenen, getrennt verschlüsselten Bereich. Benutzerverwaltung und Datensicherung übernimmt der Administrator.
+    Die Sicherungen enthalten deinen Bereich nur verschlüsselt – lesbar nur mit deinem Passwort.</p></div>`;
+}
+
+// ------------------------------------------------------------------ password & recovery key
+
+function changePasswordModal() {
+  const m = modal({
+    title: "Passwort ändern",
+    body: `<form class="stack" id="cp" style="gap:12px">
+      <label class="field"><span>Aktuelles Passwort</span><input type="password" name="old_password" autocomplete="current-password" required/></label>
+      <label class="field"><span>Neues Passwort</span><input type="password" name="new_password" autocomplete="new-password" required/>
+        <small>Mindestens 10 Zeichen. Deine Daten müssen dafür nicht neu verschlüsselt werden.</small></label>
+      <label class="field"><span>Neues Passwort wiederholen</span><input type="password" name="new_password2" autocomplete="new-password" required/></label>
+    </form>`,
+    foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-ok>${icon("check")} Ändern</button>`,
+  });
+  $("[data-ok]", m).addEventListener("click", async (e) => {
+    const d = formData($("#cp", m));
+    if (d.new_password !== d.new_password2) return toast("Die Passwörter stimmen nicht überein", "error");
+    busy(e.currentTarget);
+    try {
+      await api.changePassword({ old_password: d.old_password, new_password: d.new_password });
+      m.close();
+      toast("Passwort geändert – andere Geräte wurden abgemeldet");
+    } catch (err) {
+      busy(e.currentTarget, false);
+      toast(err.message, "error");
+    }
+  });
+}
+
+function recoveryKeyModal() {
+  const m = modal({
+    title: "Neuer Wiederherstellungsschlüssel",
+    body: `<p style="margin-top:0">Der bisherige Schlüssel wird ungültig. Bitte bestätige mit deinem Passwort.</p>
+      <label class="field"><span>Passwort</span><input type="password" id="rk-pw" autocomplete="current-password"/></label>
+      <div id="rk-out"></div>`,
+    foot: `<button class="btn" data-close>Schließen</button><button class="btn btn-primary" data-ok>${icon("key")} Erzeugen</button>`,
+  });
+  $("[data-ok]", m).addEventListener("click", async (e) => {
+    busy(e.currentTarget);
+    try {
+      const { recovery_key } = await api.newRecoveryKey($("#rk-pw", m).value);
+      $("#rk-out", m).innerHTML = `<div class="callout warn" style="margin-top:14px">${icon("alert")}<div>Nur jetzt sichtbar – sicher aufbewahren!</div></div>${recoveryKeyHtml(recovery_key)}`;
+      bindRecoveryKey($("#rk-out", m), recovery_key);
+      e.currentTarget.remove();
+    } catch (err) {
+      busy(e.currentTarget, false);
+      toast(err.message, "error");
+    }
+  });
+}
+
+// ------------------------------------------------------------------ users (admin)
+
+function usersCard(users, me) {
+  const fmt = (ts) => (ts ? new Date(ts * 1000).toLocaleDateString("de-DE") : "–");
+  return `<div class="card">
+    <div class="card-head"><div><h2>${icon("users")} Benutzer</h2><p>Jeder Benutzer hat einen eigenen, getrennt verschlüsselten Bereich – du siehst keine fremden Verträge.</p></div></div>
+    <div class="list" id="users">
+      ${users
+        .map(
+          (u) => `<div class="list-item">
+          <span class="avatar">${esc(u.username.slice(0, 1).toUpperCase())}</span>
+          <div class="grow"><div class="title">${esc(u.username)}${u.id === me.id ? ` <span class="badge info">Du</span>` : ""}</div>
+            <div class="sub">${u.role === "admin" ? "Administrator" : "Mitglied"} · ${
+              u.status === "invited" ? `Einladung offen bis ${fmt(u.invite_expires)}` : `zuletzt angemeldet ${fmt(u.last_login)}`
+            }</div></div>
+          ${
+            u.id === me.id
+              ? ""
+              : `<div class="menu"><button class="btn btn-ghost btn-sm" data-menu aria-label="Aktionen">${icon("more")}</button>
+                  <div class="menu-pop">
+                    ${u.status === "invited" ? `<button data-renew="${u.id}">${icon("refresh")} Neuen Einladungscode</button>` : ""}
+                    <button data-role="${u.id}" data-to="${u.role === "admin" ? "member" : "admin"}">${icon("shield")} ${u.role === "admin" ? "Zum Mitglied machen" : "Zum Admin machen"}</button>
+                    <hr/><button class="danger" data-del-user="${u.id}" data-name="${esc(u.username)}">${icon("trash")} Benutzer & Daten löschen</button>
+                  </div></div>`
+          }
+        </div>`,
+        )
+        .join("")}
+    </div>
+    <form id="invite" class="form-grid" style="margin-top:14px">
+      <label class="field"><span>Neuer Benutzer</span><input name="username" placeholder="z. B. Anna" required/></label>
+      <label class="field"><span>Rolle</span><select name="role"><option value="member">Mitglied</option><option value="admin">Administrator</option></select></label>
+      <div class="field span-all"><button class="btn btn-primary" type="submit">${icon("plus")} Einladen</button></div>
+    </form>
+  </div>`;
+}
+
+function showInviteCode(username, code) {
+  const text = `Hallo ${username},\n\ndu wurdest zu Contractly eingeladen.\n1. ${location.origin} öffnen\n2. „Einladungscode einlösen“ wählen\n3. Benutzername: ${username}\n   Einladungscode: ${code}\n4. Eigenes Passwort festlegen.\n\nDer Code ist 7 Tage gültig.`;
+  const m = modal({
+    title: "Einladung erstellt",
+    body: `<p style="margin-top:0">Gib <b>${esc(username)}</b> diesen Code (7 Tage gültig). Damit legt die Person ihr eigenes Passwort fest – du erfährst es nicht und kannst ihre Daten nicht lesen.</p>
+      <div class="recovery-key mono">${esc(code)}</div>
+      <textarea class="input mono small" rows="7" readonly id="inv-text">${esc(text)}</textarea>`,
+    foot: `<button class="btn" data-copy>${icon("copy")} Nachricht kopieren</button><button class="btn btn-primary" data-close>Fertig</button>`,
+  });
+  $("[data-copy]", m).addEventListener("click", async () => {
+    await navigator.clipboard.writeText(text);
+    toast("Kopiert");
+  });
+}
+
+function bindUsers(view) {
+  $("#invite", view).addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const d = formData(e.target);
+    try {
+      const r = await api.inviteUser({ username: d.username, role: d.role || "member" });
+      showInviteCode(r.user.username, r.code);
+      router();
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  });
+  $("#users", view).addEventListener("click", async (e) => {
+    const renew = e.target.closest("[data-renew]");
+    const role = e.target.closest("[data-role]");
+    const del = e.target.closest("[data-del-user]");
+    try {
+      if (renew) {
+        const r = await api.renewInvite(renew.dataset.renew);
+        showInviteCode(r.user.username, r.code);
+        router();
+      }
+      if (role) {
+        await api.setRole(role.dataset.role, role.dataset.to);
+        toast("Rolle geändert");
+        router();
+      }
+      if (del && (await confirmDialog(`„${del.dataset.name}“ und alle Verträge, Dokumente und Erinnerungen dieser Person endgültig löschen?`))) {
+        await api.deleteUser(del.dataset.delUser);
+        toast("Benutzer gelöscht");
+        router();
+      }
+    } catch (err) {
+      toast(err.message, "error");
+    }
+  });
+}
+
+// ------------------------------------------------------------------ backups (admin)
+
+function backupCard(backups) {
+  const cloud = backups.cloud;
+  return `
+    <div class="card">
+      <div class="card-head"><div><h2>${icon("shield")} Datensicherung</h2><p>Alle Benutzer inkl. Dokumente – die Bereiche bleiben mit den Schlüsseln der Benutzer verschlüsselt.</p></div></div>
+      <form id="bk" class="stack" style="gap:12px">
+        <label class="field"><span>${icon("lock")} Zusätzlich verschlüsseln mit Backup-Schlüssel <span class="muted">(optional, min. 8 Zeichen)</span></span>
+          <input type="password" name="passphrase" autocomplete="new-password" placeholder="Leer lassen = nur Benutzer-Verschlüsselung"/>
+          <small>Schützt auch die Benutzerliste. Ohne diesen Schlüssel lässt sich das Backup nicht einspielen.</small></label>
+        ${cloud.configured ? `<label class="check"><input type="checkbox" name="upload" checked/> ${icon("cloud")} Danach in die Cloud hochladen (${esc(cloud.remote)})</label>` : ""}
+        <button class="btn btn-primary" type="submit">${icon("shield")} Backup jetzt erstellen</button>
+      </form>
+      <div class="callout ${cloud.configured ? "good" : ""}" style="margin-top:16px">${icon("cloud")}<div>
+        ${
+          cloud.configured
+            ? `Cloud-Ziel: <b>${esc(cloud.remote)}</b>`
+            : `Cloud-Backup (OneDrive, Google Drive, Dropbox, Nextcloud …) über <b>rclone</b>: Remote einrichten und <code>CONTRACTLY_BACKUP_REMOTE</code> setzen – siehe README.`
+        }
+        <br><span class="small">Automatisch: <b>${{ off: "aus", daily: "täglich", weekly: "wöchentlich" }[backups.schedule] || backups.schedule}</b>${
+          backups.schedule !== "off" ? ` · behält ${backups.keep}${backups.auto_encrypted ? " · mit Backup-Schlüssel 🔒" : ""}` : ""
+        } – läuft auch, wenn niemand angemeldet ist.</span></div></div>
+      <div class="list" style="margin-top:12px" id="bk-list">
+        ${
+          backups.backups.length
+            ? backups.backups
+                .map(
+                  (b) => `<div class="list-item">
+                <span class="cat-icon sm" style="--c:var(--series-${b.encrypted ? 7 : 3})">${b.encrypted ? "🔒" : "📦"}</span>
+                <div class="grow"><div class="title small">${esc(b.name)}</div>
+                  <div class="sub">${new Date(b.created_at).toLocaleString("de-DE")} · ${fileSize(b.size)}${b.automatic ? " · automatisch" : ""}</div></div>
+                ${cloud.configured ? `<button class="btn btn-ghost btn-sm" data-up="${esc(b.name)}" title="In Cloud hochladen">${icon("cloud")}</button>` : ""}
+                <a class="btn btn-ghost btn-sm" href="/api/backups/${encodeURIComponent(b.name)}" title="Herunterladen">${icon("download")}</a>
+                <button class="btn btn-ghost btn-sm btn-danger" data-del="${esc(b.name)}" title="Löschen">${icon("trash")}</button></div>`,
+                )
+                .join("")
+            : `<p class="muted small">Noch keine Backups vorhanden.</p>`
+        }
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-head"><div><h2>${icon("refresh")} Wiederherstellen</h2><p>Ersetzt alle Benutzer und Daten durch den Stand des Backups. Danach melden sich alle mit dem damals gültigen Passwort an.</p></div></div>
+      <form id="restore" class="stack" style="gap:12px">
+        <input type="file" name="file" accept=".zip,.ctly" class="input"/>
+        <input type="password" name="passphrase" class="input" placeholder="Backup-Schlüssel (nur bei .ctly-Dateien)" autocomplete="off"/>
+        <button class="btn" type="submit">${icon("upload")} Backup einspielen</button>
+      </form>
+    </div>`;
+}
+
+function bindBackups(view) {
   $("#bk", view).addEventListener("submit", async (e) => {
     e.preventDefault();
     const d = formData(e.target);
@@ -128,14 +348,16 @@ export async function renderSettings(view) {
     e.preventDefault();
     const file = e.target.file.files[0];
     if (!file) return toast("Bitte eine Backup-Datei wählen", "error");
-    if (!(await confirmDialog("Alle aktuellen Daten werden durch das Backup ersetzt. Fortfahren?", { okLabel: "Wiederherstellen" }))) return;
+    if (!(await confirmDialog("Alle aktuellen Benutzer und Daten werden durch das Backup ersetzt. Fortfahren?", { okLabel: "Wiederherstellen" })))
+      return;
     const btn = $("button[type=submit]", e.target);
     busy(btn);
     try {
       const res = await api.restoreBackup(file, e.target.passphrase.value);
-      toast(`Wiederhergestellt (${res.documents} Dokumente)`);
+      toast(`Wiederhergestellt (${res.users} Benutzer, ${res.documents} Dokumente)`);
       state.profile = null;
-      location.hash = "#/";
+      if (res.relogin) start();
+      else location.hash = "#/";
     } catch (err) {
       toast(err.message, "error");
       busy(btn, false);
@@ -152,13 +374,15 @@ export async function renderMore(view) {
         ${[
           ["#/timeline", "timeline", "Zeitstrahl", "Abschlüsse, Wechsel & Fristen"],
           ["#/costs", "chart", "Kosten & Prognose", "Verlauf und Hochrechnung"],
-          ["#/settings", "settings", "Einstellungen", "Profil, Backup, Export"],
+          ["#/settings", "settings", "Einstellungen", "Konto, Sicherheit, Benachrichtigungen"],
         ]
           .map(
             ([href, ic, t, s]) => `<a class="list-item" href="${href}" style="padding:14px 10px">
               <span class="kpi-icon">${icon(ic)}</span><div class="grow"><div class="title">${t}</div><div class="sub">${s}</div></div>${icon("chevRight")}</a>`,
           )
           .join("")}
+        <button class="list-item" data-action="logout" style="padding:14px 10px;border:0;background:none;width:100%;text-align:left;cursor:pointer">
+          <span class="kpi-icon">${icon("logout")}</span><div class="grow"><div class="title">Abmelden</div><div class="sub">Daten wieder verschlüsseln</div></div></button>
       </div>
     </div>`;
 }

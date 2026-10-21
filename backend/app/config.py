@@ -7,7 +7,6 @@ from pathlib import Path
 class Settings:
     def __init__(self) -> None:
         self.data_dir = Path(os.environ.get("CONTRACTLY_DATA_DIR", "/data"))
-        self.database_url = os.environ.get("CONTRACTLY_DATABASE_URL", f"sqlite:///{self.data_dir / 'contractly.db'}")
         self.documents_dir = self.data_dir / "documents"
         self.static_dir = Path(
             os.environ.get(
@@ -15,9 +14,9 @@ class Settings:
                 Path(__file__).resolve().parent.parent.parent / "frontend",
             )
         )
-        self.username = os.environ.get("CONTRACTLY_USERNAME", "admin")
-        # Basic auth is only enforced when a password is configured.
-        self.password = os.environ.get("CONTRACTLY_PASSWORD", "")
+        # Login sessions (the encryption key itself stays in memory until restart or "lock").
+        self.session_hours = float(os.environ.get("CONTRACTLY_SESSION_HOURS", "12"))
+        self.session_days_remember = float(os.environ.get("CONTRACTLY_SESSION_DAYS_REMEMBER", "30"))
         self.max_upload_mb = int(os.environ.get("CONTRACTLY_MAX_UPLOAD_MB", "25"))
         # Notifications (all optional)
         self.public_url = os.environ.get("CONTRACTLY_PUBLIC_URL", "").rstrip("/")
@@ -43,9 +42,12 @@ class Settings:
         # rclone remote, e.g. "onedrive:Backups/Contractly" or "gdrive:Contractly"
         self.backup_remote = os.environ.get("CONTRACTLY_BACKUP_REMOTE", "")
 
+    @property
+    def db_path(self) -> Path:
+        return self.data_dir / "contractly.db"
+
     def ensure_dirs(self) -> None:
         self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.documents_dir.mkdir(parents=True, exist_ok=True)
         self.backup_dir.mkdir(parents=True, exist_ok=True)
 
 

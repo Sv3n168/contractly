@@ -1,11 +1,14 @@
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 
 from .. import backup
 from ..config import settings
+from .auth import COOKIE, require_admin
 
-router = APIRouter(prefix="/api/backups", tags=["backups"])
+# Backups cover the whole instance and are an admin task. They contain every user's area
+# in encrypted form only, so admins cannot read other users' data through them.
+router = APIRouter(prefix="/api/backups", tags=["backups"], dependencies=[Depends(require_admin)])
 
 
 class BackupIn(BaseModel):
@@ -62,7 +65,15 @@ def delete(name: str):
 
 
 @router.post("/restore")
-async def restore(file: UploadFile = File(...), passphrase: str | None = Form(None)):
+async def restore(
+    request: Request,
+    response: Response,
+    file: UploadFile = File(...),
+    passphrase: str | None = Form(None),
+):
+    """``passphrase`` = backup key of a .ctly file."""
     blob = await file.read()
-    result = _wrap(backup.restore, blob, passphrase or None)
+    result = _wrap(backup.restore, blob, passphrase or None, request.state.user_id)
+    if result["relogin"]:
+        response.delete_cookie(COOKIE, path="/")
     return {"restored": True, **result}

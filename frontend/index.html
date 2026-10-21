@@ -11,16 +11,12 @@
     <link rel="apple-touch-icon" href="/icon.svg" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <script>
-      try {
-        const t = localStorage.getItem("contractly-theme");
-        if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
-      } catch (e) {}
-    </script>
+    <script src="/static/js/theme.js"></script>
     <link rel="stylesheet" href="/static/css/app.css" />
   </head>
   <body>
-    <div class="app">
+    <div id="auth-root" class="hidden"></div>
+    <div class="app hidden" id="app-shell">
       <aside class="sidebar" aria-label="Hauptnavigation">
         <a class="brand" href="#/">
           <span class="brand-mark" data-icon="layers"></span><span class="label">Contractly</span>
@@ -40,7 +36,9 @@
         <a class="nav-link" href="#/reminders" data-route="reminders" title="Erinnerungen"><span data-icon="bell"></span><span class="label">Erinnerungen</span><span class="nav-badge hidden" data-due-badge></span></a>
         <a class="nav-link" href="#/settings" data-route="settings" title="Einstellungen"><span data-icon="settings"></span><span class="label">Einstellungen</span></a>
         <div class="sidebar-footer">
+          <a class="user-chip" href="#/settings" title="Konto & Einstellungen"><span class="avatar" data-user-initial></span><span class="label"><b data-user-name></b><small data-user-role></small></span></a>
           <button class="btn btn-ghost btn-icon" data-action="theme" title="Hell/Dunkel umschalten"><span data-icon="moon"></span></button>
+          <button class="btn btn-ghost btn-icon" data-action="logout" title="Abmelden – Daten werden wieder verschlüsselt"><span data-icon="logout"></span></button>
         </div>
       </aside>
 
@@ -48,6 +46,7 @@
         <a class="brand" href="#/"><span class="brand-mark" data-icon="layers"></span><span>Contractly</span></a>
         <button class="btn btn-ghost btn-icon" data-action="search" aria-label="Suchen"><span data-icon="search"></span></button>
         <button class="btn btn-ghost btn-icon" data-action="theme" aria-label="Hell/Dunkel"><span data-icon="moon"></span></button>
+        <button class="btn btn-ghost btn-icon" data-action="logout" aria-label="Abmelden"><span data-icon="logout"></span></button>
       </header>
 
       <main class="main" id="view" tabindex="-1"></main>

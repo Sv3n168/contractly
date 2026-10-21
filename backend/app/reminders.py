@@ -7,19 +7,26 @@ Two kinds of reminders exist:
 
 import asyncio
 import base64
+import json
 import logging
+import os
 import smtplib
 import ssl
 import urllib.request
 from datetime import date, timedelta
 from email.message import EmailMessage
+from pathlib import Path
+from urllib.parse import urlparse
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import calc
+from . import db as database
+from .categories import CATEGORY_MAP
 from .config import settings
 from .models import Contract, NotificationLog, Reminder
+from .security import vault
 
 log = logging.getLogger("contractly.reminders")
 
@@ -114,35 +121,113 @@ def collect(db: Session, ref: date, horizon_days: int = 60, include_dismissed: b
     return result
 
 
+# --------------------------------------------------------------------------- outbox
+#
+# While a user is logged out their data is encrypted and unreadable. To still deliver
+# reminders (and serve the calendar feed), the upcoming reminders are kept in a small
+# per-user "outbox" with dates and – unless the user opts in to contract names – only
+# neutral labels such as "Kündigungsfrist Mobilfunk-Vertrag".
+
+OUTBOX_DAYS = 400
+
+
+def outbox_path(user_id: str) -> Path:
+    return database.user_dir(user_id) / "outbox.json"
+
+
+def load_outbox(user_id: str) -> dict:
+    path = outbox_path(user_id)
+    if not path.is_file():
+        return {"items": [], "sent": []}
+    return json.loads(path.read_text())
+
+
+def _save_outbox(user_id: str, data: dict) -> None:
+    path = outbox_path(user_id)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(data, indent=1, default=str))
+    os.chmod(tmp, 0o600)
+    tmp.replace(path)
+
+
+def _neutral_title(item: dict) -> str:
+    label = CATEGORY_MAP.get(item.get("category") or "", {}).get("label")
+    what = f"{label}-Vertrag" if label else "Vertrag"
+    if item["kind"] == "deadline":
+        return f"Kündigungsfrist {what}"
+    if item["kind"] == "contract_end":
+        return f"Vertragsende {what}"
+    return f"Erinnerung ({what})" if item.get("contract_id") else "Eigene Erinnerung"
+
+
+def refresh_outbox(user_id: str) -> None:
+    """Rebuild the outbox from the (unlocked) user database."""
+    if not database.is_open(user_id):
+        return
+    reveal = vault.user(user_id).get("settings", {}).get("reveal_names", False)
+    with database.session(user_id) as db:
+        items = collect(db, date.today(), horizon_days=OUTBOX_DAYS)
+    data = load_outbox(user_id)
+    data["items"] = [
+        {
+            "key": i["key"],
+            "kind": i["kind"],
+            "date": i["date"].isoformat(),
+            "notify_date": i["notify_date"].isoformat(),
+            "title": i["title"] if reveal else _neutral_title(i),
+            "detail": (i.get("detail") or "") if reveal else "",
+            "contract_id": i.get("contract_id"),
+            "alarm_days": 14 if i["kind"] == "deadline" else None,
+        }
+        for i in items
+    ]
+    data["generated_at"] = date.today().isoformat()
+    _save_outbox(user_id, data)
+
+
 # --------------------------------------------------------------------------- delivery
 
 
-def channels() -> dict[str, bool]:
+def _targets(user_id: str) -> dict:
+    """Where to deliver a user's notifications. The admin falls back to the global env settings."""
+    user = vault.user(user_id)
+    cfg = user.get("settings", {})
+    is_admin = user.get("role") == "admin"
+    ntfy = cfg.get("ntfy_url") or (settings.ntfy_url if is_admin else "")
+    email = cfg.get("notify_email") or (settings.smtp_to if is_admin else "")
+    return {"ntfy": ntfy, "email": email if settings.smtp_host else ""}
+
+
+def channels(user_id: str) -> dict[str, bool]:
+    t = _targets(user_id)
     return {
-        "ntfy": bool(settings.ntfy_url),
-        "email": bool(settings.smtp_host and settings.smtp_to),
+        "ntfy": bool(t["ntfy"]),
+        "email": bool(t["email"]),
+        "smtp_available": bool(settings.smtp_host),
         "calendar": True,
     }
 
 
-def _send_ntfy(title: str, body: str, link: str | None) -> None:
-    req = urllib.request.Request(settings.ntfy_url, data=body.encode("utf-8"), method="POST")
+def _send_ntfy(url: str, title: str, body: str, link: str | None) -> None:
+    req = urllib.request.Request(url, data=body.encode("utf-8"), method="POST")
     # HTTP headers must be latin-1; ntfy accepts RFC 2047 encoded titles.
     req.add_header("Title", "=?UTF-8?B?" + base64.b64encode(title.encode()).decode() + "?=")
     req.add_header("Tags", "calendar")
     if link:
         req.add_header("Click", link)
-    if settings.ntfy_token:
+    # The global access token only goes to the server configured via CONTRACTLY_NTFY_URL.
+    if settings.ntfy_token and settings.ntfy_url and urlparse(url).netloc == urlparse(settings.ntfy_url).netloc:
         req.add_header("Authorization", f"Bearer {settings.ntfy_token}")
     with urllib.request.urlopen(req, timeout=15):
         pass
 
 
-def _send_mail(title: str, body: str) -> None:
+def _send_mail(to: str, title: str, body: str) -> None:
     msg = EmailMessage()
     msg["Subject"] = title
     msg["From"] = settings.smtp_from or settings.smtp_user
-    msg["To"] = settings.smtp_to
+    msg["To"] = to
     msg.set_content(body)
     if settings.smtp_security == "ssl":
         server = smtplib.SMTP_SSL(
@@ -158,18 +243,19 @@ def _send_mail(title: str, body: str) -> None:
         server.send_message(msg)
 
 
-def send(title: str, body: str, link: str | None = None) -> list[str]:
-    """Send through all configured channels; returns the channels that succeeded."""
+def send(user_id: str, title: str, body: str, link: str | None = None) -> list[str]:
+    """Send through the user's configured channels; returns the channels that succeeded."""
+    t = _targets(user_id)
     sent = []
-    if settings.ntfy_url:
+    if t["ntfy"]:
         try:
-            _send_ntfy(title, body, link)
+            _send_ntfy(t["ntfy"], title, body, link)
             sent.append("ntfy")
         except Exception:  # noqa: BLE001 - delivery must never crash the app
             log.exception("ntfy notification failed")
-    if settings.smtp_host and settings.smtp_to:
+    if t["email"]:
         try:
-            _send_mail(title, body)
+            _send_mail(t["email"], title, body)
             sent.append("email")
         except Exception:  # noqa: BLE001
             log.exception("e-mail notification failed")
@@ -177,7 +263,7 @@ def send(title: str, body: str, link: str | None = None) -> list[str]:
 
 
 def _format(item: dict) -> tuple[str, str, str | None]:
-    when = item["date"].strftime("%d.%m.%Y")
+    when = date.fromisoformat(item["date"]).strftime("%d.%m.%Y")
     body = f"{item['title']} – fällig am {when}"
     if item.get("detail"):
         body += f"\n{item['detail']}"
@@ -192,36 +278,46 @@ def _format(item: dict) -> tuple[str, str, str | None]:
     return f"Contractly: {item['title']}", body, link
 
 
-def dispatch_due(db: Session, ref: date) -> int:
-    """Send notifications for due reminders that were not sent yet. Returns the number sent."""
-    if not any((settings.ntfy_url, settings.smtp_host and settings.smtp_to)):
+def dispatch_due(user_id: str, ref: date) -> int:
+    """Send due reminders of one user from the outbox (works while the user is logged out)."""
+    if not any(_targets(user_id).values()):
         return 0
-    logged = _logged_keys(db)
+    data = load_outbox(user_id)
+    sent = set(data.get("sent", []))
     count = 0
-    for item in collect(db, ref, horizon_days=0):
-        key = f"sent:{item['key']}"
-        if not item["due"] or key in logged:
+    for item in data.get("items", []):
+        if item["notify_date"] > ref.isoformat() or item["key"] in sent:
             continue
-        if send(*_format(item)):
-            db.add(NotificationLog(key=key))
-            db.commit()
+        if send(user_id, *_format(item)):
+            sent.add(item["key"])
             count += 1
+    current = {i["key"] for i in data.get("items", [])}
+    data["sent"] = sorted(k for k in sent if k in current)
+    _save_outbox(user_id, data)
     return count
 
 
-async def notifier_loop(session_factory) -> None:
-    interval = max(settings.notify_interval_min, 1) * 60
-
-    def run_once() -> int:
-        db = session_factory()
+def run_notifications(ref: date | None = None) -> int:
+    ref = ref or date.today()
+    vault.expire_sessions()
+    total = 0
+    for user in vault.users():
+        if user.get("status") != "active":
+            continue
+        uid = user["id"]
         try:
-            return dispatch_due(db, date.today())
-        finally:
-            db.close()
+            refresh_outbox(uid)
+            total += dispatch_due(uid, ref)
+        except Exception:  # noqa: BLE001
+            log.exception("reminders for user %s failed", uid)
+    return total
 
+
+async def notifier_loop() -> None:
+    interval = max(settings.notify_interval_min, 1) * 60
     while True:
         try:
-            sent = await asyncio.to_thread(run_once)
+            sent = await asyncio.to_thread(run_notifications)
             if sent:
                 log.info("sent %d reminder notification(s)", sent)
         except Exception:  # noqa: BLE001

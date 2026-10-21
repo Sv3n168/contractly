@@ -4,10 +4,11 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .. import reminders as svc
-from ..db import get_db
+from ..db import get_db, require_user
 from ..models import Contract, NotificationLog, Reminder
 from ..schemas import ReminderIn, ReminderOut
 from ..services import today
+from .auth import current_user_id
 
 router = APIRouter(prefix="/api/reminders", tags=["reminders"])
 
@@ -34,7 +35,7 @@ def upcoming(
     return {
         "items": items,
         "due_count": sum(1 for i in items if i["due"] and not i["dismissed"]),
-        "channels": svc.channels(),
+        "channels": svc.channels(require_user()),
     }
 
 
@@ -53,6 +54,7 @@ def create_reminder(data: ReminderIn, db: Session = Depends(get_db)):
     db.add(r)
     db.commit()
     db.refresh(r)
+    svc.refresh_outbox(require_user())
     return r
 
 
@@ -64,6 +66,7 @@ def update_reminder(reminder_id: int, data: ReminderIn, db: Session = Depends(ge
         setattr(r, key, value)
     db.commit()
     db.refresh(r)
+    svc.refresh_outbox(require_user())
     return r
 
 
@@ -77,6 +80,7 @@ def complete_reminder(reminder_id: int, db: Session = Depends(get_db)):
         r.done_at = today()
     db.commit()
     db.refresh(r)
+    svc.refresh_outbox(require_user())
     return r
 
 
@@ -84,6 +88,7 @@ def complete_reminder(reminder_id: int, db: Session = Depends(get_db)):
 def delete_reminder(reminder_id: int, db: Session = Depends(get_db)):
     db.delete(_get(db, reminder_id))
     db.commit()
+    svc.refresh_outbox(require_user())
     return Response(status_code=204)
 
 
@@ -99,11 +104,11 @@ def dismiss(key: str = Query(min_length=3, max_length=180), db: Session = Depend
 
 
 @router.post("/test")
-def test_notification():
-    channels = svc.channels()
+def test_notification(user_id: str = Depends(current_user_id)):
+    channels = svc.channels(user_id)
     if not (channels["ntfy"] or channels["email"]):
-        raise HTTPException(400, "Kein Benachrichtigungskanal konfiguriert (ntfy oder SMTP)")
-    sent = svc.send("Contractly: Testbenachrichtigung", "Benachrichtigungen funktionieren 🎉")
+        raise HTTPException(400, "Kein Benachrichtigungskanal eingerichtet (Einstellungen → Benachrichtigungen)")
+    sent = svc.send(user_id, "Contractly: Testbenachrichtigung", "Benachrichtigungen funktionieren 🎉")
     if not sent:
         raise HTTPException(502, "Versand fehlgeschlagen – siehe Container-Log")
     return {"sent": sent}

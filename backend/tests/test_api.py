@@ -98,7 +98,9 @@ def test_reminders(client):
     client.post("/api/reminders/dismiss", params={"key": deadline["key"]})
     keys = [i["key"] for i in client.get("/api/reminders/upcoming").json()["items"]]
     assert deadline["key"] not in keys
-    assert "Kündigungsfrist" in client.get("/api/calendar.ics").text
+    # dismissed deadline is gone, the (neutrally labelled) own reminder is in the calendar
+    cal = client.get("/api/calendar.ics").text
+    assert "Eigene Erinnerung" in cal and "Kündigungsfrist" not in cal
     assert c["id"]
 
 
@@ -193,3 +195,9 @@ def test_switch_with_bonus_and_promo(client):
     titles = [r["title"] for r in new["reminders"]]
     assert any("Wechselbonus" in t for t in titles)
     assert any("Aktionspreis" in t for t in titles)
+
+
+def test_meta(client):
+    meta = client.get("/api/meta").json()
+    assert {c["key"] for c in meta["categories"]} >= {"mobile", "electricity", "fitness"}
+    assert "smtp" in meta and "ocr" in meta

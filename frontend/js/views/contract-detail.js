@@ -59,11 +59,13 @@ export async function renderContractDetail(view, id, query = {}) {
           <div class="menu-pop">
             <button data-act="extra">${icon("plus")} Zusatzkosten erfassen</button>
             <button data-act="price">${icon("euro")} Preisänderung erfassen</button>
+            ${c.state === "active" ? `<button data-act="pause">${icon("clock")} Pausieren (ruhend stellen)</button>` : ""}
             ${
               c.state === "active"
                 ? `<button data-act="cancel">${icon("ban")} Als gekündigt markieren</button>`
                 : c.state === "cancelled"
-                  ? `<button data-act="reactivate">${icon("refresh")} Kündigung zurücknehmen</button>`
+                  ? `${c.cancellation_confirmed_on ? "" : `<button data-act="confirmed">${icon("check")} Kündigungsbestätigung erhalten</button>`}
+                     <button data-act="reactivate">${icon("refresh")} Kündigung zurücknehmen</button>`
                   : ""
             }
             <button data-act="letter">${icon("mail")} Kündigungsschreiben</button>
@@ -96,6 +98,12 @@ export async function renderContractDetail(view, id, query = {}) {
     if (!act) return;
     if (act === "price") priceModal(c, null, () => reload("prices"));
     if (act === "extra") extraModal(c, null, () => reload());
+    if (act === "pause") pauseModal(c, () => reload());
+    if (act === "confirmed") {
+      await api.confirmCancellation(c.id);
+      toast("Bestätigung vermerkt ✓");
+      reload();
+    }
     if (act === "cancel") cancelModal(c, () => reload());
     if (act === "reactivate") {
       await api.reactivateContract(id);
@@ -151,7 +159,15 @@ async function overviewTab(el, c, reload) {
       <div class="card kpi hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Pro Monat</div>
         <div class="kpi-value num">${money(c.monthly_cost)}</div>
-        <div class="kpi-sub">${c.current_price && c.current_price.interval !== "monthly" ? `${money(c.current_price.amount)} ${intervalLabel(c.current_price.interval)}` : "aktueller Preis"}</div>
+        <div class="kpi-sub">${
+          c.current_price?.details?.kind === "pause"
+            ? "pausiert – keine Kosten"
+            : c.share_percent != null && c.share_percent !== 100
+            ? `dein Anteil ${c.share_percent} % von ${money(c.full_monthly_cost)}`
+            : c.current_price && c.current_price.interval !== "monthly"
+              ? `${money(c.current_price.amount)} ${intervalLabel(c.current_price.interval)}`
+              : "aktueller Preis"
+        }</div>
       </div>
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("calendar")}</span>Pro Jahr</div>
         <div class="kpi-value num">${money(c.yearly_cost)}</div><div class="kpi-sub">${
@@ -214,7 +230,12 @@ async function overviewTab(el, c, reload) {
                 c.successor_ids.length ? ` Nachfolger: <a href="#/contracts/${c.successor_ids[0]}">ansehen</a>` : ""
               }</div></div>`
             : c.state === "cancelled"
-              ? `<div class="callout warn">${icon("clock")}<div>Gekündigt${c.cancelled_on ? ` am ${fmtDate(c.cancelled_on)}` : ""} – läuft noch bis <b>${fmtDate(c.end_date)}</b> (${relDays(daysUntil(c.end_date))}).</div></div>`
+              ? `<div class="callout warn">${icon("clock")}<div>Gekündigt${c.cancelled_on ? ` am ${fmtDate(c.cancelled_on)}` : ""} – läuft noch bis <b>${fmtDate(c.end_date)}</b> (${relDays(daysUntil(c.end_date))}).
+                  <br/>${
+                    c.cancellation_confirmed_on
+                      ? `${icon("check", "inline")} Bestätigung erhalten am ${fmtDate(c.cancellation_confirmed_on)}`
+                      : `<b>Bestätigung des Anbieters steht noch aus.</b> <button class="btn btn-sm" id="confirm-btn" style="margin-top:6px">${icon("check")} Bestätigung erhalten</button>`
+                  }</div></div>`
               : c.cancellation_deadline
                 ? deadlineCallout(c)
                 : ""
@@ -246,6 +267,11 @@ async function overviewTab(el, c, reload) {
   chainLine($("#hist", el), hist.months, hist.series, colors, { currentMonth: hist.current_month, extras: hist.extras });
   $("#extra-btn", el)?.addEventListener("click", () => extraModal(c, null, () => reload()));
   $("#cancel-btn", el)?.addEventListener("click", () => cancelModal(c, () => reload()));
+  $("#confirm-btn", el)?.addEventListener("click", async () => {
+    await api.confirmCancellation(c.id);
+    toast("Bestätigung vermerkt ✓");
+    reload();
+  });
   $("#letter-btn", el)?.addEventListener("click", () => openLetter(c));
 }
 
@@ -443,6 +469,38 @@ export function priceModal(c, existing, done) {
       }
       m.close();
       toast("Preis gespeichert");
+      done();
+    } catch (err) {
+      busy(e.currentTarget, false);
+      toast(err.message, "error");
+    }
+  });
+}
+
+// ------------------------------------------------------------------ pause
+
+function pauseModal(c, done) {
+  const m = modal({
+    title: "Vertrag pausieren",
+    body: `<p style="margin-top:0">Für die Zeit der Pause (z. B. Krankheit, Elternzeit, Auslandsaufenthalt) fallen keine Kosten an. Danach gilt wieder der bisherige Preis.</p>
+      <div class="form-grid">
+        <label class="field"><span>Pause ab</span><input type="date" name="from_date" value="${today()}"/></label>
+        <label class="field"><span>Pause bis</span><input type="date" name="until"/><small>Leer = unbestimmt</small></label>
+        <label class="check span-all"><input type="checkbox" name="extend_term" ${c.min_term_months ? "checked" : "disabled"}/> Mindestlaufzeit um die Pause verlängern (bei Fitnessstudios üblich)</label>
+      </div>`,
+    foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-ok>${icon("clock")} Pausieren</button>`,
+  });
+  $("[data-ok]", m).addEventListener("click", async (e) => {
+    const body = $(".modal-body", m);
+    busy(e.currentTarget);
+    try {
+      await api.pauseContract(c.id, {
+        from_date: $("[name=from_date]", body).value,
+        until: $("[name=until]", body).value || null,
+        extend_term: $("[name=extend_term]", body).checked,
+      });
+      m.close();
+      toast("Pausiert – in dieser Zeit fallen keine Kosten an");
       done();
     } catch (err) {
       busy(e.currentTarget, false);

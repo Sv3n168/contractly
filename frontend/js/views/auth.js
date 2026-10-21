@@ -79,6 +79,8 @@ function render(mode) {
       <form class="stack" id="f" style="gap:14px;margin-top:18px">
         <label class="field"><span>Benutzername</span><input name="username" autocomplete="username" required autofocus/></label>
         <label class="field"><span>Passwort</span><input type="password" name="password" autocomplete="current-password" required/></label>
+        <label class="field hidden" id="totp-field"><span>${icon("shield", "inline")} Code aus der Authenticator-App</span>
+          <input name="totp" class="mono" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456"/></label>
         <label class="check small"><input type="checkbox" name="remember"/> Angemeldet bleiben (30 Tage, nur auf eigenen Geräten)</label>
         <button class="btn btn-primary btn-block" type="submit">${icon("lock")} Anmelden & entschlüsseln</button>
       </form>
@@ -86,7 +88,9 @@ function render(mode) {
         <a href="#" data-mode="activate">${icon("key", "inline")} Einladungscode einlösen</a>
         <a href="#" data-mode="recover">Passwort vergessen?</a>
       </div>`);
-    bind("login", (d) => api.login({ username: d.username, password: d.password, remember: d.remember }));
+    bind("login", (d) =>
+      api.login({ username: d.username, password: d.password, remember: d.remember, totp: d.totp || null }),
+    );
   } else if (mode === "activate") {
     frame(`
       <h1>Einladung annehmen</h1>
@@ -152,8 +156,15 @@ function bind(mode, call, withNewPassword = false) {
       else finish();
     } catch (err) {
       busy(btn, false);
-      toast(err.message, "error");
-      if (mode === "login") form.password.select();
+      if (mode === "login" && err.message === "totp_required") {
+        // Password was right; 2FA is enabled -> ask for the app code.
+        const field = $("#totp-field", form);
+        field.classList.remove("hidden");
+        field.querySelector("input").focus();
+        return;
+      }
+      toast(err.message === "totp_required" ? "Bitte Code eingeben" : err.message, "error");
+      if (mode === "login") (form.totp?.value ? form.totp : form.password).select();
     }
   });
 }

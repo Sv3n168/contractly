@@ -1,0 +1,27 @@
+Auftragskonto;Buchungstag;Valutadatum;Buchungstext;Verwendungszweck;Glaeubiger ID;Mandatsreferenz;Beguenstigter/Zahlungspflichtiger;Kontonummer/IBAN;BIC (SWIFT-Code);Betrag;Waehrung;Info
+DE1;03.02.26;x;LASTSCHRIFT;Rechnung 0;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-39,95;EUR;
+DE1;15.02.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.02.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;03.03.26;x;LASTSCHRIFT;Rechnung 1;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-39,95;EUR;
+DE1;15.03.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.03.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;03.04.26;x;LASTSCHRIFT;Rechnung 2;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-54,95;EUR;
+DE1;15.04.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.04.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;03.05.26;x;LASTSCHRIFT;Rechnung 3;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-39,95;EUR;
+DE1;15.05.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.05.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;03.06.26;x;LASTSCHRIFT;Rechnung 4;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-39,95;EUR;
+DE1;15.06.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.06.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;03.06.26;x;KARTENZAHLUNG;Einkauf;;;REWE Markt;DE6;BIC;-54,20;EUR;
+DE1;03.07.26;x;LASTSCHRIFT;Rechnung 5;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-42,95;EUR;
+DE1;15.07.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.07.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;03.08.26;x;LASTSCHRIFT;Rechnung 6;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-42,95;EUR;
+DE1;15.08.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.08.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;03.09.26;x;LASTSCHRIFT;Rechnung 7;DE11ZZZ;M1;Telekom Deutschland GmbH;DE9;BIC;-42,95;EUR;
+DE1;15.09.26;x;LASTSCHRIFT;Mitgliedsbeitrag;DE22ZZZ;M2;FitX Deutschland GmbH;DE8;BIC;-35,00;EUR;Umsatz gebucht
+DE1;25.09.26;x;GUTSCHRIFT;Gehalt;;;Arbeitgeber AG;DE7;BIC;2500,00;EUR;
+DE1;10.01.26;x;LASTSCHRIFT;Beitrag 2026;DE33ZZZ;M3;HUK-COBURG;DE5;BIC;-534,00;EUR;

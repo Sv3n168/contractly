@@ -25,6 +25,12 @@ export async function renderSettings(view) {
           <div class="card-head"><div><h2>${icon("lock")} Konto & Sicherheit</h2><p>Angemeldet als <b>${esc(me.username)}</b> · ${me.role === "admin" ? "Administrator" : "Mitglied"}</p></div></div>
           <div class="callout good">${icon("shield")}<div>Deine Verträge, Dokumente und PDFs sind <b>verschlüsselt gespeichert</b> (AES-256).
             Beim Abmelden wird dein Schlüssel aus dem Speicher gelöscht – danach kann niemand die Daten lesen, auch kein Admin.</div></div>
+          <div class="list-item" style="margin-top:12px;border-top:1px solid var(--border)">
+            <span class="kpi-icon">${icon("shield")}</span>
+            <div class="grow"><div class="title">Zwei-Faktor-Anmeldung</div>
+              <div class="sub">${me.totp_enabled ? "Aktiv – beim Anmelden wird zusätzlich ein Code aus der Authenticator-App abgefragt." : "Zusätzlicher Code aus einer Authenticator-App (z. B. Aegis, Google Authenticator)."}</div></div>
+            <button class="btn btn-sm ${me.totp_enabled ? "btn-ghost" : "btn-primary"}" id="totp">${me.totp_enabled ? "Ausschalten" : "Einrichten"}</button>
+          </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
             <button class="btn" id="pw">${icon("key")} Passwort ändern</button>
             <button class="btn" id="rk">${icon("refresh")} Neuer Wiederherstellungsschlüssel</button>
@@ -60,6 +66,16 @@ export async function renderSettings(view) {
             <button class="btn btn-primary" type="submit">${icon("check")} Speichern</button>
           </div>
         </form>
+
+        <div class="card">
+          <div class="card-head"><div><h2>${icon("home")} Home Assistant</h2><p>Monatskosten, nächste Frist & offene Erinnerungen als Sensor – nur lesend.</p></div></div>
+          ${
+            me.api_token
+              ? `<div class="callout good">${icon("check")}<div>Ein API-Token ist aktiv. Contractly hält dafür einige Kennzahlen (Summen, nächster Termin mit neutraler Bezeichnung) auch im abgemeldeten Zustand bereit.</div></div>
+                 <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn" id="ha-new">${icon("refresh")} Neuer Token</button><button class="btn btn-ghost btn-danger" id="ha-off">${icon("x")} Abschalten</button></div>`
+              : `<button class="btn" id="ha-new">${icon("plus")} API-Token erzeugen</button>`
+          }
+        </div>
 
         <div class="card">
           <div class="card-head"><div><h2>${icon("download")} Export</h2><p>Deine Vertragsdaten als JSON (ohne Dateien) – Achtung: unverschlüsselt.</p></div></div>
@@ -107,6 +123,14 @@ export async function renderSettings(view) {
     }
   });
   $("#pw", view).addEventListener("click", changePasswordModal);
+  $("#totp", view).addEventListener("click", () => (me.totp_enabled ? disableTotpModal() : enableTotpModal()));
+  $("#ha-new", view).addEventListener("click", haTokenModal);
+  $("#ha-off", view)?.addEventListener("click", async () => {
+    if (await confirmDialog("API-Token löschen? Home Assistant erhält dann keine Werte mehr.", { okLabel: "Abschalten" })) {
+      await api.revokeApiToken();
+      router();
+    }
+  });
   $("#rk", view).addEventListener("click", recoveryKeyModal);
   if (isAdmin()) {
     bindUsers(view);
@@ -168,6 +192,84 @@ function recoveryKeyModal() {
       toast(err.message, "error");
     }
   });
+}
+
+// ------------------------------------------------------------------ 2FA & Home Assistant
+
+async function enableTotpModal() {
+  const setup = await api.totpSetup();
+  const m = modal({
+    title: "Zwei-Faktor-Anmeldung einrichten",
+    body: `<ol class="small text-2" style="margin-top:0;padding-left:18px">
+        <li>QR-Code mit einer Authenticator-App scannen (z. B. Aegis, 2FAS, Google oder Microsoft Authenticator).</li>
+        <li>Den angezeigten 6-stelligen Code eingeben.</li></ol>
+      <div class="qr">${setup.qr_svg}</div>
+      <details class="more" style="margin:10px 0"><summary>Code manuell eingeben${icon("chevDown", "chev")}</summary><div class="body mono small" style="word-break:break-all">${esc(setup.secret)}</div></details>
+      <label class="field"><span>Code aus der App</span><input class="mono" id="totp-code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123456"/></label>
+      <p class="small muted">Handy verloren? Mit deinem Wiederherstellungsschlüssel kommst du trotzdem rein – dabei wird die Zwei-Faktor-Anmeldung zurückgesetzt.</p>`,
+    foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-ok>${icon("check")} Aktivieren</button>`,
+  });
+  $("[data-ok]", m).addEventListener("click", async (e) => {
+    busy(e.currentTarget);
+    try {
+      await api.totpEnable($("#totp-code", m).value);
+      m.close();
+      toast("Zwei-Faktor-Anmeldung ist aktiv 🔐");
+      router();
+    } catch (err) {
+      busy(e.currentTarget, false);
+      toast(err.message, "error");
+    }
+  });
+}
+
+function disableTotpModal() {
+  const m = modal({
+    title: "Zwei-Faktor-Anmeldung ausschalten",
+    body: `<label class="field"><span>Passwort zur Bestätigung</span><input type="password" id="pw-off" autocomplete="current-password"/></label>`,
+    foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-ok>Ausschalten</button>`,
+  });
+  $("[data-ok]", m).addEventListener("click", async (e) => {
+    busy(e.currentTarget);
+    try {
+      await api.totpDisable($("#pw-off", m).value);
+      m.close();
+      toast("Zwei-Faktor-Anmeldung ausgeschaltet");
+      router();
+    } catch (err) {
+      busy(e.currentTarget, false);
+      toast(err.message, "error");
+    }
+  });
+}
+
+async function haTokenModal() {
+  const { token } = await api.createApiToken();
+  const url = `${location.origin}/api/ha/summary`;
+  const yaml = `rest:
+  - resource: ${url}
+    headers:
+      Authorization: "Bearer ${token}"
+    scan_interval: 3600
+    sensor:
+      - name: "Vertragskosten pro Monat"
+        value_template: "{{ value_json.monthly_total }}"
+        unit_of_measurement: "€"
+      - name: "Nächste Vertragsfrist"
+        value_template: "{{ value_json.next_date }}"
+        json_attributes: [next_title, due_reminders, active_contracts]`;
+  const m = modal({
+    title: "Home Assistant verbinden",
+    wide: true,
+    body: `<p style="margin-top:0">In die <code>configuration.yaml</code> von Home Assistant einfügen und neu starten. Der Token wird nur jetzt angezeigt.</p>
+      <textarea class="input mono small" rows="13" readonly>${esc(yaml)}</textarea>`,
+    foot: `<button class="btn" data-copy>${icon("copy")} Kopieren</button><button class="btn btn-primary" data-close>Fertig</button>`,
+  });
+  $("[data-copy]", m).addEventListener("click", async () => {
+    await navigator.clipboard.writeText(yaml);
+    toast("Kopiert");
+  });
+  m.querySelector("[data-close]").addEventListener("click", () => router());
 }
 
 // ------------------------------------------------------------------ users (admin)
@@ -374,6 +476,8 @@ export async function renderMore(view) {
         ${[
           ["#/timeline", "timeline", "Zeitstrahl", "Abschlüsse, Wechsel & Fristen"],
           ["#/costs", "chart", "Kosten & Prognose", "Verlauf und Hochrechnung"],
+          ["#/report", "printer", "Jahresbericht", "Überblick, Steuer-Export, PDF"],
+          ["#/import", "upload", "Importieren", "Kontoauszug oder Vertragsliste"],
           ["#/settings", "settings", "Einstellungen", "Konto, Sicherheit, Benachrichtigungen"],
         ]
           .map(

@@ -30,15 +30,29 @@ Verträge, und alle Daten bleiben auf deinem Server.
 | **Backup** | Vollbackup (Datenbank und Dokumente), optional **AES-256-verschlüsselt mit eigenem Schlüssel**. Automatisch täglich oder wöchentlich, Upload in **OneDrive, Google Drive, Dropbox, Nextcloud, S3 …** (über rclone), Wiederherstellung in der Oberfläche |
 | **Sicherheit** | Anmeldeseite mit eigenem Konto. **Datenbank, Dokumente (PDFs, Fotos) und Backups sind verschlüsselt gespeichert** (SQLCipher/AES-256). Der Schlüssel entsteht aus dem Passwort und liegt nur während der Anmeldung im Arbeitsspeicher. Nach dem Abmelden ist nichts mehr lesbar. Dazu Wiederherstellungsschlüssel, Schutz vor Passwort-Raten und Sicherheits-Header |
 | **Mehrere Benutzer** | Jede Person hat einen **eigenen, getrennt verschlüsselten Bereich**. Der Admin lädt per Einladungscode ein; das Passwort legt die Person selbst fest, daher kann auch der Admin keine fremden Verträge lesen |
-| **Komfort** | Responsive für Desktop (Seitenleiste), Tablet (Icon-Leiste) und Smartphone (Navigation unten). Hell/Dunkel, Schnellsuche (Strg+K), als App installierbar (PWA), Demo-Daten zum Ausprobieren |
+| **Importieren** | **Kontoauszug** (CSV/Excel aus dem Online-Banking) hochladen: regelmäßige Abbuchungen werden als Verträge vorgeschlagen, inklusive Preisverlauf. Preiserhöhungen bei bestehenden Verträgen und einzelne teurere Monate werden erkannt. Außerdem **Vertragslisten** aus Excel/CSV übernehmen (Vorlage zum Download). Die Dateien werden nicht gespeichert |
+| **Alltagssituationen** | **Kostenanteil** (Partner zahlt die Hälfte), **Pausieren** (z. B. Fitnessstudio ruhend, auf Wunsch mit verlängerter Laufzeit), **Kündigungsbestätigung** nachverfolgen, automatische Erinnerungen an **Widerrufsfrist**, **Ende der Preisgarantie**, **angekündigte Preiserhöhungen** (Sonderkündigungsrecht), fehlende Kündigungsbestätigung und einen jährlichen **Abo-Check** („Nutzt du das noch?“). Hinweis auf **doppelte Verträge** beim Anlegen |
+| **Jahresbericht & Steuer** | „Dein Vertragsjahr“: Kosten, Kategorien, Wechsel, Preisänderungen, druckbar als PDF. **Steuer-Export** (CSV) der steuerlich relevanten Verträge (Vorgabe je Kategorie, pro Vertrag änderbar) |
+| **Zwei-Faktor-Anmeldung** | Optional per Authenticator-App (TOTP, QR-Code). Das Geheimnis ist mit dem Datenschlüssel verschlüsselt; der Wiederherstellungsschlüssel hilft auch bei verlorenem Handy |
+| **Home Assistant** | Lesender API-Token: Monatskosten, nächste Frist und offene Erinnerungen als REST-Sensor (fertiges YAML zum Kopieren) |
+| **Komfort** | Responsive für Desktop (Seitenleiste), Tablet (Icon-Leiste) und Smartphone (Navigation unten). Vertrag direkt mit der **Handykamera** fotografieren. Hell/Dunkel, Schnellsuche (Strg+K), als App installierbar (PWA), Demo-Daten zum Ausprobieren |
 
 ## Schnellstart
 
+Fertige Images für x86 und ARM (Raspberry Pi, Synology & Co.) liegen unter
+`ghcr.io/sv3n168/contractly`. Es reicht die `docker-compose.yml`:
+
 ```bash
-git clone https://github.com/sv3n168/contractly.git
-cd contractly
-docker compose up -d --build
+mkdir contractly && cd contractly
+curl -O https://raw.githubusercontent.com/sv3n168/contractly/main/docker-compose.yml
+docker compose up -d
 ```
+
+Updates: `docker compose pull && docker compose up -d`. Die Datenbank wird beim nächsten Anmelden
+automatisch auf den neuen Stand migriert.
+
+Selbst bauen: Repository klonen, in der `docker-compose.yml` `image:` durch `build: .` ersetzen und
+`docker compose up -d --build` ausführen.
 
 Danach <http://localhost:8000> öffnen. Bei leerer Datenbank kannst du mit einem Klick Demo-Daten laden.
 
@@ -58,9 +72,12 @@ Alle Daten (Datenbank, Dokumente, Backups) liegen im Ordner `./data`.
 - Jede Person hat einen zufälligen Datenschlüssel. Damit sind ihre SQLCipher-Datenbank und alle
   hochgeladenen Dateien verschlüsselt (AES-256). Gespeichert wird der Datenschlüssel nur
   verschlüsselt: einmal mit dem Passwort (scrypt), einmal mit dem Wiederherstellungsschlüssel.
-- Nach der Anmeldung liegt der Schlüssel nur im Arbeitsspeicher des Servers. **Abmelden** (bzw.
-  Ablauf der Sitzung oder ein Neustart des Containers) löscht ihn. Ab dann sind Datenbank und PDFs
-  auch für den Server unlesbar.
+- Nach der Anmeldung liegt der Schlüssel im Arbeitsspeicher des Servers. In der Sitzungsdatenbank
+  (`sessions.db`) steht er nur verschlüsselt mit einem Geheimnis, das ausschließlich im Cookie deines
+  Browsers steckt. Deshalb übersteht eine Anmeldung einen Neustart und funktioniert auch mit mehreren
+  Containern auf demselben Datenordner, ohne dass der Server die Daten alleine öffnen kann.
+- **Abmelden** (bzw. Ablauf der Sitzung) löscht Schlüssel und Sitzung. Ab dann sind Datenbank und
+  PDFs auch für den Server unlesbar.
 - PDFs werden beim Ansehen im Arbeitsspeicher entschlüsselt. Für die Texterkennung entsteht kurz eine
   Kopie in `/dev/shm` (RAM), die danach sofort gelöscht wird.
 - Damit **Erinnerungen und der Kalender** auch im abgemeldeten Zustand funktionieren, merkt sich
@@ -165,8 +182,24 @@ cd backend
 python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 CONTRACTLY_DATA_DIR=../data uvicorn app.main:app --reload   # http://localhost:8000
-python -m pytest
+python -m pytest                                            # Backend-Tests
+
+cd ../e2e && npm ci && npx playwright install chromium
+PYTHON=../backend/.venv/bin/python npx playwright test      # Oberflächen-Tests (Desktop & Smartphone)
 ```
+
+**Datenbank-Änderungen** laufen über Alembic-Migrationen (`backend/app/migrations/versions/`). Nach
+einer Änderung an `models.py` eine neue Migration erzeugen:
+
+```bash
+python -c "from alembic import command; from sqlalchemy import create_engine; from app.migrate import alembic_config
+e = create_engine('sqlite://')
+with e.begin() as c:
+    command.upgrade(alembic_config(c), 'head')
+    command.revision(alembic_config(c), message='beschreibung', autogenerate=True)"
+```
+
+Migrationen werden automatisch ausgeführt, sobald eine Benutzer-Datenbank geöffnet wird.
 
 Für OCR werden lokal `tesseract-ocr`, `tesseract-ocr-deu` und `poppler-utils` benötigt.
 
@@ -175,6 +208,8 @@ Für OCR werden lokal `tesseract-ocr`, `tesseract-ocr-deu` und `poppler-utils` b
 - `backend/app`: FastAPI, SQLAlchemy mit SQLCipher (verschlüsseltes SQLite, je Benutzer eine Datei
   unter `data/users/<id>/`). Benutzer, Sitzungen und Schlüssel stehen in `security.py`. Berechnungen für Kosten, Fristen und Vergleiche stehen in `calc.py`, Erinnerungen in `reminders.py`, Backups in `backup.py`, die Texterkennung in `ocr.py`.
 - `frontend/`: Single-Page-App ohne Build-Schritt (ES-Module, Chart.js mitgeliefert, funktioniert offline).
+- `e2e/`: Playwright-Tests der Oberfläche. Sie laufen in der CI, zusammen mit den Backend-Tests und
+  einem Docker-Smoke-Test. Bei jedem Push auf `main` wird das Multi-Arch-Image veröffentlicht.
 - REST-API mit interaktiver Doku unter `/docs`.
 
 ## Lizenz

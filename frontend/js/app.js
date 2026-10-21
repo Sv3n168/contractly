@@ -13,6 +13,8 @@ import { renderCosts } from "./views/costs.js";
 import { renderReminders } from "./views/reminders.js";
 import { renderSettings, renderMore } from "./views/settings.js";
 import { hideAuth, showAuth } from "./views/auth.js";
+import { renderImport } from "./views/import.js";
+import { renderReport } from "./views/report.js";
 
 const routes = [
   [/^\/?$/, "dashboard", renderDashboard],
@@ -24,6 +26,8 @@ const routes = [
   [/^\/costs$/, "costs", renderCosts],
   [/^\/reminders$/, "reminders", renderReminders],
   [/^\/settings$/, "settings", renderSettings],
+  [/^\/import$/, "import", renderImport],
+  [/^\/report$/, "report", renderReport],
   [/^\/more$/, "more", renderMore],
 ];
 

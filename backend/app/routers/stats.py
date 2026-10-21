@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from .. import calc, ocr
-from ..categories import CATEGORIES, CATEGORY_MAP, INTERVALS, tax_relevant
+from ..categories import CATEGORIES, CATEGORY_MAP, INTERVALS, TAX_RELEVANT_DEFAULT, tax_relevant
 from ..config import settings
 from ..db import get_db
 from ..models import AppSetting
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api", tags=["stats"])
 @router.get("/meta")
 def meta():
     return {
-        "categories": CATEGORIES,
+        "categories": [{**c, "tax_default": c["key"] in TAX_RELEVANT_DEFAULT} for c in CATEGORIES],
         "intervals": INTERVALS,
         "today": today(),
         "ocr": ocr.available(),

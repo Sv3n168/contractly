@@ -121,4 +121,28 @@ export const api = {
   },
 
   demo: () => request("POST", "/api/demo"),
+
+  pauseContract: (id, data) => request("POST", `/api/contracts/${id}/pause`, data),
+  confirmCancellation: (id, data = {}) => request("POST", `/api/contracts/${id}/cancellation-confirmed`, data),
+  stillUsed: (id) => request("POST", `/api/contracts/${id}/still-used`),
+
+  analyzeBank: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request("POST", "/api/import/bank", fd);
+  },
+  analyzeContractList: (file) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    return request("POST", "/api/import/contracts", fd);
+  },
+  applyImport: (data) => request("POST", "/api/import/apply", data),
+
+  report: (year) => request("GET", `/api/stats/report${qs({ year })}`),
+
+  totpSetup: () => request("POST", "/api/auth/2fa/setup"),
+  totpEnable: (code) => request("POST", "/api/auth/2fa/enable", { code }),
+  totpDisable: (password) => request("POST", "/api/auth/2fa/disable", { password }),
+  createApiToken: () => request("POST", "/api/auth/api-token"),
+  revokeApiToken: () => request("DELETE", "/api/auth/api-token"),
 };

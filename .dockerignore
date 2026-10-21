@@ -5,3 +5,5 @@
 data
 backend/tests
 *.md
+e2e
+.github

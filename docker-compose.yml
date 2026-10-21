@@ -1,7 +1,7 @@
 services:
   contractly:
-    build: .
-    image: contractly:latest
+    # Fertiges Image (x86 & ARM). Zum Selbstbauen stattdessen „build: .“ verwenden.
+    image: ghcr.io/sv3n168/contractly:latest
     container_name: contractly
     restart: unless-stopped
     ports:

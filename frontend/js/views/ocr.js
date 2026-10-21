@@ -115,5 +115,10 @@ export function contractPayload(c) {
     attributes: { ...(c.attributes || {}) },
     notes: c.notes,
     predecessor_id: c.predecessor_id,
+    share_percent: c.share_percent,
+    cancellation_confirmed_on: c.cancellation_confirmed_on,
+    tax_relevant: c.tax_relevant,
+    withdrawal_until: c.withdrawal_until,
+    last_checked_on: c.last_checked_on,
   };
 }

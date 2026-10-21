@@ -2043,6 +2043,27 @@ details.more > .body {
   body {
     background: #fff;
   }
+  .app {
+    display: block;
+  }
+  .main {
+    padding: 0;
+    max-width: none;
+  }
+  .card {
+    box-shadow: none;
+    break-inside: avoid;
+  }
+  .kpi.hero {
+    color: #000;
+    background: #f1f2f8;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .kpi.hero .kpi-label,
+  .kpi.hero .kpi-sub {
+    color: #333;
+  }
   .sidebar,
   .topbar,
   .bottom-nav,
@@ -2243,5 +2264,28 @@ body:not(.is-admin) .admin-only {
   .auth-main {
     place-items: start center;
     padding: 24px 16px 40px;
+  }
+}
+
+.qr {
+  display: grid;
+  place-items: center;
+  padding: 10px;
+  background: #fff;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.qr svg {
+  width: 220px;
+  height: auto;
+}
+
+/* Camera shortcut only where it makes sense (touch devices) */
+.camera-only {
+  display: none;
+}
+@media (pointer: coarse) {
+  .camera-only {
+    display: flex;
   }
 }

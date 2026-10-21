@@ -6,6 +6,8 @@ import { catColorVar, category, catIcon, isEnergy, state } from "../store.js";
 import { $, $$, busy, esc, formData, icon, today, toast } from "../ui.js";
 import { applySuggestionsToForm } from "./ocr.js";
 
+const form_q = (root, sel) => root.querySelector(sel);
+
 export function attributeInputs(cat, values = {}, prefix = "attr_", fields = null) {
   return (fields || category(cat).fields || [])
     .map((f) => {
@@ -71,6 +73,8 @@ export async function renderContractForm(view, id, query = {}) {
         <label class="dropzone" id="drop">${icon("scan")}<b>Datei auswählen oder hierher ziehen</b>
           <span class="muted small">PDF, JPG, PNG · wird dem Vertrag angehängt</span>
           <input type="file" accept=".pdf,image/*" hidden /></label>
+        <label class="btn btn-block camera-only" style="margin-top:10px">${icon("scan")} Vertrag mit der Kamera fotografieren
+          <input type="file" accept="image/*" capture="environment" hidden data-camera /></label>
         <div id="ocr-status" style="margin-top:12px"></div>
       </div>`;
     $$(".cat-tile", view).forEach((b) =>
@@ -149,6 +153,13 @@ export async function renderContractForm(view, id, query = {}) {
             <label class="field"><span>Vertragsbeginn</span>
               <input name="start_date" type="date" value="${esc(src.start_date || query.start || today())}" required /></label>
           </div>
+          <div id="dup-hint"></div>
+          ${
+            editing
+              ? ""
+              : `<label class="check small" style="margin-top:14px"><input type="checkbox" name="withdrawal" checked/>
+                  Gerade erst abgeschlossen? An die 14-tägige Widerrufsfrist erinnern</label>`
+          }
           ${
             isEnergy(cat) && !editing
               ? `<div class="callout" style="margin-top:16px">${icon("info")}<div>Bei Strom & Gas trägst du als Preis am einfachsten den <b>monatlichen Abschlag</b> ein. Grund- und Arbeitspreis für den Vergleich findest du unten bei den Eckdaten.</div></div>`
@@ -190,8 +201,14 @@ export async function renderContractForm(view, id, query = {}) {
         </details>
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("file")} Nummern, Adresse & Notizen${icon("chevDown", "chev")}</summary>
+          <summary>${icon("file")} Nummern, Kostenanteil & Notizen${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
+            <label class="field"><span>Mein Anteil</span><div class="input-group">
+              <input name="share_percent" type="number" min="0" max="100" value="${esc(src.share_percent ?? 100)}"/><span class="addon">%</span></div>
+              <small>z. B. 50, wenn Partner:in die Hälfte zahlt</small></label>
+            <label class="check" style="align-self:center"><input type="checkbox" name="tax_relevant" ${
+              (src.tax_relevant ?? category(cat).tax_default) ? "checked" : ""
+            }/> Steuerlich relevant</label>
             <label class="field"><span>Kundennummer</span><input name="customer_number" value="${esc(src.customer_number ?? pred.customer_number ?? "")}" /></label>
             <label class="field"><span>Vertragsnummer</span><input name="contract_number" value="${esc(src.contract_number ?? "")}" /></label>
             <label class="field span-2"><span>Anschrift des Anbieters <span class="muted">(für Kündigungsschreiben)</span></span>
@@ -215,6 +232,21 @@ export async function renderContractForm(view, id, query = {}) {
 
     $("#change-cat", view)?.addEventListener("click", drawCategoryStep);
     fillProviderList();
+    if (!editing && !predecessor) {
+      // Gentle hint when the same contract seems to exist already.
+      const providerInput = form_q(view, "[name=provider]");
+      providerInput.addEventListener("change", async () => {
+        const p = providerInput.value.trim().toLowerCase();
+        const hint = $("#dup-hint", view);
+        if (!p) return (hint.innerHTML = "");
+        const list = await api.contracts({ include_ended: false });
+        const dup = list.find((c) => c.category === cat && (c.provider || "").toLowerCase() === p);
+        hint.innerHTML = dup
+          ? `<div class="callout warn" style="margin-top:14px">${icon("info")}<div>Du hast schon <a href="#/contracts/${dup.id}">${esc(dup.name)}</a> bei ${esc(dup.provider)}.
+              Neuer Tarif beim selben Anbieter? Dann besser dort „Durch neuen Vertrag ersetzen“ – so bleibt der Kostenverlauf durchgehend.</div></div>`
+          : "";
+      });
+    }
     const form = $("#form", view);
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
@@ -239,6 +271,17 @@ export async function renderContractForm(view, id, query = {}) {
         reminder_days: data.reminder_days,
         notes: data.notes,
         attributes: { ...(editing?.attributes || {}), ...collectAttributes(data) },
+        share_percent: data.share_percent == null || data.share_percent === 100 ? null : data.share_percent,
+        tax_relevant: data.tax_relevant === category(cat).tax_default ? null : data.tax_relevant,
+        // keep values that this form doesn't edit
+        cancellation_confirmed_on: editing?.cancellation_confirmed_on ?? null,
+        last_checked_on: editing?.last_checked_on ?? null,
+        withdrawal_until: editing
+          ? editing.withdrawal_until
+          : // only for contracts signed just now (an old contract has no withdrawal period left)
+            data.withdrawal && (data.start_date || today()) >= new Date(Date.now() - 14 * 86400000).toISOString().slice(0, 10)
+            ? new Date(Date.now() + 14 * 86400000).toISOString().slice(0, 10)
+            : null,
       };
       // Unchecked/emptied attributes must be removable when editing.
       if (editing) {
@@ -306,6 +349,8 @@ export function setupDrop(root, onFile) {
   const drop = $("#drop", root) || $(".dropzone", root);
   const input = $("input[type=file]", drop);
   input.addEventListener("change", () => input.files[0] && onFile(input.files[0]));
+  const camera = root.querySelector("[data-camera]");
+  camera?.addEventListener("change", () => camera.files[0] && onFile(camera.files[0]));
   ["dragenter", "dragover"].forEach((ev) =>
     drop.addEventListener(ev, (e) => {
       e.preventDefault();

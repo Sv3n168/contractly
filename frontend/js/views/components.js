@@ -62,7 +62,9 @@ export function contractCard(c) {
       ${c.state !== "active" ? stateBadge(c) : ""}
     </div>
     <div class="cc-price"><strong class="num">${money(c.monthly_cost)}</strong>${priceLine}</div>
-    <div class="cc-meta">${attrChips(c)}${c.predecessor_id ? `<span class="badge info">${icon("swap")} gewechselt</span>` : ""}</div>
+    <div class="cc-meta">${c.current_price?.details?.kind === "pause" ? `<span class="badge warn">${icon("clock")} pausiert</span>` : ""}${
+      c.share_percent != null && c.share_percent !== 100 ? `<span class="badge info">Anteil ${c.share_percent} %</span>` : ""
+    }${attrChips(c)}${c.predecessor_id ? `<span class="badge info">${icon("swap")} gewechselt</span>` : ""}</div>
     <div class="cc-foot">
       ${deadlineHint(c) || `<span>seit ${fmtDate(c.start_date)}</span>`}
       <span class="num">${money(c.yearly_cost, true)}/Jahr</span>
@@ -77,7 +79,17 @@ export function datePill(d, urgency = "") {
 
 export function reminderItem(item, { actions = true, compact = false } = {}) {
   const urgency = item.days_left < 0 || item.days_left <= 7 ? "urgent" : item.days_left <= 30 ? "soon" : "";
-  const kindIcon = { deadline: "alert", contract_end: "clock", custom: "bell" }[item.kind] || "bell";
+  const kindIcon =
+    {
+      deadline: "alert",
+      contract_end: "clock",
+      custom: "bell",
+      price_increase: "trendUp",
+      price_guarantee: "shield",
+      withdrawal: "refresh",
+      confirmation: "mail",
+      subscription_check: "sparkles",
+    }[item.kind] || "bell";
   const href = item.contract_id ? `#/contracts/${item.contract_id}` : "#/reminders";
   return `
   <div class="list-item">
@@ -86,13 +98,7 @@ export function reminderItem(item, { actions = true, compact = false } = {}) {
       <div class="title">${esc(item.title)}</div>
       <div class="sub">${icon(kindIcon, "inline")} ${esc(relDays(item.days_left))}${item.detail && !compact ? " · " + esc(item.detail) : ""}</div>
     </a>
-    ${
-      actions
-        ? item.kind === "custom"
-          ? `<button class="btn btn-sm" data-done="${item.reminder_id}" title="Erledigt">${icon("check")}</button>`
-          : `<button class="btn btn-sm btn-ghost" data-dismiss="${esc(item.key)}" title="Ausblenden">${icon("x")}</button>`
-        : ""
-    }
+    ${actions ? reminderActions(item) : ""}
   </div>`;
 }
 
@@ -106,7 +112,15 @@ export function bindReminderActions(root, api, onChange) {
   root.addEventListener("click", async (e) => {
     const done = e.target.closest("[data-done]");
     const dismiss = e.target.closest("[data-dismiss]");
-    if (done) {
+    const used = e.target.closest("[data-still-used]");
+    const confirmed = e.target.closest("[data-confirmed]");
+    if (used) {
+      await api.stillUsed(used.dataset.stillUsed);
+      onChange("Prima – wir fragen in einem Jahr wieder");
+    } else if (confirmed) {
+      await api.confirmCancellation(confirmed.dataset.confirmed);
+      onChange("Bestätigung vermerkt ✓");
+    } else if (done) {
       await api.completeReminder(done.dataset.done);
       onChange("Erledigt ✓");
     } else if (dismiss) {
@@ -114,4 +128,22 @@ export function bindReminderActions(root, api, onChange) {
       onChange("Ausgeblendet");
     }
   });
+}
+
+function reminderActions(item) {
+  const dismiss = `<button class="btn btn-sm btn-ghost" data-dismiss="${esc(item.key)}" title="Ausblenden">${icon("x")}</button>`;
+  switch (item.kind) {
+    case "custom":
+      return `<button class="btn btn-sm" data-done="${item.reminder_id}" title="Erledigt">${icon("check")}</button>`;
+    case "subscription_check":
+      return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-still-used="${item.contract_id}" title="Nutze ich noch">${icon("check")}<span class="label">Nutze ich</span></button>
+        <a class="btn btn-sm btn-ghost" href="#/contracts/${item.contract_id}" title="Kündigen">${icon("ban")}</a></div>`;
+    case "confirmation":
+      return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-confirmed="${item.contract_id}" title="Bestätigung erhalten">${icon("check")}</button>${dismiss}</div>`;
+    case "price_increase":
+    case "price_guarantee":
+      return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm" href="#/contracts/${item.contract_id}?tab=compare" title="Vergleichen">${icon("scale")}</a>${dismiss}</div>`;
+    default:
+      return dismiss;
+  }
 }

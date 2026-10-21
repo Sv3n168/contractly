@@ -2,14 +2,14 @@ const { test, expect } = require("@playwright/test");
 const path = require("path");
 const { watchErrors } = require("./helpers");
 
-test("bank statement import suggests contracts", async ({ page }) => {
+test("contract list import", async ({ page }) => {
   const check = watchErrors(page);
   await page.goto("/#/import");
-  await page.setInputFiles("#drop input[type=file]", path.join(__dirname, "..", "fixtures", "umsaetze.csv"));
-  await expect(page.locator("#bank-result")).toContainText("regelmäßige Zahlungen");
+  await page.setInputFiles("#drop input[type=file]", path.join(__dirname, "..", "fixtures", "vertraege.csv"));
+  await expect(page.locator("#list-result")).toContainText("Yoga-Studio Sonnenschein");
   await page.click("#apply");
   await expect(page).toHaveURL(/#\/contracts$/);
-  await expect(page.locator(".contract-card", { hasText: "FitX Deutschland" })).toBeVisible();
+  await expect(page.locator(".contract-card", { hasText: "Yoga-Studio Sonnenschein" })).toBeVisible();
   check();
 });
 

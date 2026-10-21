@@ -287,30 +287,66 @@ function deadlineCallout(c) {
     ${cls === "good" ? "Entspannt – genug Zeit zum Vergleichen." : "Jetzt vergleichen lohnt sich!"}</div></div>`;
 }
 
+const MONTH_INITIALS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
+const readingUnit = (c) => (c.category === "gas" ? "m³" : "kWh");
+
+function forecastText(e) {
+  const f = e.forecast;
+  if (!f) return "Basierend auf dem hinterlegten Jahresverbrauch";
+  const how = f.learned ? "an deinen Haushalt angepasst" : "mit typischem Jahresverlauf";
+  const rough = f.relative_uncertainty >= 0.3 ? " – noch grobe Schätzung" : "";
+  return `Prognose aus ${e.readings} Zählerständen, ${how}${rough}`;
+}
+
+function monthBars(f) {
+  const max = Math.max(...f.monthly_kwh);
+  const now = new Date().getMonth();
+  return `<div class="month-bars" role="img" aria-label="Erwarteter Verbrauch pro Monat">${f.monthly_kwh
+    .map(
+      (v, i) => `<div class="mb${i === now ? " now" : ""}" title="${MONTH_INITIALS[i]}: ${num(v)} kWh">
+        <div class="bar" style="height:${Math.max(4, (v / max) * 100)}%"></div><span>${MONTH_INITIALS[i]}</span></div>`,
+    )
+    .join("")}</div>`;
+}
+
 function energyCard(c) {
   const e = c.energy;
   if (!e) return "";
+  const f = e.forecast;
   if (!e.expected_yearly_cost) {
     return `<div class="card"><div class="card-head"><div><h2>${icon("gauge")} Verbrauch & Abrechnung</h2></div></div>
-      <p class="muted" style="margin:0">Trage Grundpreis, Arbeitspreis und Jahresverbrauch ein (oder erfasse Zählerstände), dann schätzt Contractly deine Jahresabrechnung.</p></div>`;
+      <p class="muted" style="margin:0">Trage Grundpreis und Arbeitspreis ein und erfasse Zählerstände (oder deinen Jahresverbrauch) –
+        dann sagt Contractly dir, ob dein Abschlag reicht.</p></div>`;
   }
   const s = e.settlement_estimate;
+  const range = f && f.low_kwh !== f.high_kwh ? `<div class="small muted">${num(f.low_kwh)} – ${num(f.high_kwh)} kWh</div>` : "";
+  const costRange = e.cost_low != null ? `<div class="small muted">${money(e.cost_low)} – ${money(e.cost_high)}</div>` : "";
+  let verdict = "";
+  if (s != null) {
+    const cls = s >= 0 ? "good" : Math.abs(s) < 30 ? "warn" : "bad";
+    const fix =
+      e.needed_installment && s < -30
+        ? ` Mit einem Abschlag von <b>${money(e.needed_installment)}</b> ab jetzt kommst du ohne Nachzahlung durch.`
+        : "";
+    verdict = `<div class="callout ${cls}" style="margin-top:12px">${icon(s >= 0 ? "piggy" : "alert")}
+      <div>Voraussichtlich <b>${s >= 0 ? "Guthaben" : "Nachzahlung"} von ${money(Math.abs(s))}</b>
+        bei der Abrechnung${e.billing_year_end ? ` zum ${fmtDate(e.billing_year_end)}` : ""}.${fix}</div></div>`;
+  }
+  const tip =
+    !f || f.coverage < 0.8
+      ? `<p class="small muted" style="margin:10px 0 0">${icon("info", "inline")} Tipp: Trag einmal im Monat deinen Zählerstand ein – je mehr Werte über das Jahr, desto genauer die Prognose.</p>`
+      : "";
   return `<div class="card">
-    <div class="card-head"><div><h2>${icon("gauge")} Verbrauch & Abrechnung</h2>
-      <p>${e.consumption_source === "readings" ? `Hochgerechnet aus ${e.readings} Zählerständen` : "Basierend auf hinterlegtem Jahresverbrauch"}</p></div></div>
+    <div class="card-head"><div><h2>${icon("gauge")} Verbrauch & Abrechnung</h2><p>${forecastText(e)}</p></div></div>
     <div class="facts">
-      <div class="fact"><div class="k">Verbrauch / Jahr</div><div class="v">${num(e.consumption_used)} kWh</div></div>
-      <div class="fact"><div class="k">Erwartete Kosten / Jahr</div><div class="v">${money(e.expected_yearly_cost)}</div></div>
-      ${e.installment ? `<div class="fact"><div class="k">Abschlag</div><div class="v">${money(e.installment)} / Monat</div></div>` : ""}
+      <div class="fact"><div class="k">Verbrauch / Jahr</div><div class="v">${num(e.consumption_used)} kWh</div>${range}</div>
+      <div class="fact"><div class="k">Erwartete Kosten / Jahr</div><div class="v">${money(e.expected_yearly_cost)}</div>${costRange}</div>
+      ${e.installment ? `<div class="fact"><div class="k">Dein Abschlag</div><div class="v">${money(e.installment)} / Monat</div></div>` : ""}
       <div class="fact"><div class="k">Passender Abschlag</div><div class="v">${money(e.suggested_installment)} / Monat</div></div>
     </div>
-    ${
-      s != null
-        ? `<div class="callout ${s >= 0 ? "good" : Math.abs(s) < 30 ? "warn" : "bad"}" style="margin-top:12px">${icon(s >= 0 ? "piggy" : "alert")}
-            <div>Voraussichtlich <b>${s >= 0 ? "Guthaben" : "Nachzahlung"} von ${money(Math.abs(s))}</b> bei der Jahresabrechnung.
-            ${s < -30 ? "Überleg dir, den Abschlag anzupassen." : ""}</div></div>`
-        : ""
-    }
+    ${f ? monthBars(f) : ""}
+    ${verdict}
+    ${tip}
   </div>`;
 }
 
@@ -618,11 +654,12 @@ async function runOcr(c, docId, reload) {
 // ------------------------------------------------------------------ meter readings
 
 function readingsTab(el, c, reload) {
+  const unit = readingUnit(c);
   const rows = [...c.meter_readings].sort((a, b) => b.reading_date.localeCompare(a.reading_date));
   el.innerHTML = `
     <div class="grid grid-main">
       <div class="card">
-        <div class="card-head"><div><h2>Zählerstände</h2><p>Mindestens zwei Ablesungen ergeben eine Verbrauchs-Hochrechnung.</p></div></div>
+        <div class="card-head"><div><h2>Zählerstände</h2><p>Ab zwei Ablesungen gibt es eine Prognose. Contractly berücksichtigt, dass im Winter mehr verbraucht wird.</p></div></div>
         ${
           rows.length
             ? `<div class="table-wrap"><table class="table"><thead><tr><th>Datum</th><th class="r">Stand</th><th class="r">Verbrauch seit vorher</th><th class="r">pro Tag</th><th></th></tr></thead><tbody>
@@ -631,8 +668,8 @@ function readingsTab(el, c, reload) {
                   const prev = rows[i + 1];
                   const used = prev ? r.value - prev.value : null;
                   const days = prev ? (new Date(r.reading_date) - new Date(prev.reading_date)) / 86400000 : null;
-                  return `<tr><td>${fmtDate(r.reading_date)}</td><td class="r num"><b>${num(r.value)}</b> kWh</td>
-                    <td class="r num">${used != null ? num(used) + " kWh" : "–"}</td><td class="r num">${days ? num(used / days) + " kWh" : "–"}</td>
+                  return `<tr><td>${fmtDate(r.reading_date)}</td><td class="r num"><b>${num(r.value)}</b> ${unit}</td>
+                    <td class="r num">${used != null ? num(used) + " " + unit : "–"}</td><td class="r num">${days ? num(used / days) + " " + unit : "–"}</td>
                     <td class="r"><button class="btn btn-ghost btn-sm btn-danger" data-del="${r.id}" aria-label="Löschen">${icon("trash")}</button></td></tr>`;
                 })
                 .join("")}</tbody></table></div>`
@@ -644,7 +681,8 @@ function readingsTab(el, c, reload) {
           <div class="card-head"><h2>Neuer Zählerstand</h2></div>
           <div class="stack" style="gap:12px">
             <label class="field"><span>Datum</span><input type="date" name="reading_date" value="${today()}"/></label>
-            <label class="field"><span>Zählerstand</span><div class="input-group"><input type="number" step="any" name="value" required inputmode="decimal"/><span class="addon">kWh</span></div></label>
+            <label class="field"><span>Zählerstand</span><div class="input-group"><input type="number" step="any" name="value" required inputmode="decimal"/><span class="addon">${unit}</span></div>
+              ${c.category === "gas" ? `<small>Wie auf dem Gaszähler (m³). Umgerechnet wird mit ${num(c.attributes?.gas_factor || 10)} kWh/m³ – den genauen Wert findest du auf der Rechnung.</small>` : ""}</label>
             <button class="btn btn-primary btn-block" type="submit">${icon("plus")} Speichern</button>
           </div>
         </form>

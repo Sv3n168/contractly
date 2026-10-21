@@ -26,11 +26,11 @@ Verträge, und alle Daten bleiben auf deinem Server.
 | **Erinnerungen** | Automatisch vor jeder Kündigungsfrist (Vorlauf je Vertrag einstellbar), eigene Erinnerungen (auch wiederkehrend). Zustellung im Dashboard, als **Kalender-Abo (iCal)**, per **Push (ntfy)** oder **E-Mail** |
 | **Kündigungsschreiben** | Fertiger Brief mit deinen Absenderdaten, Anbieter-Adresse und Kunden-, Vertrags-, Zähler- oder Rufnummer. Ordentlich oder Sonderkündigung, optional mit Rufnummernmitnahme und SEPA-Widerruf. Drucken/PDF, Kopieren, E-Mail |
 | **Dokumente & OCR** | PDFs und Fotos je Vertrag ablegen. „Erkennen“ liest Kundennummer, Vertragsnummer, Anbieter-Adresse, Preise, Zählernummer, MaLo, IBAN, Vertragsbeginn usw. aus und schlägt sie zur Übernahme vor |
-| **Strom & Gas** | Zählerstände erfassen, daraus Verbrauch hochrechnen, Jahresabrechnung schätzen (Nachzahlung oder Guthaben) und einen passenden Abschlag vorschlagen |
+| **Strom & Gas** | Zählerstände erfassen (Gas in m³), daraus den Jahresverbrauch **prognostizieren**, Jahresabrechnung schätzen (Nachzahlung oder Guthaben, mit Spanne) und den Abschlag vorschlagen, mit dem keine Nachzahlung entsteht. **Erinnerung, wenn eine Nachzahlung droht.** Siehe [Verbrauchsprognose](#verbrauchsprognose-strom--gas) |
 | **Backup** | Vollbackup (Datenbank und Dokumente), optional **AES-256-verschlüsselt mit eigenem Schlüssel**. Automatisch täglich oder wöchentlich, Upload in **OneDrive, Google Drive, Dropbox, Nextcloud, S3 …** (über rclone), Wiederherstellung in der Oberfläche |
 | **Sicherheit** | Anmeldeseite mit eigenem Konto. **Datenbank, Dokumente (PDFs, Fotos) und Backups sind verschlüsselt gespeichert** (SQLCipher/AES-256). Der Schlüssel entsteht aus dem Passwort und liegt nur während der Anmeldung im Arbeitsspeicher. Nach dem Abmelden ist nichts mehr lesbar. Dazu Wiederherstellungsschlüssel, Schutz vor Passwort-Raten und Sicherheits-Header |
 | **Mehrere Benutzer** | Jede Person hat einen **eigenen, getrennt verschlüsselten Bereich**. Der Admin lädt per Einladungscode ein; das Passwort legt die Person selbst fest, daher kann auch der Admin keine fremden Verträge lesen |
-| **Importieren** | **Kontoauszug** (CSV/Excel aus dem Online-Banking) hochladen: regelmäßige Abbuchungen werden als Verträge vorgeschlagen, inklusive Preisverlauf. Preiserhöhungen bei bestehenden Verträgen und einzelne teurere Monate werden erkannt. Außerdem **Vertragslisten** aus Excel/CSV übernehmen (Vorlage zum Download). Die Dateien werden nicht gespeichert |
+| **Importieren** | **Vertragslisten** aus Excel/CSV übernehmen (Vorlage zum Download), Spalten werden automatisch erkannt. Die Dateien werden nicht gespeichert |
 | **Alltagssituationen** | **Kostenanteil** (Partner zahlt die Hälfte), **Pausieren** (z. B. Fitnessstudio ruhend, auf Wunsch mit verlängerter Laufzeit), **Kündigungsbestätigung** nachverfolgen, automatische Erinnerungen an **Widerrufsfrist**, **Ende der Preisgarantie**, **angekündigte Preiserhöhungen** (Sonderkündigungsrecht), fehlende Kündigungsbestätigung und einen jährlichen **Abo-Check** („Nutzt du das noch?“). Hinweis auf **doppelte Verträge** beim Anlegen |
 | **Jahresbericht & Steuer** | „Dein Vertragsjahr“: Kosten, Kategorien, Wechsel, Preisänderungen, druckbar als PDF. **Steuer-Export** (CSV) der steuerlich relevanten Verträge (Vorgabe je Kategorie, pro Vertrag änderbar) |
 | **Zwei-Faktor-Anmeldung** | Optional per Authenticator-App (TOTP, QR-Code). Das Geheimnis ist mit dem Datenschlüssel verschlüsselt; der Wiederherstellungsschlüssel hilft auch bei verlorenem Handy |
@@ -117,6 +117,26 @@ Alle Daten (Datenbank, Dokumente, Backups) liegen im Ordner `./data`.
 vorhandenen Daten aus `./data` in den Bereich des Admins übernommen, verschlüsselt, und die
 unverschlüsselten Originale werden gelöscht. Die frühere Variable `CONTRACTLY_PASSWORD` wird nicht
 mehr verwendet.
+
+## Verbrauchsprognose (Strom & Gas)
+
+Wer im Winter abliest, verbraucht gerade viel mehr als im Sommer. Einfaches Hochrechnen würde den
+Jahresverbrauch dann stark überschätzen. Contractly rechnet deshalb mit einem kleinen, lokal laufenden
+Modell (keine Cloud, keine Daten verlassen den Server):
+
+1. **Typischer Jahresverlauf:** Für Gas (Heizung) und Haushaltsstrom ist hinterlegt, welcher Anteil des
+   Jahresverbrauchs üblicherweise auf jeden Monat fällt. Bei „Heizstrom / Wärmepumpe“ wird der
+   Heizverlauf berücksichtigt.
+2. **Anpassung an die Ablesungen:** Jeder Zeitraum zwischen zwei Zählerständen wird mit dem verglichen,
+   was der Verlauf für genau diese Tage erwartet. Daraus ergibt sich der Jahresverbrauch.
+3. **Lernen:** Sobald die Ablesungen den größten Teil eines Jahres abdecken, passt Contractly den
+   Verlauf an deinen Haushalt an (z. B. wenig Heizung, viel Warmwasser).
+4. **Ehrliche Spanne:** Wie gut die Ablesungen zusammenpassen und wie viel vom Jahr noch fehlt, ergibt
+   die Spanne. Vor einer drohenden Nachzahlung wird nur gewarnt, wenn sie auch im günstigen Fall eintritt.
+
+Gaszähler zeigen m³. Umgerechnet wird mit dem Faktor von deiner Gasrechnung (Brennwert × Zustandszahl,
+meist um 10 kWh/m³), einzutragen in den Vertragsdaten. Am genauesten wird die Prognose, wenn du etwa
+einmal im Monat abliest.
 
 ## Konfiguration
 

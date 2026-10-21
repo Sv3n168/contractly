@@ -1,4 +1,4 @@
-"""Import endpoints: bank statements and contract lists (analyse first, then apply)."""
+"""Import of contract lists (analyse first, then apply)."""
 
 import asyncio
 from datetime import date
@@ -12,8 +12,6 @@ from .. import importer
 from ..categories import CATEGORY_KEYS, INTERVALS
 from ..db import get_db
 from ..models import Contract, PriceEntry
-from ..services import load_contracts
-from .contracts import get_contract
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -25,22 +23,6 @@ async def _read(file: UploadFile) -> bytes:
     if len(blob) > MAX_BYTES:
         raise HTTPException(413, "Datei zu groß (max. 10 MB)")
     return blob
-
-
-@router.post("/bank")
-async def analyse_bank_statement(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    """Find recurring debits in a bank export and compare them with the existing contracts."""
-    try:
-        txs = await asyncio.to_thread(importer.read_transactions, await _read(file), file.filename or "")
-    except importer.ImportError_ as exc:
-        raise HTTPException(400, str(exc)) from exc
-    suggestions = await asyncio.to_thread(importer.detect_recurring, txs)
-    importer.match_contracts(suggestions, load_contracts(db))
-    return {
-        "transactions": len(txs),
-        "period": {"from": min(t["date"] for t in txs), "to": max(t["date"] for t in txs)},
-        "suggestions": suggestions,
-    }
 
 
 @router.post("/contracts")
@@ -61,12 +43,6 @@ def template():
     )
 
 
-class PriceStep(BaseModel):
-    date: date
-    old: float = Field(ge=0)
-    new: float = Field(ge=0)
-
-
 class NewContract(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     provider: str | None = None
@@ -80,19 +56,10 @@ class NewContract(BaseModel):
     notice_value: int | None = None
     notice_unit: str = "months"
     notes: str | None = None
-    price_changes: list[PriceStep] = Field(default_factory=list)
-
-
-class PriceUpdate(BaseModel):
-    contract_id: int
-    valid_from: date
-    amount: float = Field(ge=0)
-    interval: str = "monthly"
 
 
 class ApplyIn(BaseModel):
     create: list[NewContract] = Field(default_factory=list)
-    price_updates: list[PriceUpdate] = Field(default_factory=list)
 
 
 @router.post("/apply")
@@ -101,9 +68,6 @@ def apply_import(data: ApplyIn, db: Session = Depends(get_db)):
     for n in data.create:
         category = n.category if n.category in CATEGORY_KEYS else "other"
         interval = n.interval if n.interval in INTERVALS and n.interval != "once" else "monthly"
-        changes = sorted(n.price_changes, key=lambda p: p.date)
-        # A detected history starts with the price before the first change.
-        first_amount = changes[0].old if changes else n.amount
         c = Contract(
             name=n.name,
             category=category,
@@ -118,24 +82,8 @@ def apply_import(data: ApplyIn, db: Session = Depends(get_db)):
             notes=n.notes,
             attributes={},
         )
-        c.prices.append(PriceEntry(valid_from=n.start_date, amount=first_amount, interval=interval, details={}))
-        for step in changes:
-            c.prices.append(
-                PriceEntry(
-                    valid_from=step.date, amount=step.new, interval=interval, note="aus Kontoauszug erkannt", details={}
-                )
-            )
+        c.prices.append(PriceEntry(valid_from=n.start_date, amount=n.amount, interval=interval, details={}))
         db.add(c)
         created += 1
-    updated = 0
-    for u in data.price_updates:
-        c = get_contract(db, u.contract_id)
-        interval = u.interval if u.interval in INTERVALS and u.interval != "once" else "monthly"
-        c.prices.append(
-            PriceEntry(
-                valid_from=u.valid_from, amount=u.amount, interval=interval, note="aus Kontoauszug erkannt", details={}
-            )
-        )
-        updated += 1
     db.commit()
-    return {"created": created, "updated": updated}
+    return {"created": created}

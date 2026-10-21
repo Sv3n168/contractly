@@ -126,11 +126,6 @@ export const api = {
   confirmCancellation: (id, data = {}) => request("POST", `/api/contracts/${id}/cancellation-confirmed`, data),
   stillUsed: (id) => request("POST", `/api/contracts/${id}/still-used`),
 
-  analyzeBank: (file) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    return request("POST", "/api/import/bank", fd);
-  },
   analyzeContractList: (file) => {
     const fd = new FormData();
     fd.append("file", file);

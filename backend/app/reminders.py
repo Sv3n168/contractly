@@ -25,7 +25,7 @@ from sqlalchemy.orm import Session
 
 from . import calc
 from . import db as database
-from .categories import CATEGORY_MAP, SUBSCRIPTION_CATEGORIES
+from .categories import CATEGORY_MAP, SUBSCRIPTION_CATEGORIES, is_energy
 from .config import settings
 from .models import Contract, NotificationLog, Reminder
 from .security import vault
@@ -206,9 +206,26 @@ def _scenario_items(c: Contract, ref: date, horizon: date) -> list[dict]:
             out.append(
                 _item(c, "confirmation", due, title, due, "Beim Anbieter nachhaken, falls noch keine Bestätigung kam.")
             )
+    # Meter readings point to a clearly higher consumption than the installment covers
+    if is_energy(c.category) and running and c.meter_readings:
+        e = calc.energy_analysis(c, ref) or {}
+        gap = -(e.get("settlement_estimate") or 0)
+        # Only warn when even the optimistic end of the forecast range means paying extra.
+        sure = -(e.get("settlement_best_case") or 0) >= max(50, 0.05 * e.get("cost_low", 0))
+        enough_data = e.get("forecast") and e["forecast"]["coverage"] >= 0.25
+        if enough_data and e.get("needed_installment") and sure:
+            amount = f"{e['needed_installment']:.2f}".replace(".", ",")
+            title = f"Nachzahlung droht: {c.name} (ca. {gap:.0f} €)"
+            detail = f"Abschlag auf {amount} € erhöhen, dann bleibt die Jahresabrechnung ohne Nachzahlung."
+            out.append(_item(c, "installment_check", e["billing_year_end"], title, ref, detail))
     # Yearly "do I still use this?" for subscriptions
     if c.category in SUBSCRIPTION_CATEGORIES and c.end_date is None and c.start_date <= ref:
-        due = calc.add_months(c.last_checked_on or c.start_date, 12)
+        # Yearly on the anniversary; an unanswered check stays open for two months, then waits a year.
+        base = c.last_checked_on or c.start_date
+        years = max(1, (ref.year - base.year) - (1 if (ref.month, ref.day) < (base.month, base.day) else 0))
+        due = calc.add_months(base, 12 * years)
+        if due < ref - timedelta(days=60):
+            due = calc.add_months(base, 12 * (years + 1))
         if due <= horizon:
             title = f"Abo-Check: {c.name} noch genutzt?"
             out.append(_item(c, "subscription_check", due, title, due, "Wenn nicht: kündigen spart Geld."))
@@ -258,6 +275,7 @@ def _neutral_title(item: dict) -> str:
         "price_increase": "Preiserhöhung – Sonderkündigung prüfen",
         "confirmation": "Kündigungsbestätigung fehlt",
         "subscription_check": "Abo-Check",
+        "installment_check": "Abschlag prüfen – Nachzahlung droht",
     }
     if item["kind"] in neutral:
         return f"{neutral[item['kind']]} ({what})"

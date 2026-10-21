@@ -477,7 +477,7 @@ export async function renderMore(view) {
           ["#/timeline", "timeline", "Zeitstrahl", "Abschlüsse, Wechsel & Fristen"],
           ["#/costs", "chart", "Kosten & Prognose", "Verlauf und Hochrechnung"],
           ["#/report", "printer", "Jahresbericht", "Überblick, Steuer-Export, PDF"],
-          ["#/import", "upload", "Importieren", "Kontoauszug oder Vertragsliste"],
+          ["#/import", "upload", "Importieren", "Vertragsliste aus Excel oder CSV"],
           ["#/settings", "settings", "Einstellungen", "Konto, Sicherheit, Benachrichtigungen"],
         ]
           .map(

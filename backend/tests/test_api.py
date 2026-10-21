@@ -276,6 +276,16 @@ def test_subscription_check(client):
     assert "subscription_check" not in {i["kind"] for i in client.get("/api/reminders/upcoming").json()["items"]}
 
 
+def test_subscription_check_of_old_subscription_is_not_years_overdue(client):
+    """Never answered: the check refers to the latest anniversary, not the first one years ago."""
+    _create(client, name="Spotify", category="streaming", start_date=add_months(date.today(), -41).isoformat())
+    _create(client, name="Disney+", category="streaming", start_date=add_months(date.today(), -37).isoformat())
+    items = client.get("/api/reminders/upcoming?horizon_days=400").json()["items"]
+    due = {i["contract_name"]: date.fromisoformat(i["date"]) for i in items if i["kind"] == "subscription_check"}
+    assert due["Spotify"] == add_months(date.today(), 7)  # missed 5 months ago -> next anniversary
+    assert due["Disney+"] == add_months(date.today(), -1)  # 1 month ago -> still open
+
+
 def test_yearly_report_and_tax_export(client):
     y = date.today().year - 1
     client.post(

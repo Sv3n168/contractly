@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from .categories import INTERVALS, is_energy
+from .forecast import forecast
 from .models import Contract, Offer, PriceEntry
 
 # --------------------------------------------------------------------------- dates
@@ -437,39 +438,62 @@ def switch_savings(contract: Contract, today: date) -> float | None:
     return round(old_monthly * months - paid, 2)
 
 
+def billing_year(contract: Contract, today: date) -> tuple[date, date]:
+    """Current settlement period: yearly from the contract start (most suppliers bill this way)."""
+    start = contract.start_date
+    years = max(0, today.year - start.year - (1 if (today.month, today.day) < (start.month, start.day) else 0))
+    begin = add_months(start, 12 * years)
+    return begin, add_months(begin, 12) - timedelta(days=1)
+
+
 def energy_analysis(contract: Contract, today: date) -> dict | None:
-    """Extrapolate yearly consumption from meter readings and estimate the annual settlement."""
-    readings = sorted(contract.meter_readings, key=lambda r: r.reading_date)
+    """Consumption forecast from meter readings and the expected annual settlement."""
     attrs = contract.attributes or {}
+    readings = [(r.reading_date, r.value) for r in contract.meter_readings]
     result: dict = {"readings": len(readings)}
-    if len(readings) >= 2:
-        first, last = readings[0], readings[-1]
-        days = (last.reading_date - first.reading_date).days
-        consumed = last.value - first.value
-        if days > 0 and consumed >= 0:
-            result["consumption_per_year"] = round(consumed / days * 365, 0)
-            result["period_days"] = days
-            result["period_consumption"] = round(consumed, 1)
+    fc = forecast(readings, contract.category, attrs) if len(readings) >= 2 else None
+    if fc:
+        result["forecast"] = fc
+        result["consumption_per_year"] = fc["annual_kwh"]
     consumption = result.get("consumption_per_year") or attrs.get("consumption_kwh")
     if consumption:
         result["consumption_used"] = consumption
-        result["consumption_source"] = "readings" if "consumption_per_year" in result else "contract"
+        result["consumption_source"] = "readings" if fc else "contract"
     current = price_at(contract, today)
     base = attrs.get("base_price_month")
     unit = attrs.get("unit_price_ct")
     if current is not None and current.details:
         base = current.details.get("base_price_month", base)
         unit = current.details.get("unit_price_ct", unit)
-    if consumption and (base is not None or unit is not None):
-        expected = float(base or 0) * 12 + float(unit or 0) * float(consumption) / 100
-        result["expected_yearly_cost"] = round(expected, 2)
-        result["suggested_installment"] = round(expected / 12, 2)
-        installment = attrs.get("installment")
-        if installment is None and current is not None:
-            installment = monthly_equivalent(current.amount, current.interval)
-        if installment:
-            result["installment"] = round(float(installment), 2)
-            result["yearly_installments"] = round(float(installment) * 12, 2)
-            # positive: expected credit (Guthaben), negative: expected additional payment
-            result["settlement_estimate"] = round(float(installment) * 12 - expected, 2)
+    if not consumption or (base is None and unit is None):
+        return result
+
+    def cost(kwh: float) -> float:
+        return float(base or 0) * 12 + float(unit or 0) * float(kwh) / 100
+
+    expected = cost(consumption)
+    result["expected_yearly_cost"] = round(expected, 2)
+    result["suggested_installment"] = round(expected / 12, 2)
+    if fc:
+        result["cost_low"] = round(cost(fc["low_kwh"]), 2)
+        result["cost_high"] = round(cost(fc["high_kwh"]), 2)
+    installment = attrs.get("installment")
+    if installment is None and current is not None:
+        installment = monthly_equivalent(current.amount, current.interval)
+    if not installment:
+        return result
+    installment = float(installment)
+    result["installment"] = round(installment, 2)
+    result["yearly_installments"] = round(installment * 12, 2)
+    # positive: expected credit (Guthaben), negative: expected additional payment
+    result["settlement_estimate"] = round(installment * 12 - expected, 2)
+    if fc:  # best case within the forecast range
+        result["settlement_best_case"] = round(installment * 12 - result["cost_low"], 2)
+    begin, end = billing_year(contract, today)
+    result["billing_year_end"] = end
+    elapsed = (today.year - begin.year) * 12 + today.month - begin.month
+    remaining = 12 - elapsed
+    if result["settlement_estimate"] < 0 and remaining > 0:
+        # Installment from now on that avoids the additional payment at the end of the period.
+        result["needed_installment"] = round((expected - installment * elapsed) / remaining, 2)
     return result

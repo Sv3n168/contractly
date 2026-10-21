@@ -63,7 +63,7 @@ CATEGORIES: list[dict] = [
         "icon": "⚡",
         "energy": True,
         "defaults": {"min_term_months": 12, "renewal_months": 1, "notice_value": 1, "notice_unit": "months"},
-        "fields": ENERGY_FIELDS + [_f("green", "Ökostrom", "bool")],
+        "fields": ENERGY_FIELDS + [_f("green", "Ökostrom", "bool"), _f("heating", "Heizstrom / Wärmepumpe", "bool")],
     },
     {
         "key": "gas",
@@ -71,7 +71,11 @@ CATEGORIES: list[dict] = [
         "icon": "🔥",
         "energy": True,
         "defaults": {"min_term_months": 12, "renewal_months": 1, "notice_value": 1, "notice_unit": "months"},
-        "fields": ENERGY_FIELDS + [_f("climate_neutral", "Klimaneutral", "bool")],
+        "fields": ENERGY_FIELDS
+        + [
+            _f("gas_factor", "Umrechnung m³ → kWh", "number", "kWh/m³", placeholder="ca. 10 – steht auf der Rechnung"),
+            _f("climate_neutral", "Klimaneutral", "bool"),
+        ],
     },
     {
         "key": "car_insurance",

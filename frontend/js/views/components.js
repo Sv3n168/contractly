@@ -89,6 +89,7 @@ export function reminderItem(item, { actions = true, compact = false } = {}) {
       withdrawal: "refresh",
       confirmation: "mail",
       subscription_check: "sparkles",
+      installment_check: "gauge",
     }[item.kind] || "bell";
   const href = item.contract_id ? `#/contracts/${item.contract_id}` : "#/reminders";
   return `
@@ -98,7 +99,7 @@ export function reminderItem(item, { actions = true, compact = false } = {}) {
       <div class="title">${esc(item.title)}</div>
       <div class="sub">${icon(kindIcon, "inline")} ${esc(relDays(item.days_left))}${item.detail && !compact ? " · " + esc(item.detail) : ""}</div>
     </a>
-    ${actions ? reminderActions(item) : ""}
+    ${actions ? reminderActions(item, compact) : ""}
   </div>`;
 }
 
@@ -130,16 +131,20 @@ export function bindReminderActions(root, api, onChange) {
   });
 }
 
-function reminderActions(item) {
+function reminderActions(item, compact = false) {
+  // In narrow lists (dashboard) buttons show only their icon, so the title keeps its space.
+  const label = (text) => (compact ? "" : `<span class="label">${text}</span>`);
   const dismiss = `<button class="btn btn-sm btn-ghost" data-dismiss="${esc(item.key)}" title="Ausblenden">${icon("x")}</button>`;
   switch (item.kind) {
     case "custom":
       return `<button class="btn btn-sm" data-done="${item.reminder_id}" title="Erledigt">${icon("check")}</button>`;
     case "subscription_check":
-      return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-still-used="${item.contract_id}" title="Nutze ich noch">${icon("check")}<span class="label">Nutze ich</span></button>
+      return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-still-used="${item.contract_id}" title="Nutze ich noch">${icon("check")}${label("Nutze ich")}</button>
         <a class="btn btn-sm btn-ghost" href="#/contracts/${item.contract_id}" title="Kündigen">${icon("ban")}</a></div>`;
     case "confirmation":
       return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-confirmed="${item.contract_id}" title="Bestätigung erhalten">${icon("check")}</button>${dismiss}</div>`;
+    case "installment_check":
+      return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm" href="#/contracts/${item.contract_id}?tab=prices" title="Abschlag anpassen">${icon("euro")}${label("Anpassen")}</a>${dismiss}</div>`;
     case "price_increase":
     case "price_guarantee":
       return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm" href="#/contracts/${item.contract_id}?tab=compare" title="Vergleichen">${icon("scale")}</a>${dismiss}</div>`;

@@ -4,6 +4,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
+from . import forecast
 from .calc import add_months
 from .models import Contract, MeterReading, Offer, PriceEntry, Reminder
 
@@ -154,7 +155,7 @@ def seed(db: Session, ref: date | None = None) -> int:
     for months, value in ((-14, 10250), (-8, 11610), (-2, 12890)):
         power.meter_readings.append(MeterReading(reading_date=_m(ref, months) + timedelta(days=3), value=value))
 
-    contract(
+    gas = contract(
         name="Erdgas Komfort",
         category="gas",
         provider="E.ON",
@@ -166,6 +167,13 @@ def seed(db: Session, ref: date | None = None) -> int:
         attributes={"base_price_month": 15.9, "unit_price_ct": 10.8, "consumption_kwh": 9000, "installment": 95},
         prices=[(_m(ref, -20), 95, "monthly", "Abschlag")],
     )
+    # Gas meter (m³) read every two months; the household uses more than the installment covers.
+    start, value = _m(ref, -14) + timedelta(days=5), 18_420.0
+    for months in range(-14, 0, 2):
+        day = _m(ref, months) + timedelta(days=5)
+        value += 1050 * sum(forecast.month_weights(forecast.PROFILES["heating"], start, day).values())
+        start = day
+        gas.meter_readings.append(MeterReading(reading_date=day, value=round(value)))
 
     year_start = date(ref.year - 2, 1, 1)
     contract(

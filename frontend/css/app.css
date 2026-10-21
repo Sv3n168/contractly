@@ -974,6 +974,38 @@ a.list-item:hover {
   border-radius: 4px;
 }
 
+/* expected consumption per month (energy forecast) */
+.month-bars {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
+  height: 72px;
+  margin-top: 14px;
+}
+.month-bars .mb {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.month-bars .bar {
+  width: 100%;
+  max-width: 22px;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--primary);
+  opacity: 0.45;
+}
+.month-bars .mb.now .bar {
+  opacity: 1;
+}
+.month-bars span {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1;
+}
+
 /* ------------------------------------------------------------------ table */
 
 .table-wrap {

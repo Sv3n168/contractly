@@ -72,17 +72,17 @@ export async function renderReport(view, _m, query = {}) {
 
     <div class="card">
       <div class="card-head"><div><h2>Alle Verträge</h2><p>Eigener Anteil · ${icon("check", "inline")} = steuerlich relevant (in den Vertragsdetails änderbar)</p></div></div>
-      <div class="table-wrap"><table class="table"><thead><tr><th>Vertrag</th><th>Kategorie</th><th class="r">Anteil</th><th class="r">${year}</th><th>Steuer</th></tr></thead><tbody>
+      <div class="table-wrap"><table class="table"><thead><tr><th>Vertrag</th><th class="hide-sm">Kategorie</th><th class="r hide-sm">Anteil</th><th class="r">${year}</th><th>Steuer</th></tr></thead><tbody>
         ${r.contracts
           .map(
             (c) => `<tr><td><b>${esc(c.name)}</b><div class="small muted">${esc(c.provider || "")}</div></td>
-              <td>${catIcon(c.category)} ${esc(catLabel(c.category))}</td>
-              <td class="r num">${c.share_percent ?? 100} %</td>
+              <td class="hide-sm">${catIcon(c.category)} ${esc(catLabel(c.category))}</td>
+              <td class="r num hide-sm">${c.share_percent ?? 100} %</td>
               <td class="r num"><b>${money(c.total)}</b>${c.extras ? `<div class="small muted">inkl. ${money(c.extras)} extra</div>` : ""}</td>
               <td>${c.tax_relevant ? icon("check") : ""}</td></tr>`,
           )
           .join("")}
-        <tr><td colspan="3"><b>Summe</b></td><td class="r num"><b>${money(r.total)}</b></td><td></td></tr>
+        <tr><td><b>Summe</b></td><td class="hide-sm"></td><td class="hide-sm"></td><td class="r num"><b>${money(r.total)}</b></td><td></td></tr>
       </tbody></table></div>
     </div>`;
 

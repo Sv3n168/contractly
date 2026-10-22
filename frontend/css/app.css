@@ -15,7 +15,7 @@
 
 :root {
   color-scheme: light;
-  --bg: #f5f4f0;
+  --bg: #fbfaf7;
   --surface: #ffffff;
   --surface-2: #f2f1ec;
   --surface-3: #e8e6df;
@@ -712,6 +712,10 @@ h3 {
   display: grid;
   gap: 20px;
 }
+/* grid children may shrink below their content (long titles ellipsize instead of widening the page) */
+.grid > * {
+  min-width: 0;
+}
 .grid-2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -852,6 +856,95 @@ h3 {
   border-radius: 50%;
   display: inline-block;
   flex: none;
+}
+
+/* ------------------------------------------------------------------ areas with tabs */
+
+.section-head {
+  margin-bottom: 22px;
+}
+.section-head h1 {
+  margin-bottom: 14px;
+}
+.section-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+}
+.section-tabs a {
+  flex: none;
+  padding: 10px 14px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  transition: color var(--dur-fast), border-color var(--dur-fast);
+}
+.section-tabs a:hover {
+  color: var(--text);
+}
+.section-tabs a.active {
+  color: var(--text);
+  border-bottom-color: var(--primary);
+}
+/* the area title is the page title; the page's own heading becomes a subheading */
+.section-body .page-head h1 {
+  font-size: 20px;
+  letter-spacing: -0.01em;
+}
+.section-body .page-head {
+  margin-bottom: 18px;
+}
+
+.nav-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 8px;
+}
+.nav-settings {
+  margin-top: auto;
+  margin-bottom: 8px;
+}
+.nav-settings + .sidebar-footer {
+  margin-top: 0;
+}
+
+/* ------------------------------------------------------------------ overview */
+
+.dash-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  gap: 20px;
+  margin-bottom: 20px;
+  /* the black card and "Als Nächstes zu tun" start on one line */
+  align-items: start;
+}
+.dash-hero {
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+}
+
+.dash-hero .kpi-value {
+  font-size: 40px;
+  margin: 14px 0 10px;
+}
+.dash-hero .kpi-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-hero .kpi-sub .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+@media (max-width: 900px) {
+  .dash-top {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ------------------------------------------------------------------ contract cards */
@@ -2080,7 +2173,7 @@ details.more > .body {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .grid-main {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -2246,6 +2339,41 @@ details.more > .body {
   }
   .card.contract-list {
     padding: 4px 0;
+  }
+  /* tables keep the columns that matter on a phone, so nothing (actions!) scrolls out of sight */
+  .hide-sm {
+    display: none;
+  }
+  /* page actions: up to two icon buttons sit beside the title, more of them get their own row */
+  .page-head:has(.page-actions > :nth-child(3)) {
+    flex-wrap: wrap;
+  }
+  .page-head:has(.page-actions > :nth-child(3)) .page-actions {
+    width: 100%;
+  }
+  .tab {
+    padding: 10px 10px;
+  }
+  .table th,
+  .table td {
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+  .btn-sm {
+    min-height: 38px;
+    min-width: 38px;
+    justify-content: center;
+  }
+  /* reminders: the text keeps the row next to the date, buttons move below it */
+  .reminder-item {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+  .reminder-item > .grow {
+    flex: 1 1 calc(100% - 70px);
+  }
+  .reminder-item > .grow + .btn {
+    margin-left: auto;
   }
   .kpi-value {
     margin-top: 4px;
@@ -2613,6 +2741,12 @@ body:not(.is-admin) .admin-only {
   .camera-only {
     display: flex;
   }
+  /* fingers need larger targets than a mouse */
+  .btn-sm {
+    min-height: 38px;
+    min-width: 38px;
+    justify-content: center;
+  }
 }
 
 /* ------------------------------------------------------------------ post & mails */
@@ -2832,7 +2966,8 @@ body:not(.is-admin) .admin-only {
 #view.entering > *,
 #view.entering .kpis > *,
 #view.entering .grid > *,
-#view.entering .contract-grid > * {
+#view.entering .contract-grid > *,
+#view.entering .section-body > * {
   animation: rise var(--dur-slow) var(--spring) both;
 }
 #view.entering > :nth-child(2),
@@ -2959,6 +3094,120 @@ details.more[open] > .body {
 @keyframes sheet-down {
   to {
     transform: translateY(100%);
+  }
+}
+
+/* ------------------------------------------------------------------ calm layout
+ * Pages sit on one surface: sections are separated by a hairline and a small caps heading
+ * instead of boxed cards. The black card stays the one object on a page. Tiles (contract
+ * grid view) keep their box.
+ */
+
+.main .card:not(.kpi.hero):not(.contract-card) {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 22px 0 8px;
+}
+.main .card-head {
+  margin-bottom: 10px;
+}
+.main .card-head h2 {
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.main .card-head h2 .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+.main .card-head p {
+  font-size: 13px;
+}
+.main .grid,
+.main .dash-top {
+  column-gap: 48px;
+  row-gap: 12px;
+}
+.main .stack {
+  gap: 12px;
+}
+
+/* key figures: one row with thin dividers, no boxes */
+.main .kpis {
+  gap: 0;
+  margin-bottom: 12px;
+}
+.main .kpis > .kpi:not(.hero) {
+  border-top: 1px solid var(--border);
+  padding: 18px 22px;
+}
+.main .kpis > .kpi:not(.hero):first-child {
+  padding-left: 0;
+}
+.main .kpis > .kpi:not(.hero) + .kpi:not(.hero) {
+  border-left: 1px solid var(--border);
+}
+.main .kpis > .kpi.hero {
+  margin: 0 16px 0 0;
+}
+.main .kpis > .kpi.hero:last-child {
+  margin: 0 0 0 16px;
+}
+.main .kpi-label .kpi-icon {
+  display: none;
+}
+
+/* lists run edge to edge inside a section */
+.main .card.contract-list {
+  padding-top: 4px;
+}
+.main .contract-row,
+.main .cl-group {
+  padding-left: 0;
+  padding-right: 0;
+}
+.main .settings-link {
+  padding: 16px 0;
+}
+/* the tab bar already draws the line above a tab's first section */
+.main #tab > .card:first-child,
+.main #tab > .grid:first-child > .card,
+.main #tab > .grid:first-child > .stack > .card:first-child,
+.main #tab > .kpis:first-child > .kpi:not(.hero) {
+  border-top: 0;
+  padding-top: 4px;
+}
+.main .table th:first-child,
+.main .table td:first-child {
+  padding-left: 0;
+}
+.main .table th:last-child,
+.main .table td:last-child {
+  padding-right: 0;
+}
+
+@media (max-width: 720px) {
+  .main .card:not(.kpi.hero):not(.contract-card) {
+    padding: 18px 0 6px;
+  }
+  .main .kpis {
+    row-gap: 12px;
+  }
+  .main .kpis > .kpi.hero,
+  .main .kpis > .kpi.hero:last-child {
+    margin: 0;
+  }
+  .main .kpis > .kpi:not(.hero) {
+    padding: 12px 10px 12px 12px;
+  }
+  .main .kpis > .kpi:not(.hero):first-child,
+  .main .kpis:has(> .hero) > .kpi:not(.hero):first-child {
+    padding-left: 0;
   }
 }
 

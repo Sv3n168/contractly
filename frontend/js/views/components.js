@@ -111,7 +111,7 @@ export function reminderItem(item, { actions = true, compact = false } = {}) {
     }[item.kind] || "bell";
   const href = item.contract_id ? `#/contracts/${item.contract_id}` : item.kind === "checkup" ? "#/checkup" : "#/reminders";
   return `
-  <div class="list-item">
+  <div class="list-item reminder-item">
     ${datePill(item.date, urgency)}
     <a class="grow" href="${href}" style="color:inherit">
       <div class="title">${esc(item.title)}</div>

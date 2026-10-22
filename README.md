@@ -7,6 +7,19 @@ Handy, Internet, Strom, Gas, Kfz-Versicherung, Rechtsschutz, Fitnessstudio, Stre
 was regelmäßig Geld kostet. Contractly ist kein Vergleichsportal. Es verwaltet nur deine eigenen
 Verträge, und alle Daten bleiben auf deinem Server.
 
+## Aufbau
+
+Contractly beantwortet vier Fragen – dafür gibt es vier Bereiche:
+
+| Bereich | Frage | Darin |
+|---|---|---|
+| **Übersicht** | Wo stehe ich? | Fixkosten pro Monat, was als Nächstes zu tun ist, Kostenverlauf |
+| **Verträge** | Was habe ich? | Alle Verträge als kompakte Liste (oder Kacheln), Details, Kredit, Zählerstände, Vergleich |
+| **Zu tun** | Was muss ich erledigen? | Fristen & Erinnerungen · Post & Mails · Jahres-Check |
+| **Auswertung** | Was kostet mich das? | Kosten & Prognose · Einnahmen · Zeitstrahl · Jahresbericht |
+
+Selten Gebrauchtes liegt in den **Einstellungen**: Notfall-Mappe, Import, Backup, Benutzer und Sicherheit.
+
 ## Funktionen
 
 | Bereich | Was du bekommst |

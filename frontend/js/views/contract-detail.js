@@ -394,7 +394,7 @@ function pricesTab(el, c, reload) {
       ${
         recurring.length
           ? `<div class="table-wrap"><table class="table"><thead><tr>
-              <th>Gültig ab</th><th class="r">Betrag</th><th>Zahlweise</th><th class="r">pro Monat</th><th class="r">Änderung</th><th>Notiz</th><th></th></tr></thead><tbody>
+              <th>Gültig ab</th><th class="r">Betrag</th><th class="hide-sm">Zahlweise</th><th class="r">pro Monat</th><th class="r hide-sm">Änderung</th><th class="hide-sm">Notiz</th><th></th></tr></thead><tbody>
               ${recurring
                 .map((p, i) => {
                   const prev = recurring[i + 1];
@@ -402,10 +402,10 @@ function pricesTab(el, c, reload) {
                   return `<tr>
                     <td class="num">${fmtDate(p.valid_from)}</td>
                     <td class="r num"><b>${money(p.amount)}</b></td>
-                    <td>${intervalLabel(p.interval)}</td>
+                    <td class="hide-sm">${intervalLabel(p.interval)}</td>
                     <td class="r num">${money(p.monthly_equivalent)}</td>
-                    <td class="r num">${diff ? `<span class="${diff > 0 ? "worse" : "better"}">${signedMoney(diff)}</span>` : ""}</td>
-                    <td class="muted">${esc(p.note || "")}${p.details?.unit_price_ct ? ` <span class="small">(${num(p.details.base_price_month)} €/M + ${num(p.details.unit_price_ct)} ct)</span>` : ""}</td>
+                    <td class="r num hide-sm">${diff ? `<span class="${diff > 0 ? "worse" : "better"}">${signedMoney(diff)}</span>` : ""}</td>
+                    <td class="muted hide-sm">${esc(p.note || "")}${p.details?.unit_price_ct ? ` <span class="small">(${num(p.details.base_price_month)} €/M + ${num(p.details.unit_price_ct)} ct)</span>` : ""}</td>
                     ${actions(p)}</tr>`;
                 })
                 .join("")}</tbody></table></div>`
@@ -427,7 +427,7 @@ function pricesTab(el, c, reload) {
       }
       ${
         once.length
-          ? `<div class="table-wrap"><table class="table"><thead><tr><th>Monat</th><th>Art</th><th>Grund</th><th class="r">Betrag</th><th class="r">Rechnung gesamt</th><th></th></tr></thead><tbody>
+          ? `<div class="table-wrap"><table class="table"><thead><tr><th>Monat</th><th class="hide-sm">Art</th><th>Grund</th><th class="r">Betrag</th><th class="r hide-sm">Rechnung gesamt</th><th></th></tr></thead><tbody>
               ${once
                 .map((p) => {
                   const extra = isExtra(p);
@@ -437,10 +437,10 @@ function pricesTab(el, c, reload) {
                     : `<span class="badge ${p.amount < 0 ? "good" : ""}">${p.amount < 0 ? "Gutschrift" : "einmalig"}</span>`;
                   return `<tr>
                     <td class="num">${extra ? esc(monthLabel(ym)) : fmtDate(p.valid_from)}</td>
-                    <td>${kind}</td>
+                    <td class="hide-sm">${kind}</td>
                     <td class="muted">${esc(p.note || "")}</td>
                     <td class="r num"><b class="${p.amount > 0 ? "" : "better"}">${signedMoney(p.amount)}</b></td>
-                    <td class="r num muted">${extra ? money(basePriceAt(c, ym) + p.amount) : "–"}</td>
+                    <td class="r num muted hide-sm">${extra ? money(basePriceAt(c, ym) + p.amount) : "–"}</td>
                     ${actions(p)}</tr>`;
                 })
                 .join("")}</tbody></table></div>`
@@ -678,14 +678,14 @@ function readingsTab(el, c, reload) {
         <div class="card-head"><div><h2>Zählerstände</h2><p>Ab zwei Ablesungen gibt es eine Prognose. Contractly berücksichtigt, dass im Winter mehr verbraucht wird.</p></div></div>
         ${
           rows.length
-            ? `<div class="table-wrap"><table class="table"><thead><tr><th>Datum</th><th class="r">Stand</th><th class="r">Verbrauch seit vorher</th><th class="r">pro Tag</th><th></th></tr></thead><tbody>
+            ? `<div class="table-wrap"><table class="table"><thead><tr><th>Datum</th><th class="r">Stand</th><th class="r">Verbrauch seit vorher</th><th class="r hide-sm">pro Tag</th><th></th></tr></thead><tbody>
               ${rows
                 .map((r, i) => {
                   const prev = rows[i + 1];
                   const used = prev ? r.value - prev.value : null;
                   const days = prev ? (new Date(r.reading_date) - new Date(prev.reading_date)) / 86400000 : null;
                   return `<tr><td>${fmtDate(r.reading_date)}</td><td class="r num"><b>${num(r.value)}</b> ${unit}</td>
-                    <td class="r num">${used != null ? num(used) + " " + unit : "–"}</td><td class="r num">${days ? num(used / days) + " " + unit : "–"}</td>
+                    <td class="r num">${used != null ? num(used) + " " + unit : "–"}</td><td class="r num hide-sm">${days ? num(used / days) + " " + unit : "–"}</td>
                     <td class="r"><button class="btn btn-ghost btn-sm btn-danger" data-del="${r.id}" aria-label="Löschen">${icon("trash")}</button></td></tr>`;
                 })
                 .join("")}</tbody></table></div>`

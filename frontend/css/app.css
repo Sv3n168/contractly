@@ -2799,3 +2799,27 @@ details.more[open] > .body {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ------------------------------------------------------------------ income */
+
+.income-title {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.income-title p {
+  margin: 2px 0 0;
+}
+.income-now {
+  display: flex;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.income-now .big {
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
+}
+.income-card.ended {
+  opacity: 0.7;
+}

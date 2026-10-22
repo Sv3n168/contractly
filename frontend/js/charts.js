@@ -207,3 +207,36 @@ export function legendHtml(items) {
     .map((i) => `<span><span class="sw" style="background:${i.color}"></span>${i.label}</span>`)
     .join("")}</div>`;
 }
+
+/**
+ * Income per month (regular + one-off payments, stacked) against the fixed costs as a line –
+ * one euro axis, so the gap between bar and line is what is left.
+ */
+export function incomeChart(canvas, months, { regular, oneOff, costs }) {
+  const opts = base();
+  opts.scales.x.stacked = true;
+  opts.scales.y.stacked = false;
+  opts.plugins.tooltip.callbacks.title = (items) => fmtMonth(months[items[0].dataIndex]);
+  const good = cssVar("--good");
+  const bar = {
+    borderColor: cssVar("--surface"),
+    borderWidth: { top: 2, left: 0, right: 0, bottom: 0 },
+    borderSkipped: false,
+    borderRadius: 4,
+    maxBarThickness: 22,
+    categoryPercentage: 0.78,
+    stack: "income",
+  };
+  return mount(canvas, {
+    type: "bar",
+    data: {
+      labels: months.map(fmtMonth),
+      datasets: [
+        { type: "line", label: "Fixkosten", data: costs, borderColor: cssVar("--text"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.25, order: 0 },
+        { type: "bar", label: "Regelmäßig", data: regular, backgroundColor: good, ...bar, order: 1 },
+        { type: "bar", label: "Boni & Sonderzahlungen", data: oneOff.map((v) => v || null), backgroundColor: good + "70", ...bar, order: 1 },
+      ],
+    },
+    options: opts,
+  });
+}

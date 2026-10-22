@@ -10,6 +10,7 @@ for (const [name, hash] of [
   ["post & mails", "/inbox"],
   ["yearly check", "/checkup"],
   ["emergency folder", "/emergency"],
+  ["income", "/income"],
   ["report", "/report"],
   ["settings", "/settings"],
 ]) {

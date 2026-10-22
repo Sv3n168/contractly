@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from . import forecast
 from .calc import add_months
-from .models import Contract, MeterReading, Offer, PriceEntry, Reminder
+from .models import Contract, IncomeEntry, IncomeSource, MeterReading, Offer, PriceEntry, Reminder
 
 
 def _m(ref: date, months: int) -> date:
@@ -289,5 +289,28 @@ def seed(db: Session, ref: date | None = None) -> int:
             lead_days=7,
         )
     )
+    db.commit()
+    # Income: salary with two raises, yearly bonus and holiday pay, plus child benefit
+    job_start = _m(ref, -30)
+    salary = IncomeSource(name="Gehalt", kind="salary", payer="Musterwerk GmbH", start_date=job_start)
+    salary.entries += [
+        IncomeEntry(valid_from=job_start, net=2850, gross=4300, interval="monthly", note="Einstieg"),
+        IncomeEntry(valid_from=_m(ref, -18), net=2975, gross=4500, interval="monthly", note="Tariferhöhung"),
+        IncomeEntry(valid_from=_m(ref, -6), net=3180, gross=4850, interval="monthly", note="Beförderung"),
+    ]
+    for months_ago, net, gross, note in (
+        (-22, 1900, 3600, "Bonus"),
+        (-16, 1250, 2300, "Urlaubsgeld"),
+        (-10, 2100, 4000, "Bonus"),
+        (-4, 1300, 2425, "Urlaubsgeld"),
+    ):
+        salary.entries.append(
+            IncomeEntry(
+                valid_from=_m(ref, months_ago) + timedelta(days=24), net=net, gross=gross, interval="once", note=note
+            )
+        )
+    kids = IncomeSource(name="Kindergeld", kind="child_benefit", payer="Familienkasse", start_date=_m(ref, -14))
+    kids.entries.append(IncomeEntry(valid_from=_m(ref, -14), net=255, interval="monthly"))
+    db.add_all([salary, kids])
     db.commit()
     return len(created)

@@ -179,3 +179,41 @@ class AppSetting(Base):
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[dict] = mapped_column(JSON, default=dict)
+
+
+class IncomeSource(Base):
+    """Where money comes in: a salary, pension, rent, child benefit, side job …"""
+
+    __tablename__ = "income_sources"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(200))
+    kind: Mapped[str] = mapped_column(String(30), default="salary")
+    payer: Mapped[str | None] = mapped_column(String(200))  # employer, tenant, office …
+    start_date: Mapped[date] = mapped_column(Date)
+    end_date: Mapped[date | None] = mapped_column(Date)
+    note: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    entries: Mapped[list["IncomeEntry"]] = relationship(
+        back_populates="source", cascade="all, delete-orphan", order_by="IncomeEntry.valid_from"
+    )
+
+
+class IncomeEntry(Base):
+    """An amount valid from a date until the next entry (raise), or a one-off payment (bonus).
+
+    Net is what arrives on the account and is always given; gross is optional.
+    """
+
+    __tablename__ = "income_entries"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey("income_sources.id", ondelete="CASCADE"), index=True)
+    valid_from: Mapped[date] = mapped_column(Date)
+    net: Mapped[float] = mapped_column(Float)
+    gross: Mapped[float | None] = mapped_column(Float)
+    interval: Mapped[str] = mapped_column(String(20), default="monthly")
+    note: Mapped[str | None] = mapped_column(String(300))
+
+    source: Mapped[IncomeSource] = relationship(back_populates="entries")

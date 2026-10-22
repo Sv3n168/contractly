@@ -101,6 +101,11 @@ export async function renderDashboard(view) {
       <div class="card kpi hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Fixkosten pro Monat</div>
         <div class="kpi-value num" data-count="${summary.monthly_total}" data-format="money">${money(summary.monthly_total)}</div>
+        ${
+          summary.fixed_cost_ratio != null
+            ? `<div class="kpi-sub"><a href="#/income" style="color:inherit"><b style="color:var(--emerald)">${Math.round(summary.fixed_cost_ratio * 100)} %</b> deines Nettos · ${money(summary.free_monthly, true)} bleiben</a></div>`
+            : ""
+        }
         <div class="kpi-sub">${
           summary.monthly_year_ago
             ? `<span class="delta">${icon(delta > 0 ? "trendUp" : "trendDown")} ${signedMoney(delta)}</span> ggü. Vorjahr`

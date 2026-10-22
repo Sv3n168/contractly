@@ -17,6 +17,7 @@ import { renderImport } from "./views/import.js";
 import { renderInbox, setSharedMessage } from "./views/inbox.js";
 import { renderCheckup } from "./views/checkup.js";
 import { renderEmergency } from "./views/emergency.js";
+import { renderIncome } from "./views/income.js";
 import { renderReport } from "./views/report.js";
 
 const routes = [
@@ -33,6 +34,7 @@ const routes = [
   [/^\/inbox$/, "inbox", renderInbox],
   [/^\/checkup$/, "checkup", renderCheckup],
   [/^\/emergency$/, "emergency", renderEmergency],
+  [/^\/income$/, "income", renderIncome],
   [/^\/report$/, "report", renderReport],
   [/^\/more$/, "more", renderMore],
 ];

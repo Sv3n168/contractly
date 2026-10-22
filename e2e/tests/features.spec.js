@@ -106,3 +106,24 @@ test("loan: balance, special repayment and refinancing check", async ({ page }) 
   await expect(page.locator("#loan-compare-result")).toContainText("weniger Zinsen");
   check();
 });
+
+test("income: salary with net only, raise and bonus", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/income");
+  await expect(page.getByRole("heading", { name: "Einnahmen", exact: true })).toBeVisible();
+  // the demo already has income; add a side job with net only
+  await page.click("#add");
+  await page.selectOption(".modal [name=kind]", "side_job");
+  await page.fill(".modal [name=name]", "Nachhilfe");
+  await page.fill(".modal [name=net]", "300");
+  await page.click(".modal [data-save]");
+  const card = page.locator(".income-card", { hasText: "Nachhilfe" });
+  await expect(card).toContainText("300,00 €");
+  await card.locator("[data-bonus]").click();
+  await page.fill(".modal [name=net]", "150");
+  await page.fill(".modal [name=note]", "Ferienkurs");
+  await page.click(".modal [data-save]");
+  await expect(page.locator(".income-card", { hasText: "Nachhilfe" })).toContainText("Ferienkurs");
+  await expect(page.locator(".kpi.hero")).toContainText("%");
+  check();
+});

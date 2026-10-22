@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Notfall-Mappe</title>
+<style>
+  :root { color-scheme: light; --ink:#1d2433; --muted:#667085; --line:#e4e7ee; --soft:#f5f6fa; --accent:#4f46e5; --warn:#fff5e0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--ink); background: var(--soft); }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 26px; margin: 0 0 4px; } h2 { font-size: 19px; margin: 0 0 10px; } h3 { font-size: 16px; margin: 0; }
+  .muted { color: var(--muted); } .small { font-size: 13px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 20px; margin: 16px 0; }
+  .lock { max-width: 420px; margin: 12vh auto; text-align: center; }
+  .lock input { width: 100%; padding: 12px 14px; font-size: 16px; border: 1px solid var(--line); border-radius: 10px; margin: 14px 0 10px; }
+  button, .btn { font: inherit; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; color: var(--ink); text-decoration: none; display: inline-block; }
+  .primary { background: var(--accent); border-color: var(--accent); color: #fff; width: 100%; }
+  .err { color: #c0392b; min-height: 1.5em; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--muted); }
+  td.r, th.r { text-align: right; white-space: nowrap; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: 4px 16px; margin: 12px 0; }
+  dt { color: var(--muted); } dd { margin: 0; white-space: pre-wrap; }
+  .hint { background: var(--warn); border-radius: 10px; padding: 10px 14px; margin: 10px 0; }
+  .letter { white-space: pre-wrap; font: 13px/1.5 ui-monospace, Menlo, Consolas, monospace; background: var(--soft); border-radius: 10px; padding: 14px; margin: 8px 0; }
+  ol { padding-left: 20px; } li { margin: 4px 0; }
+  .note { white-space: pre-wrap; }
+  .bar { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  details summary { cursor: pointer; color: var(--accent); }
+  @media print {
+    body { background: #fff; } main { padding: 0; } .card { border: 0; padding: 0; margin: 18px 0; break-inside: avoid-page; }
+    .bar, button, .btn { display: none !important; } details { display: block; } details > summary { display: none; }
+    .contract { break-before: page; }
+  }
+</style>
+</head>
+<body>
+<main id="app">
+  <div class="card lock">
+    <div style="font-size:40px">🔒</div>
+    <h1>Notfall-Mappe</h1>
+    <p class="muted">Erstellt am __GENERATED__ mit Contractly. Der Inhalt ist verschlüsselt –
+      bitte das Passwort eingeben, das du von der Person bekommen hast.</p>
+    <form id="unlock">
+      <input id="pw" type="password" autocomplete="off" placeholder="Passwort" autofocus>
+      <div class="err" id="err"></div>
+      <button class="primary" type="submit">Öffnen</button>
+    </form>
+    <p class="small muted">Funktioniert offline in jedem aktuellen Browser. Es werden keine Daten übertragen.</p>
+  </div>
+</main>
+<script>
+"use strict";
+const PAYLOAD = __PAYLOAD__;
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+const money = (v) => new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }).format(v || 0);
+const day = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("de-DE") : "–");
+
+async function decrypt(passphrase) {
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(passphrase), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", hash: "SHA-256", salt: b64(PAYLOAD.salt), iterations: PAYLOAD.iter },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(PAYLOAD.iv) }, key, b64(PAYLOAD.ct));
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+function render(data) {
+  const f = data.folder;
+  const docs = data.documents || {};
+  const o = f.owner || {};
+  $("#app").innerHTML = `
+    <div class="bar"><button onclick="window.print()">Drucken</button></div>
+    <h1>Notfall-Mappe${o.name ? " von " + esc(o.name) : ""}</h1>
+    <p class="muted">Stand ${day(f.generated_on)} · ${f.contracts.length} laufende Verträge · zusammen ${money(f.monthly_total)} pro Monat</p>
+    ${f.note ? `<div class="card"><h2>Persönliche Hinweise</h2><div class="note">${esc(f.note)}</div></div>` : ""}
+    <div class="card"><h2>Was jetzt zu tun ist</h2><ol>${f.checklist.map((x) => `<li>${esc(x)}</li>`).join("")}</ol></div>
+    <div class="card"><h2>Alle Verträge auf einen Blick</h2>
+      <table><thead><tr><th>Vertrag</th><th>Anbieter</th><th>Kundennummer</th><th class="r">Kosten</th><th>Kündigungsfrist</th></tr></thead><tbody>
+      ${f.contracts.map((c) => `<tr><td>${esc(c.icon)} <a href="#c${c.id}">${esc(c.name)}</a></td><td>${esc(c.provider || "")}</td>
+        <td>${esc(c.customer_number || c.contract_number || "")}</td><td class="r">${esc(c.price || "")}</td><td>${esc(c.notice)}</td></tr>`).join("")}
+      </tbody></table></div>
+    ${f.contracts.map((c) => contract(c, docs)).join("")}`;
+  document.querySelectorAll("[data-doc]").forEach((a) => a.addEventListener("click", (e) => {
+    e.preventDefault();
+    const d = docs[a.dataset.doc];
+    const url = URL.createObjectURL(new Blob([b64(d.data)], { type: d.type || "application/octet-stream" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = d.name; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }));
+  document.querySelectorAll("[data-copy]").forEach((b) => b.addEventListener("click", async () => {
+    await navigator.clipboard.writeText(document.getElementById(b.dataset.copy).textContent);
+    b.textContent = "Kopiert ✓";
+  }));
+}
+
+function contract(c, docs) {
+  const rows = [
+    ["Kategorie", c.category_label],
+    ["Anbieter", [c.provider, c.provider_address].filter(Boolean).join("\n")],
+    ["Kundennummer", c.customer_number], ["Vertragsnummer", c.contract_number],
+    ...c.details.map((d) => [d.label, d.value]),
+    ["Preis", c.price], ["Seit", day(c.start_date)], ["Kündigungsfrist", c.notice],
+    ["Nächstes Vertragsende", c.flexible ? "monatlich kündbar" : day(c.next_term_end)],
+    ["Kündigen bis", c.flexible ? "" : day(c.cancellation_deadline)],
+    ["Bereits gekündigt", c.cancelled_on ? `am ${day(c.cancelled_on)}${c.end_date ? `, endet ${day(c.end_date)}` : ""}` : ""],
+    ["Notizen", c.notes],
+  ].filter(([, v]) => v && v !== "–");
+  return `<div class="card contract" id="c${c.id}">
+    <h2>${esc(c.icon)} ${esc(c.name)}</h2>
+    <dl>${rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
+    <div class="hint"><b>Im Todesfall:</b> ${esc(c.death_hint)}</div>
+    ${c.documents.length ? `<h3>Unterlagen</h3><ul>${c.documents.map((d) => `<li>${docs[d.id]
+      ? `<a href="#" data-doc="${d.id}">${esc(d.name)}</a>` : esc(d.name)}${d.description ? ` <span class="muted small">– ${esc(d.description)}</span>` : ""}</li>`).join("")}</ul>` : ""}
+    <details><summary>Vorbereitetes Kündigungsschreiben</summary>
+      <div class="letter" id="l${c.id}">${esc(c.letter)}</div>
+      <div class="bar"><button data-copy="l${c.id}">Text kopieren</button></div></details>
+  </div>`;
+}
+
+$("#unlock").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  $("#err").textContent = "Entschlüssele …";
+  try {
+    render(await decrypt($("#pw").value));
+  } catch {
+    $("#err").textContent = "Das Passwort stimmt nicht.";
+  }
+});
+</script>
+</body>
+</html>

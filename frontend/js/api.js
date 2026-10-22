@@ -87,6 +87,21 @@ export const api = {
     fd.append("file", file);
     return request("POST", "/api/documents/analyze", fd);
   },
+  analyzeMessage: (file, { text, subject } = {}) => {
+    const fd = new FormData();
+    if (file) fd.append("file", file);
+    if (text) fd.append("text", text);
+    if (subject) fd.append("subject", subject);
+    return request("POST", "/api/inbox/analyze", fd);
+  },
+  messageProposal: (docId, contractId) => request("GET", `/api/inbox/${docId}${qs({ contract_id: contractId })}`),
+  applyMessage: (docId, data) => request("POST", `/api/inbox/${docId}/apply`, data),
+  checkup: () => request("GET", "/api/checkup"),
+  checkupDecide: (contractId, decision) => request("POST", `/api/checkup/${contractId}`, { decision }),
+  checkupComplete: () => request("POST", "/api/checkup/complete"),
+  emergency: () => request("GET", "/api/emergency"),
+  emergencyNote: (note) => request("PUT", "/api/emergency/note", { note }),
+  emergencyExport: (data) => request("POST", "/api/emergency/export", data, { raw: true }),
   extractDocument: (docId, refresh = false) => request("POST", `/api/documents/${docId}/extract${qs({ refresh })}`),
   deleteDocument: (docId) => request("DELETE", `/api/documents/${docId}`),
 

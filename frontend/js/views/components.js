@@ -90,8 +90,9 @@ export function reminderItem(item, { actions = true, compact = false } = {}) {
       confirmation: "mail",
       subscription_check: "sparkles",
       installment_check: "gauge",
+      checkup: "refresh",
     }[item.kind] || "bell";
-  const href = item.contract_id ? `#/contracts/${item.contract_id}` : "#/reminders";
+  const href = item.contract_id ? `#/contracts/${item.contract_id}` : item.kind === "checkup" ? "#/checkup" : "#/reminders";
   return `
   <div class="list-item">
     ${datePill(item.date, urgency)}
@@ -143,6 +144,8 @@ function reminderActions(item, compact = false) {
         <a class="btn btn-sm btn-ghost" href="#/contracts/${item.contract_id}" title="Kündigen">${icon("ban")}</a></div>`;
     case "confirmation":
       return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-confirmed="${item.contract_id}" title="Bestätigung erhalten">${icon("check")}</button>${dismiss}</div>`;
+    case "checkup":
+      return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm btn-primary" href="#/checkup" title="Jahres-Check starten">${icon("chevRight")}${label("Starten")}</a>${dismiss}</div>`;
     case "installment_check":
       return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm" href="#/contracts/${item.contract_id}?tab=prices" title="Abschlag anpassen">${icon("euro")}${label("Anpassen")}</a>${dismiss}</div>`;
     case "price_increase":

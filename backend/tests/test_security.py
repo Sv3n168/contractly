@@ -1,7 +1,6 @@
 """Encryption at rest, login, separate user areas and backups."""
 
 import sqlite3
-import time
 from datetime import date, timedelta
 
 from app import db as database
@@ -320,11 +319,12 @@ def test_two_factor_login(client):
     bad = client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": "123456"})
     assert bad.status_code == 401
     # the code used for activation is spent; the next one works exactly once
-    reused = client.post(
-        "/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": totp_code(setup["secret"])}
-    )
+    # (codes are derived from the stored time step, so a 30-second boundary mid-test doesn't matter)
+    step = vault.find("admin")["totp_step"]
+    spent = totp_code(setup["secret"], step * 30)
+    reused = client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": spent})
     assert reused.status_code == 401
-    code = totp_code(setup["secret"], time.time() + 30)
+    code = totp_code(setup["secret"], (step + 1) * 30)
     ok = client.post("/api/auth/login", json={"username": "admin", "password": PASSWORD, "totp": code})
     assert ok.status_code == 200
     assert ok.json()["failed_logins"] == 2  # wrong code + reused code, reported after login

@@ -14,6 +14,9 @@ import { renderReminders } from "./views/reminders.js";
 import { renderSettings, renderMore } from "./views/settings.js";
 import { hideAuth, showAuth } from "./views/auth.js";
 import { renderImport } from "./views/import.js";
+import { renderInbox, setSharedMessage } from "./views/inbox.js";
+import { renderCheckup } from "./views/checkup.js";
+import { renderEmergency } from "./views/emergency.js";
 import { renderReport } from "./views/report.js";
 
 const routes = [
@@ -27,6 +30,9 @@ const routes = [
   [/^\/reminders$/, "reminders", renderReminders],
   [/^\/settings$/, "settings", renderSettings],
   [/^\/import$/, "import", renderImport],
+  [/^\/inbox$/, "inbox", renderInbox],
+  [/^\/checkup$/, "checkup", renderCheckup],
+  [/^\/emergency$/, "emergency", renderEmergency],
   [/^\/report$/, "report", renderReport],
   [/^\/more$/, "more", renderMore],
 ];
@@ -243,7 +249,16 @@ function boot() {
   if ("serviceWorker" in navigator && location.protocol === "https:") {
     navigator.serviceWorker.register("/sw.js").catch(() => {});
   }
+  takeSharedMessage();
   start();
+}
+
+/** "Teilen → Contractly" on the phone (PWA share target) opens /?title=…&text=… */
+function takeSharedMessage() {
+  const q = new URLSearchParams(location.search);
+  if (!q.has("text") && !q.has("title")) return;
+  setSharedMessage({ subject: q.get("title") || "", text: [q.get("text"), q.get("url")].filter(Boolean).join("\n") });
+  history.replaceState(null, "", "/#/inbox");
 }
 
 boot();

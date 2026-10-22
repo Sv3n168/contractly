@@ -26,26 +26,33 @@ router = APIRouter(prefix="/api", tags=["documents"])
 CHUNK = 1024 * 1024
 
 
-async def _store_upload(file: UploadFile) -> tuple[str, str, int, str]:
-    """Encrypt an upload into the documents directory. Returns (original, stored, size, type)."""
-    original = Path(file.filename or "dokument").name[:300]
-    suffix = Path(original).suffix.lower()[:10]
-    stored = f"{uuid.uuid4().hex}{suffix}"
+def store_bytes(original: str, data: bytes, content_type: str | None = None) -> tuple[str, str, int, str]:
+    """Encrypt content into the documents directory. Returns (original, stored, size, type)."""
+    original = Path(original or "dokument").name[:300]
+    stored = f"{uuid.uuid4().hex}{Path(original).suffix.lower()[:10]}"
     target = documents_dir() / stored
+    tmp = target.with_name(stored + ".partial")
+    tmp.write_bytes(encrypt_bytes(data, file_key(), stored.encode()))
+    tmp.replace(target)
+    content_type = content_type or mimetypes.guess_type(original)[0] or "application/octet-stream"
+    return original, stored, len(data), content_type
+
+
+async def read_upload(file: UploadFile) -> bytes:
     limit = settings.max_upload_mb * 1024 * 1024
     buf = bytearray()
     while chunk := await file.read(CHUNK):
         buf.extend(chunk)
         if len(buf) > limit:
             raise HTTPException(413, f"Datei größer als {settings.max_upload_mb} MB")
-    size = len(buf)
-    tmp = target.with_name(stored + ".partial")
+    return bytes(buf)
+
+
+async def _store_upload(file: UploadFile) -> tuple[str, str, int, str]:
+    """Encrypt an upload into the documents directory. Returns (original, stored, size, type)."""
+    data = await read_upload(file)
     # Encrypting up to max_upload_mb takes a moment: keep the event loop free for other users.
-    sealed = await asyncio.to_thread(encrypt_bytes, bytes(buf), file_key(), stored.encode())
-    await asyncio.to_thread(tmp.write_bytes, sealed)
-    tmp.replace(target)
-    content_type = file.content_type or mimetypes.guess_type(original)[0] or "application/octet-stream"
-    return original, stored, size, content_type
+    return await asyncio.to_thread(store_bytes, file.filename or "dokument", data, file.content_type)
 
 
 @router.post("/contracts/{contract_id}/documents", response_model=DocumentOut, status_code=201)

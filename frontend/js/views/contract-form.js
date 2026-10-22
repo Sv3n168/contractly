@@ -323,6 +323,17 @@ export async function renderContractForm(view, id, query = {}) {
     });
   };
 
+  if (query.document) {
+    // From "Post & Mails": an already stored letter/e-mail for a contract that isn't recorded yet.
+    try {
+      const res = await api.extractDocument(Number(query.document));
+      attachments.push({ id: res.document_id, name: "Schreiben" });
+      pendingSuggestions = res.suggestions;
+      cat ||= guessCategory(res.text);
+    } catch {
+      /* continue without prefill */
+    }
+  }
   if (cat) drawForm();
   else drawCategoryStep();
 }

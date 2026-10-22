@@ -7,6 +7,9 @@ for (const [name, hash] of [
   ["contract detail", "/contracts/1"],
   ["compare", "/contracts/1?tab=compare"],
   ["import", "/import"],
+  ["post & mails", "/inbox"],
+  ["yearly check", "/checkup"],
+  ["emergency folder", "/emergency"],
   ["report", "/report"],
   ["settings", "/settings"],
 ]) {

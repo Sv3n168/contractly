@@ -34,7 +34,8 @@ export async function renderContracts(view) {
   view.innerHTML = `
     <div class="page-head">
       <div><h1>Verträge</h1><p>${running.length} laufend · ${money(monthly)} im Monat · ${money(monthly * 12, true)} im Jahr</p></div>
-      <div class="page-actions"><a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a></div>
+      <div class="page-actions"><a class="btn" href="#/import">${icon("upload")}<span class="label">Importieren</span></a>
+        <a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a></div>
     </div>
     <div class="card" style="padding:14px;margin-bottom:20px;display:flex;flex-direction:column;gap:12px">
       <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">

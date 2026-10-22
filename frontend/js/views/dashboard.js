@@ -48,6 +48,7 @@ export async function renderDashboard(view) {
 
   const delta = summary.monthly_total - summary.monthly_year_ago;
   const urgent = summary.deadlines.filter((d) => d.type === "deadline" && d.days_left <= 14);
+  const checkupDue = upcoming.items.some((i) => i.kind === "checkup" && i.due);
   const currentMonth = isoDate(now).slice(0, 7);
 
   // Fold category series into the eight fixed groups.
@@ -74,7 +75,7 @@ export async function renderDashboard(view) {
         <p>Dein Vertragsüberblick für ${monthName}.</p>
       </div>
       <div class="page-actions">
-        <a class="btn" href="#/costs">${icon("chart")}<span class="label">Prognose</span></a>
+        <a class="btn" href="#/inbox">${icon("mail")}<span class="label">Post erfassen</span></a>
         <a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a>
       </div>
     </div>
@@ -85,6 +86,14 @@ export async function renderDashboard(view) {
             <div><b>${urgent.length === 1 ? "Eine Kündigungsfrist läuft" : `${urgent.length} Kündigungsfristen laufen`} bald ab.</b>
             ${urgent.map((d) => `<a href="#/contracts/${d.contract_id}">${esc(d.name)}</a> (bis ${fmtDate(d.date)})`).join(", ")}.
             Kündigen oder bewusst weiterlaufen lassen?</div></div>`
+        : ""
+    }
+
+    ${
+      checkupDue
+        ? `<div class="callout" style="margin-bottom:20px">${icon("refresh")}
+            <div class="grow"><b>Zeit für deinen Jahres-Check.</b> 5 Minuten – Contractly zeigt dir nur die Verträge, bei denen sich ein Blick lohnt.</div>
+            <a class="btn btn-sm btn-primary" href="#/checkup">Starten</a></div>`
         : ""
     }
 

@@ -30,6 +30,9 @@ Verträge, und alle Daten bleiben auf deinem Server.
 | **Backup** | Vollbackup (Datenbank und Dokumente), optional **AES-256-verschlüsselt mit eigenem Schlüssel**. Automatisch täglich oder wöchentlich, Upload in **OneDrive, Google Drive, Dropbox, Nextcloud, S3 …** (über rclone), Wiederherstellung in der Oberfläche |
 | **Sicherheit** | Anmeldeseite mit eigenem Konto. **Datenbank, Dokumente (PDFs, Fotos) und Backups sind verschlüsselt gespeichert** (SQLCipher/AES-256). Der Schlüssel entsteht aus dem Passwort und liegt nur während der Anmeldung im Arbeitsspeicher. Nach dem Abmelden ist nichts mehr lesbar. Dazu Wiederherstellungsschlüssel, Schutz vor Passwort-Raten und Sicherheits-Header |
 | **Mehrere Benutzer** | Jede Person hat einen **eigenen, getrennt verschlüsselten Bereich**. Der Admin lädt per Einladungscode ein; das Passwort legt die Person selbst fest, daher kann auch der Admin keine fremden Verträge lesen |
+| **Post & Mails** | Brief fotografieren, PDF oder E-Mail (.eml) hineinziehen, Mail-Text einfügen oder am Handy *Teilen → Contractly*. Contractly erkennt **Preiserhöhung, neuen Abschlag, Jahresabrechnung, Kündigungsbestätigung, Vertragsbestätigung, neue AGB**, ordnet das Schreiben dem Vertrag zu (Kunden-/Vertragsnummer, Anbieter, Absender-Domain) und trägt mit einem Klick ein, was sich ändert. Das Schreiben wird verschlüsselt beim Vertrag abgelegt. Siehe [Post & Mails](#post--mails) |
+| **Jahres-Check** | Einmal im Jahr, etwa 5 Minuten: nur die Verträge mit Handlungsbedarf (Aktionspreis ausgelaufen, teurer geworden, Bonus verbraucht, Preisgarantie endet, nie verglichen, Abo ungenutzt, Abschlag zu niedrig, Frist naht) – je Vertrag *Passt so*, *Vergleichen* oder *Kündigen*, am Ende Zusammenfassung mit Ersparnis und fertigen Kündigungsschreiben |
+| **Notfall-Mappe** | Alles, was Angehörige brauchen: Verträge mit Nummern, Anschriften, Fristen, Unterlagen, Hinweisen für den Todesfall und vorbereitetem Kündigungsschreiben, dazu persönliche Hinweise. Zum Drucken oder als **eine verschlüsselte HTML-Datei**, die sich offline in jedem Browser mit Passwort öffnen lässt |
 | **Importieren** | **Vertragslisten** aus Excel/CSV übernehmen (Vorlage zum Download), Spalten werden automatisch erkannt. Die Dateien werden nicht gespeichert |
 | **Alltagssituationen** | **Kostenanteil** (Partner zahlt die Hälfte), **Pausieren** (z. B. Fitnessstudio ruhend, auf Wunsch mit verlängerter Laufzeit), **Kündigungsbestätigung** nachverfolgen, automatische Erinnerungen an **Widerrufsfrist**, **Ende der Preisgarantie**, **angekündigte Preiserhöhungen** (Sonderkündigungsrecht), fehlende Kündigungsbestätigung und einen jährlichen **Abo-Check** („Nutzt du das noch?“). Hinweis auf **doppelte Verträge** beim Anlegen |
 | **Jahresbericht & Steuer** | „Dein Vertragsjahr“: Kosten, Kategorien, Wechsel, Preisänderungen, druckbar als PDF. **Steuer-Export** (CSV) der steuerlich relevanten Verträge (Vorgabe je Kategorie, pro Vertrag änderbar) |
@@ -117,6 +120,31 @@ Alle Daten (Datenbank, Dokumente, Backups) liegen im Ordner `./data`.
 vorhandenen Daten aus `./data` in den Bereich des Admins übernommen, verschlüsselt, und die
 unverschlüsselten Originale werden gelöscht. Die frühere Variable `CONTRACTLY_PASSWORD` wird nicht
 mehr verwendet.
+
+## Post & Mails
+
+Unter *Post & Mails* landet alles, was ein Anbieter schickt:
+
+- **Brief:** am Handy *Brief fotografieren*, sonst Foto oder PDF hineinziehen (Texterkennung mit Tesseract).
+- **E-Mail:** als `.eml` speichern und hineinziehen – in Gmail *⋮ → Nachricht herunterladen*, in Outlook/Thunderbird
+  *Speichern unter* bzw. die Mail auf den Desktop ziehen. Ein PDF-Anhang (z. B. die Rechnung) wird mitgelesen und abgelegt.
+  Oder einfach den Text der Mail kopieren und einfügen.
+- **Handy:** Contractly zum Startbildschirm hinzufügen, dann in der Mail-App *Teilen → Contractly*.
+
+Contractly erkennt die Art des Schreibens und schlägt vor, was sich ändert – etwa „Neuer Preis 49,95 € ab 01.01.2027“
+samt Erinnerung an das Sonderkündigungsrecht, „Nachzahlung 184,80 €“ und den neuen Abschlag oder „Kündigung bestätigt,
+Vertragsende 31.12.2026“. Beträge und Daten lassen sich vor dem Übernehmen anpassen. Die Erkennung läuft vollständig
+lokal (Regeln, keine KI-Cloud); `.msg`-Dateien aus Outlook werden nicht unterstützt.
+
+## Jahres-Check und Notfall-Mappe
+
+Der **Jahres-Check** ist jedes Jahr ab Mitte Januar fällig (erstmals im Jahr nach dem ersten erfassten Vertrag) und
+erscheint als Erinnerung und auf dem Dashboard. *Passt so* gilt auch als Antwort auf den jährlichen Abo-Check.
+
+Die **Notfall-Mappe** enthält nur laufende Verträge. Die verschlüsselte Datei nutzt AES-256-GCM mit einem per
+PBKDF2-SHA256 (600.000 Runden) abgeleiteten Schlüssel; entschlüsselt wird im Browser der Angehörigen (WebCrypto),
+ohne Internet und ohne Contractly. Bewahre das Passwort getrennt von der Datei auf, z. B. auf Papier bei den
+Unterlagen. Nach größeren Änderungen (oder im Jahres-Check) einfach eine neue Datei erzeugen.
 
 ## Verbrauchsprognose (Strom & Gas)
 

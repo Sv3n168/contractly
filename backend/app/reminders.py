@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import calc
+from . import calc, checkup
 from . import db as database
 from .categories import CATEGORY_MAP, SUBSCRIPTION_CATEGORIES, is_energy
 from .config import settings
@@ -92,6 +92,22 @@ def collect(db: Session, ref: date, horizon_days: int = 60, include_dismissed: b
                 )
 
         items.extend(_scenario_items(c, ref, horizon))
+
+    due = checkup.due_date(db, list(db.scalars(select(Contract))), ref)
+    if due and due <= horizon:
+        items.append(
+            {
+                "key": f"checkup:{due.year}",
+                "kind": "checkup",
+                "title": "Jahres-Check: 5 Minuten für deine Verträge",
+                "date": due,
+                "notify_date": due,
+                "contract_id": None,
+                "contract_name": None,
+                "category": None,
+                "detail": "Contractly zeigt dir nur die Verträge, bei denen sich ein Blick lohnt.",
+            }
+        )
 
     for r in db.scalars(select(Reminder).where(Reminder.done_at.is_(None))):
         notify = r.due_date - timedelta(days=r.lead_days or 0)
@@ -267,6 +283,8 @@ def _neutral_title(item: dict) -> str:
     what = f"{label}-Vertrag" if label else "Vertrag"
     if item["kind"] == "deadline":
         return f"Kündigungsfrist {what}"
+    if item["kind"] == "checkup":
+        return "Jahres-Check: 5 Minuten für deine Verträge"
     if item["kind"] == "contract_end":
         return f"Vertragsende {what}"
     neutral = {

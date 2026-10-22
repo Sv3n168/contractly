@@ -943,6 +943,89 @@ h3 {
   color: var(--muted);
 }
 
+/* compact list: one line per contract */
+.contract-list {
+  padding: 6px 0;
+}
+.cl-group {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px 6px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.cl-group:not(:first-child) {
+  margin-top: 6px;
+  border-top: 1px solid var(--border);
+}
+.contract-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 20px;
+  color: var(--text);
+  transition: background var(--dur-fast);
+}
+.contract-row + .contract-row {
+  border-top: 1px solid var(--border);
+}
+.contract-row:hover {
+  background: var(--surface-2);
+}
+.contract-row.ended {
+  opacity: 0.65;
+}
+.cr-title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.cr-title b,
+.cr-title span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cr-title span {
+  font-size: 13px;
+  color: var(--muted);
+}
+.cr-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.cr-deadline {
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 0;
+}
+.cr-deadline > span:not(.badge) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cr-price {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 96px;
+}
+.cr-price b {
+  font-size: 16px;
+  font-weight: 700;
+}
+.cr-price span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .group-head {
   display: flex;
   align-items: center;
@@ -2047,8 +2130,25 @@ details.more > .body {
   h1 {
     font-size: 22px;
   }
+  /* actions sit next to the title as small icon buttons instead of taking a row */
   .page-head {
     margin-bottom: 18px;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+  }
+  .page-head > :first-child {
+    flex: 1;
+    min-width: 0;
+  }
+  .page-head .page-actions {
+    flex-wrap: nowrap;
+    flex: none;
+  }
+  .page-head .page-actions .btn {
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    justify-content: center;
   }
   .page-head .page-actions .btn .label {
     display: none;
@@ -2100,19 +2200,90 @@ details.more > .body {
     font-size: 10px;
   }
   .kpis {
-    gap: 12px;
+    gap: 10px;
+    margin-bottom: 16px;
   }
+  /* phones: compact tiles – label on one line, no icon, short sub line */
   .kpi {
-    padding: 16px;
+    padding: 12px 14px;
+  }
+  .kpi-label {
+    display: block;
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .kpi-label .kpi-icon {
+    display: none;
+  }
+  /* four tiles with the black card: it gets the full width, the rest share one row */
+  .kpis:has(> .hero):has(> :nth-child(4):last-child) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) {
+    padding: 10px 12px;
+  }
+  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-label {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 11.5px;
+    line-height: 1.25;
+  }
+  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-value {
+    font-size: 17px;
+  }
+  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-sub {
+    font-size: 11.5px;
+  }
+  .kpis > .kpi.hero {
+    grid-column: 1 / -1;
+  }
+  .kpis > .kpi.hero .kpi-value {
+    font-size: 26px;
+  }
+  .card.contract-list {
+    padding: 4px 0;
   }
   .kpi-value {
-    font-size: 22px;
+    margin-top: 4px;
+    font-size: 20px;
+  }
+  .kpi-sub {
+    margin-top: 4px;
+    font-size: 12px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
   .card {
     padding: 16px;
   }
   .contract-grid {
     grid-template-columns: 1fr;
+  }
+  .contract-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 10px 16px;
+  }
+  .contract-row .cr-meta {
+    display: none;
+  }
+  .contract-row .cr-deadline {
+    grid-column: 2 / -1;
+    grid-row: 2;
+    margin-top: -6px;
+  }
+  .contract-row .cr-deadline:empty {
+    display: none;
+  }
+  .cl-group {
+    padding: 12px 16px 4px;
   }
   .form-grid {
     grid-template-columns: 1fr 1fr;
@@ -2695,6 +2866,7 @@ body:not(.is-admin) .admin-only {
 .bottom-nav a:active,
 a.list-item:active,
 button.list-item:active,
+.contract-row:active,
 .contract-card:active,
 .cat-tile:active,
 .tab:active {

@@ -16,6 +16,8 @@ class Contract(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     category: Mapped[str] = mapped_column(String(50), index=True)
+    # Own emoji; None = the category's emoji.
+    icon: Mapped[str | None] = mapped_column(String(16))
     provider: Mapped[str | None] = mapped_column(String(200))
     provider_address: Mapped[str | None] = mapped_column(Text)
     customer_number: Mapped[str | None] = mapped_column(String(100))
@@ -189,6 +191,7 @@ class IncomeSource(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(200))
     kind: Mapped[str] = mapped_column(String(30), default="salary")
+    icon: Mapped[str | None] = mapped_column(String(16))  # own emoji; None = the kind's emoji
     payer: Mapped[str | None] = mapped_column(String(200))  # employer, tenant, office …
     start_date: Mapped[date] = mapped_column(Date)
     end_date: Mapped[date | None] = mapped_column(Date)

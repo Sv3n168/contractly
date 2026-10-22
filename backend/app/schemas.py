@@ -56,6 +56,7 @@ class DocumentOut(ORM):
 class ContractBase(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     category: str
+    icon: str | None = None
     provider: str | None = None
     provider_address: str | None = None
     customer_number: str | None = None
@@ -83,6 +84,11 @@ class ContractBase(BaseModel):
             raise ValueError(f"unknown category {v!r}")
         return v
 
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, v: str | None) -> str | None:
+        return clean_icon(v)
+
 
 class ContractCreate(ContractBase):
     predecessor_id: int | None = None
@@ -97,10 +103,21 @@ class ContractUpdate(ContractBase):
     predecessor_id: int | None = None
 
 
+def clean_icon(value: str | None) -> str | None:
+    """An own emoji: short, no letters or digits (one emoji can be several code points)."""
+    v = (value or "").strip()
+    if not v:
+        return None
+    if len(v) > 16 or any(ch.isascii() and (ch.isalnum() or ch in "<>&\"'") for ch in v):
+        raise ValueError("Bitte ein einzelnes Emoji wählen")
+    return v
+
+
 class ContractSummary(ORM):
     id: int
     name: str
     category: str
+    icon: str | None = None
     provider: str | None
     start_date: date
     end_date: date | None

@@ -1,6 +1,6 @@
 // Reusable view fragments.
 
-import { STATE_LABEL, catColorVar, catIcon, catLabel, category, intervalLabel } from "../store.js";
+import { STATE_LABEL, catColorVar, contractIcon, catLabel, category, intervalLabel } from "../store.js";
 import { daysUntil, esc, fmtDate, icon, money, num, relDays } from "../ui.js";
 
 export function attrValue(field, value) {
@@ -54,7 +54,7 @@ export function contractCard(c) {
   return `
   <a class="card contract-card ${c.state === "ended" ? "ended" : ""}" href="#/contracts/${c.id}">
     <div class="cc-top">
-      <div class="cat-icon" style="--c:${catColorVar(c.category)}">${catIcon(c.category)}</div>
+      <div class="cat-icon" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
       <div class="cc-title">
         <h3>${esc(c.name)}</h3>
         <div class="provider">${esc(c.provider || catLabel(c.category))}</div>
@@ -81,7 +81,7 @@ export function contractRow(c) {
   }${c.share_percent != null && c.share_percent !== 100 ? `<span class="badge info">Anteil ${c.share_percent} %</span>` : ""}`;
   return `
   <a class="contract-row ${c.state === "ended" ? "ended" : ""}" href="#/contracts/${c.id}">
-    <div class="cat-icon sm" style="--c:${catColorVar(c.category)}">${catIcon(c.category)}</div>
+    <div class="cat-icon sm" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
     <div class="cr-title"><b>${esc(c.name)}</b><span>${esc(c.provider || catLabel(c.category))}</span></div>
     <div class="cr-meta">${flags}${attrChips(c, 2)}</div>
     <div class="cr-deadline">${deadlineHint(c)}</div>
@@ -172,3 +172,69 @@ function reminderActions(item, compact = false) {
       return dismiss;
   }
 }
+
+// ------------------------------------------------------------------ own emoji
+
+const EMOJIS = [
+  "📱", "🌐", "📶", "☎️", "⚡", "🔥", "💧", "☀️", "🚗", "🏍️", "🚲", "🚆",
+  "🏠", "🔑", "🛡️", "⚖️", "🩺", "🦷", "👓", "💊", "🏋️", "🧘", "⚽", "🎾",
+  "🎬", "🎵", "🎮", "📺", "📰", "📚", "☁️", "💻", "🐶", "🐱", "👶", "🎓",
+  "🏦", "💳", "💶", "🐷", "📈", "🧾", "🛒", "🍽️", "☕", "✈️", "🎁", "⭐",
+];
+
+/** Button showing the own emoji (or the default) that opens a small picker below it. */
+export function iconPicker(value, fallback, colorVar = "var(--primary)") {
+  return `<div class="icon-picker">
+    <button type="button" class="cat-icon icon-pick" style="--c:${colorVar}" data-fallback="${esc(fallback)}"
+      title="Symbol ändern" aria-label="Symbol ändern" aria-expanded="false">${esc(value || fallback)}</button>
+    <input type="hidden" name="icon" value="${esc(value || "")}"/>
+    <div class="icon-pop" hidden>
+      <div class="icon-grid">${EMOJIS.map((e) => `<button type="button" data-emoji="${e}">${e}</button>`).join("")}</div>
+      <div class="icon-own">
+        <input class="input" maxlength="16" placeholder="Eigenes Emoji" aria-label="Eigenes Emoji" autocomplete="off"/>
+        <button type="button" class="btn btn-sm" data-default>${esc(fallback)} Standard</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+export function bindIconPicker(root) {
+  const box = root.querySelector(".icon-picker");
+  if (!box) return;
+  const pick = box.querySelector(".icon-pick");
+  const field = box.querySelector("input[name=icon]");
+  const pop = box.querySelector(".icon-pop");
+  const own = box.querySelector(".icon-own input");
+  const set = (value) => {
+    field.value = value;
+    pick.textContent = value || pick.dataset.fallback;
+  };
+  const toggle = (open) => {
+    pop.hidden = !open;
+    pick.setAttribute("aria-expanded", String(open));
+  };
+  pick.addEventListener("click", () => toggle(pop.hidden));
+  pop.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-emoji]");
+    if (b) {
+      set(b.dataset.emoji);
+      toggle(false);
+    }
+    if (e.target.closest("[data-default]")) {
+      set("");
+      toggle(false);
+    }
+  });
+  own.addEventListener("input", () => {
+    const v = own.value.trim();
+    // only symbols – letters and digits would just be text
+    if (v && !/[A-Za-z0-9<>&"']/.test(v)) set(v);
+  });
+  own.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      toggle(false);
+    }
+  });
+}
+

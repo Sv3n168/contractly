@@ -3097,6 +3097,58 @@ details.more[open] > .body {
   }
 }
 
+/* ------------------------------------------------------------------ own emoji */
+
+.icon-picker {
+  position: relative;
+}
+.icon-pick {
+  border: 1px dashed transparent;
+  cursor: pointer;
+  transition: border-color var(--dur-fast), transform var(--dur) var(--spring);
+}
+.icon-pick:hover,
+.icon-pick[aria-expanded="true"] {
+  border-color: var(--border-strong);
+}
+.icon-pop {
+  position: absolute;
+  z-index: 60;
+  top: calc(100% + 8px);
+  left: 0;
+  width: min(332px, calc(100vw - 32px));
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+}
+.icon-grid button {
+  aspect-ratio: 1;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font-size: 20px;
+  cursor: pointer;
+}
+.icon-grid button:hover {
+  background: var(--surface-2);
+}
+.icon-own {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.icon-own .input {
+  flex: 1;
+  min-width: 0;
+}
+
 /* ------------------------------------------------------------------ calm layout
  * Pages sit on one surface: sections are separated by a hairline and a small caps heading
  * instead of boxed cards. The black card stays the one object on a page. Tiles (contract

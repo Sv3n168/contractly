@@ -3,7 +3,7 @@
 import { api } from "./api.js";
 import { loadMeta, state } from "./store.js";
 import { $, $$, countUp, esc, icon, modal, money, toast } from "./ui.js";
-import { catColorVar, catIcon, catLabel } from "./store.js";
+import { catColorVar, contractIcon, catLabel } from "./store.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { renderContracts } from "./views/contracts.js";
 import { renderContractDetail } from "./views/contract-detail.js";
@@ -205,7 +205,7 @@ async function openSearch() {
       ? hits
           .map(
             (c, i) => `<a href="#/contracts/${c.id}" class="${i === sel ? "sel" : ""}">
-              <span class="cat-icon sm" style="--c:${catColorVar(c.category)}">${catIcon(c.category)}</span>
+              <span class="cat-icon sm" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</span>
               <span style="flex:1;min-width:0"><b>${esc(c.name)}</b><br><span class="small muted">${esc(c.provider || catLabel(c.category))}</span></span>
               <span class="num small">${c.monthly_cost ? money(c.monthly_cost) + "/M" : ""}</span></a>`,
           )

@@ -146,7 +146,7 @@ def build(contracts: list[Contract], owner: dict, note: str, today: date) -> dic
                 "name": c.name,
                 "category": c.category,
                 "category_label": cat.get("label", "Sonstiges"),
-                "icon": cat.get("icon", "📄"),
+                "icon": c.icon or cat.get("icon", "📄"),
                 "provider": c.provider,
                 "provider_address": c.provider_address,
                 "customer_number": c.customer_number,

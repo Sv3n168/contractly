@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 from .. import income
 from ..db import get_db
 from ..models import IncomeEntry, IncomeSource
+from ..schemas import clean_icon
 from ..services import load_contracts, today
 
 router = APIRouter(prefix="/api/income", tags=["income"])
@@ -35,6 +36,7 @@ class EntryIn(BaseModel):
 class SourceIn(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     kind: str = "salary"
+    icon: str | None = None
     payer: str | None = Field(None, max_length=200)
     start_date: date
     end_date: date | None = None
@@ -46,6 +48,11 @@ class SourceIn(BaseModel):
         if v not in income.KINDS:
             raise ValueError("Unbekannte Art")
         return v
+
+    @field_validator("icon")
+    @classmethod
+    def _icon(cls, v: str | None) -> str | None:
+        return clean_icon(v)
 
 
 class NewSourceIn(SourceIn):

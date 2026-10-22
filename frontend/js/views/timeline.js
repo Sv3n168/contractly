@@ -2,7 +2,7 @@
 // consecutive segments on the same row (e.g. FitX → Sportnavi).
 
 import { api } from "../api.js";
-import { catColorVar, catIcon, catLabel } from "../store.js";
+import { catColorVar, contractIcon, catLabel } from "../store.js";
 import { $, esc, fmtDate, icon, money, parseDate, today } from "../ui.js";
 import { emptyState } from "./components.js";
 
@@ -118,7 +118,7 @@ function drawTimeline(view, contracts) {
           : "";
       return `<div class="tl-row">
         <a class="tl-label" href="#/contracts/${head.id}">
-          <span class="cat-icon sm" style="--c:${catColorVar(head.category)}">${catIcon(head.category)}</span>
+          <span class="cat-icon sm" style="--c:${catColorVar(head.category)}">${esc(contractIcon(head))}</span>
           <span style="min-width:0"><div class="t">${esc(head.name)}</div>
             <div class="s">${chain.length > 1 ? `${chain.length - 1}× gewechselt` : esc(head.provider || catLabel(head.category))}</div></span>
         </a>

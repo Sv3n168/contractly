@@ -24,6 +24,23 @@ test("create a contract with the wizard", async ({ page }) => {
   check();
 });
 
+test("own emoji for a contract", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Streaming" }).click();
+  await page.fill("[name=name]", "Hundeschule");
+  await page.fill("[name=price_amount]", "25");
+  await page.click(".icon-pick");
+  await page.click(".icon-grid [data-emoji='🐶']");
+  await expect(page.locator(".icon-pick")).toHaveText("🐶");
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Hundeschule" })).toBeVisible();
+  await expect(page.locator(".cat-icon.lg")).toHaveText("🐶");
+  await page.goto("/#/contracts");
+  await expect(page.locator(".contract-row", { hasText: "Hundeschule" }).locator(".cat-icon")).toHaveText("🐶");
+  check();
+});
+
 test("record extra charges by invoice amount", async ({ page }) => {
   const check = watchErrors(page);
   await page.goto("/#/contracts/1?tab=prices");

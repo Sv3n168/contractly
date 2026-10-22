@@ -104,6 +104,12 @@ export async function renderSettings(view) {
           <p class="small text-2" style="margin:0">Selbst gehostete Vertragsverwaltung. Deine Daten bleiben auf deinem Server – kein Vergleichsportal, keine Werbung, kein Tracking.
           Texterkennung (OCR): ${state.meta.ocr?.tesseract ? "verfügbar ✓" : "nicht verfügbar"}</p>
         </div>
+        <div class="card">
+          <div class="card-head"><div><h2>${icon("trash")} Neu anfangen</h2>
+            <p>Löscht alle Verträge, Dokumente, Einnahmen, Erinnerungen und die Notfall-Hinweise – z. B. die Demo-Daten.
+              Konto, Passwort, Zwei-Faktor-Anmeldung, Benachrichtigungen und dein Profil bleiben.</p></div></div>
+          <button class="btn btn-danger" id="reset">${icon("trash")} Alle Daten löschen</button>
+        </div>
       </div>
     </div>`;
 
@@ -143,6 +149,7 @@ export async function renderSettings(view) {
     }
   });
   $("#rk", view).addEventListener("click", recoveryKeyModal);
+  $("#reset", view).addEventListener("click", resetModal);
   if (isAdmin()) {
     bindUsers(view);
     bindBackups(view);
@@ -156,6 +163,34 @@ function memberInfo() {
 }
 
 // ------------------------------------------------------------------ password & recovery key
+
+function resetModal() {
+  const m = modal({
+    title: "Alle Daten löschen?",
+    body: `<p style="margin-top:0">Alle Verträge mit Preisen, Dokumenten und Zählerständen, alle Einnahmen, Erinnerungen und die Notfall-Hinweise
+      werden <b>endgültig</b> gelöscht. Das lässt sich nicht rückgängig machen – höchstens über ein vorher erstelltes Backup.</p>
+      <label class="field"><span>Zur Bestätigung <b>LÖSCHEN</b> eingeben</span>
+        <input name="confirm" autocomplete="off" autocapitalize="characters" spellcheck="false"/></label>`,
+    foot: `<button class="btn" data-close>Abbrechen</button>
+      <button class="btn" data-ok disabled style="background:var(--bad);border-color:var(--bad);color:#fff">${icon("trash")} Endgültig löschen</button>`,
+  });
+  const input = $("[name=confirm]", m);
+  const ok = $("[data-ok]", m);
+  input.addEventListener("input", () => (ok.disabled = input.value.trim().toUpperCase() !== "LÖSCHEN"));
+  input.focus();
+  ok.addEventListener("click", async () => {
+    busy(ok);
+    try {
+      const r = await api.resetData({ confirm: input.value });
+      m.close();
+      toast(`Gelöscht: ${r.contracts} Verträge, ${r.income_sources} Einnahmen, ${r.documents} Dokumente`);
+      location.hash = "#/";
+    } catch (err) {
+      busy(ok, false);
+      toast(err.message, "error");
+    }
+  });
+}
 
 function changePasswordModal() {
   const m = modal({

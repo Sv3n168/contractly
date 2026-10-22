@@ -215,7 +215,8 @@ export function legendHtml(items) {
 export function incomeChart(canvas, months, { regular, oneOff, costs }) {
   const opts = base();
   opts.scales.x.stacked = true;
-  opts.scales.y.stacked = false;
+  // bonuses sit on top of the regular income; the cost line is its own stack
+  opts.scales.y.stacked = true;
   opts.plugins.tooltip.callbacks.title = (items) => fmtMonth(months[items[0].dataIndex]);
   const good = cssVar("--good");
   const bar = {
@@ -232,7 +233,7 @@ export function incomeChart(canvas, months, { regular, oneOff, costs }) {
     data: {
       labels: months.map(fmtMonth),
       datasets: [
-        { type: "line", label: "Fixkosten", data: costs, borderColor: cssVar("--text"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.25, order: 0 },
+        { type: "line", label: "Fixkosten", data: costs, borderColor: cssVar("--text"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.25, order: 0, stack: "costs" },
         { type: "bar", label: "Regelmäßig", data: regular, backgroundColor: good, ...bar, order: 1 },
         { type: "bar", label: "Boni & Sonderzahlungen", data: oneOff.map((v) => v || null), backgroundColor: good + "70", ...bar, order: 1 },
       ],

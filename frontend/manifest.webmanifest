@@ -1,0 +1,13 @@
+{
+  "name": "Contractly",
+  "short_name": "Contractly",
+  "description": "Alle laufenden Verträge im Blick – Kosten, Fristen, Preisverläufe und Wechsel.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6fa",
+  "theme_color": "#4f46e5",
+  "lang": "de",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

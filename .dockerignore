@@ -1,0 +1,9 @@
+.git
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+data
+backend/tests
+*.md
+e2e
+.github

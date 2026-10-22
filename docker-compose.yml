@@ -1,0 +1,34 @@
+services:
+  contractly:
+    # Fertiges Image (x86 & ARM). Zum Selbstbauen stattdessen „build: .“ verwenden.
+    image: ghcr.io/sv3n168/contractly:latest
+    container_name: contractly
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      TZ: Europe/Berlin
+      # PUID: "1000"   # Benutzer-/Gruppen-ID für die Dateien in ./data
+      # PGID: "1000"
+      # Anmeldung & Verschlüsselung werden beim ersten Aufruf im Browser eingerichtet.
+      # CONTRACTLY_SESSION_HOURS: "12"            # Abmeldung nach Inaktivität
+      # CONTRACTLY_SESSION_DAYS_REMEMBER: "30"    # bei „Angemeldet bleiben“
+      # --- Öffentliche URL (für Links in Benachrichtigungen) ---
+      # CONTRACTLY_PUBLIC_URL: https://vertraege.example.org
+      # --- Push-Erinnerungen via ntfy (Benutzer tragen ihr Thema in den Einstellungen ein;
+      #     diese Werte gelten als Vorgabe für den Admin) ---
+      # CONTRACTLY_NTFY_URL: https://ntfy.sh/mein-geheimes-topic
+      # CONTRACTLY_NTFY_TOKEN: tk_...
+      # --- E-Mail-Versand (Server); Empfänger legt jeder Benutzer selbst fest ---
+      # CONTRACTLY_SMTP_HOST: smtp.example.org
+      # CONTRACTLY_SMTP_PORT: "587"
+      # CONTRACTLY_SMTP_USER: me@example.org
+      # CONTRACTLY_SMTP_PASSWORD: secret
+      # CONTRACTLY_SMTP_TO: me@example.org
+      # --- Automatische Backups ---
+      # CONTRACTLY_BACKUP_SCHEDULE: daily        # off | daily | weekly
+      # CONTRACTLY_BACKUP_KEEP: "14"
+      # CONTRACTLY_BACKUP_PASSPHRASE: langer-geheimer-schluessel
+      # CONTRACTLY_BACKUP_REMOTE: onedrive:Backups/Contractly   # rclone-Remote

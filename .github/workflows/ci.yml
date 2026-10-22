@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system tools (OCR)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-deu poppler-utils
+      - name: Install dependencies
+        run: pip install -r backend/requirements-dev.txt ruff
+      - name: Lint
+        working-directory: backend
+        run: ruff check app tests && ruff format --check app tests
+      - name: Tests
+        working-directory: backend
+        run: python -m pytest -q
+
+  e2e:
+    # Pinned: Playwright 1.56 ships browser dependencies only up to Ubuntu 24.04.
+    runs-on: ubuntu-24.04
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install backend
+        run: pip install -r backend/requirements.txt
+      - name: Install Playwright
+        working-directory: e2e
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: UI tests (desktop & mobile)
+        working-directory: e2e
+        run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: e2e/playwright-report
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t contractly:ci .
+      - name: Smoke test
+        run: |
+          docker run -d --name contractly-ci -p 8000:8000 contractly:ci
+          for i in $(seq 1 30); do curl -fsS localhost:8000/healthz && break; sleep 1; done
+          test "$(curl -s -o /dev/null -w '%{http_code}' localhost:8000/api/contracts)" = "401"
+          curl -fsS -c jar -H 'content-type: application/json' \
+            -d '{"username":"admin","password":"ci-test-passwort"}' localhost:8000/api/auth/setup
+          curl -fsS -b jar -X POST localhost:8000/api/demo
+          curl -fsS -b jar localhost:8000/api/stats/summary > /dev/null
+          docker exec contractly-ci sh -c 'head -c 15 /data/users/*/contractly.db | grep -qv "SQLite format"'
+          docker exec contractly-ci tesseract --list-langs | grep deu

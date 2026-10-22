@@ -27,19 +27,13 @@
         <button class="search-trigger" data-action="search" title="Suchen (Strg+K)">
           <span data-icon="search"></span><span>Suchen…</span><kbd>Strg K</kbd>
         </button>
-        <div class="nav-section">Übersicht</div>
-        <a class="nav-link" href="#/" data-route="dashboard" title="Dashboard"><span data-icon="home"></span><span class="label">Dashboard</span></a>
-        <a class="nav-link" href="#/contracts" data-route="contracts" title="Verträge"><span data-icon="file"></span><span class="label">Verträge</span></a>
-        <a class="nav-link" href="#/timeline" data-route="timeline" title="Zeitstrahl"><span data-icon="timeline"></span><span class="label">Zeitstrahl</span></a>
-        <a class="nav-link" href="#/costs" data-route="costs" title="Kosten & Prognose"><span data-icon="chart"></span><span class="label">Kosten &amp; Prognose</span></a>
-        <a class="nav-link" href="#/income" data-route="income" title="Einnahmen"><span data-icon="trendUp"></span><span class="label">Einnahmen</span></a>
-        <a class="nav-link" href="#/report" data-route="report" title="Jahresbericht"><span data-icon="printer"></span><span class="label">Jahresbericht</span></a>
-        <div class="nav-section">Organisieren</div>
-        <a class="nav-link" href="#/inbox" data-route="inbox" title="Post & Mails"><span data-icon="mail"></span><span class="label">Post &amp; Mails</span></a>
-        <a class="nav-link" href="#/reminders" data-route="reminders" title="Erinnerungen"><span data-icon="bell"></span><span class="label">Erinnerungen</span><span class="nav-badge hidden" data-due-badge></span></a>
-        <a class="nav-link" href="#/checkup" data-route="checkup" title="Jahres-Check"><span data-icon="refresh"></span><span class="label">Jahres-Check</span></a>
-        <a class="nav-link" href="#/emergency" data-route="emergency" title="Notfall-Mappe"><span data-icon="shield"></span><span class="label">Notfall-Mappe</span></a>
-        <a class="nav-link" href="#/settings" data-route="settings" title="Einstellungen"><span data-icon="settings"></span><span class="label">Einstellungen</span></a>
+        <nav class="nav-main">
+          <a class="nav-link" href="#/" data-route="dashboard" title="Übersicht"><span data-icon="home"></span><span class="label">Übersicht</span></a>
+          <a class="nav-link" href="#/contracts" data-route="contracts" title="Verträge"><span data-icon="file"></span><span class="label">Verträge</span></a>
+          <a class="nav-link" href="#/reminders" data-route="todo" title="Zu tun"><span data-icon="bell"></span><span class="label">Zu tun</span><span class="nav-badge hidden" data-due-badge></span></a>
+          <a class="nav-link" href="#/costs" data-route="insights" title="Auswertung"><span data-icon="chart"></span><span class="label">Auswertung</span></a>
+        </nav>
+        <a class="nav-link nav-settings" href="#/settings" data-route="settings" title="Einstellungen"><span data-icon="settings"></span><span class="label">Einstellungen</span></a>
         <div class="sidebar-footer">
           <a class="user-chip" href="#/settings" title="Konto & Einstellungen"><span class="avatar" data-user-initial></span><span class="label"><b data-user-name></b><small data-user-role></small></span></a>
           <button class="btn btn-ghost btn-icon" data-action="theme" title="Hell/Dunkel umschalten"><span data-icon="moon"></span></button>
@@ -51,17 +45,17 @@
         <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"></span><span>Contractly</span></a>
         <button class="btn btn-ghost btn-icon" data-action="search" aria-label="Suchen"><span data-icon="search"></span></button>
         <button class="btn btn-ghost btn-icon" data-action="theme" aria-label="Hell/Dunkel"><span data-icon="moon"></span></button>
-        <button class="btn btn-ghost btn-icon" data-action="logout" aria-label="Abmelden"><span data-icon="logout"></span></button>
+        <a class="btn btn-ghost btn-icon" href="#/settings" data-route="settings" aria-label="Einstellungen"><span data-icon="settings"></span></a>
       </header>
 
       <main class="main" id="view" tabindex="-1"></main>
 
       <nav class="bottom-nav" aria-label="Navigation">
-        <a href="#/" data-route="dashboard"><span data-icon="home"></span>Start</a>
+        <a href="#/" data-route="dashboard"><span data-icon="home"></span>Übersicht</a>
         <a href="#/contracts" data-route="contracts"><span data-icon="file"></span>Verträge</a>
         <a href="#/contracts/new" aria-label="Neuer Vertrag"><span class="fab"><span data-icon="plus"></span></span></a>
-        <a href="#/reminders" data-route="reminders"><span data-icon="bell"></span>Erinnern<span class="nav-badge hidden" data-due-badge></span></a>
-        <a href="#/more" data-route="more"><span data-icon="menu"></span>Mehr</a>
+        <a href="#/reminders" data-route="todo"><span data-icon="bell"></span>Zu tun<span class="nav-badge hidden" data-due-badge></span></a>
+        <a href="#/costs" data-route="insights"><span data-icon="chart"></span>Auswertung</a>
       </nav>
     </div>
 

@@ -169,8 +169,9 @@ export async function renderContractForm(view, id, query = {}) {
 
         ${
           (c.fields || []).length
-            ? `<div class="card"><div class="card-head"><div><h2>Leistungen & Eckdaten</h2><p>Optional – hilft beim Vergleichen.</p></div></div>
-                <div class="form-grid">${attributeInputs(cat, src.attributes || pred.attributes || {})}</div></div>`
+            ? `<details class="more" ${editing || cat === "loan" ? "open" : ""}>
+                <summary>${icon("list")} Leistungen & Eckdaten <span class="muted small" style="font-weight:500">– optional, hilft beim Vergleichen</span>${icon("chevDown", "chev")}</summary>
+                <div class="body"><div class="form-grid">${attributeInputs(cat, src.attributes || pred.attributes || {})}</div></div></details>`
             : ""
         }
 

@@ -11,7 +11,7 @@ import { renderContractForm } from "./views/contract-form.js";
 import { renderTimeline } from "./views/timeline.js";
 import { renderCosts } from "./views/costs.js";
 import { renderReminders } from "./views/reminders.js";
-import { renderSettings, renderMore } from "./views/settings.js";
+import { renderSettings } from "./views/settings.js";
 import { hideAuth, showAuth } from "./views/auth.js";
 import { renderImport } from "./views/import.js";
 import { renderInbox, setSharedMessage } from "./views/inbox.js";
@@ -20,24 +20,60 @@ import { renderEmergency } from "./views/emergency.js";
 import { renderIncome } from "./views/income.js";
 import { renderReport } from "./views/report.js";
 
+// Four areas: Übersicht, Verträge, Zu tun, Auswertung (+ Einstellungen). Pages that belong to an
+// area are shown as its tabs; the fourth column names the area.
 const routes = [
   [/^\/?$/, "dashboard", renderDashboard],
   [/^\/contracts\/?$/, "contracts", renderContracts],
   [/^\/contracts\/new$/, "contracts", (el, _m, q) => renderContractForm(el, null, q)],
   [/^\/contracts\/(\d+)\/edit$/, "contracts", (el, m, q) => renderContractForm(el, Number(m[1]), q)],
   [/^\/contracts\/(\d+)$/, "contracts", (el, m, q) => renderContractDetail(el, Number(m[1]), q)],
-  [/^\/timeline$/, "timeline", renderTimeline],
-  [/^\/costs$/, "costs", renderCosts],
-  [/^\/reminders$/, "reminders", renderReminders],
+  [/^\/reminders$/, "reminders", renderReminders, "todo"],
+  [/^\/inbox$/, "inbox", renderInbox, "todo"],
+  [/^\/checkup$/, "checkup", renderCheckup, "todo"],
+  [/^\/costs$/, "costs", renderCosts, "insights"],
+  [/^\/income$/, "income", renderIncome, "insights"],
+  [/^\/timeline$/, "timeline", renderTimeline, "insights"],
+  [/^\/report$/, "report", renderReport, "insights"],
   [/^\/settings$/, "settings", renderSettings],
-  [/^\/import$/, "import", renderImport],
-  [/^\/inbox$/, "inbox", renderInbox],
-  [/^\/checkup$/, "checkup", renderCheckup],
-  [/^\/emergency$/, "emergency", renderEmergency],
-  [/^\/income$/, "income", renderIncome],
-  [/^\/report$/, "report", renderReport],
-  [/^\/more$/, "more", renderMore],
+  [/^\/import$/, "import", renderImport, "settings"],
+  [/^\/emergency$/, "emergency", renderEmergency, "settings"],
 ];
+
+const SECTIONS = {
+  todo: {
+    title: "Zu tun",
+    tabs: [
+      ["reminders", "Fristen & Erinnerungen"],
+      ["inbox", "Post & Mails"],
+      ["checkup", "Jahres-Check"],
+    ],
+  },
+  insights: {
+    title: "Auswertung",
+    tabs: [
+      ["costs", "Kosten & Prognose"],
+      ["income", "Einnahmen"],
+      ["timeline", "Zeitstrahl"],
+      ["report", "Jahresbericht"],
+    ],
+  },
+};
+
+/** An area with tabs: its title and tab bar stay, the page renders below them. */
+function sectionShell(view, section, name) {
+  const s = SECTIONS[section];
+  if (!s) return view;
+  view.innerHTML = `
+    <div class="section-head">
+      <h1>${s.title}</h1>
+      <nav class="section-tabs scroll-x" aria-label="${s.title}">${s.tabs
+        .map(([key, label]) => `<a href="#/${key}" class="${key === name ? "active" : ""}"${key === name ? ' aria-current="page"' : ""}>${label}</a>`)
+        .join("")}</nav>
+    </div>
+    <div class="section-body"><div class="skeleton" style="height:300px"></div></div>`;
+  return view.querySelector(".section-body");
+}
 
 function parseHash() {
   const raw = location.hash.replace(/^#/, "") || "/";
@@ -57,16 +93,22 @@ export async function router() {
     location.hash = "#/";
     return;
   }
-  const [re, name, render] = match;
+  const [re, name, render, section] = match;
   // A dialog belongs to the page it was opened on (a page refreshing itself keeps it).
   if (path !== router.lastPath) $$(".modal-backdrop").forEach((b) => b.remove());
   router.lastPath = path;
-  $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === name));
+  $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === (section || name)));
   view.innerHTML = `<div class="skeleton" style="height:120px;margin-bottom:20px"></div><div class="skeleton" style="height:300px"></div>`;
   try {
     await loadMeta();
     if (token !== renderToken) return;
-    await render(view, path.match(re), query);
+    const target = sectionShell(view, section, name);
+    await render(target, path.match(re), query);
+    if (token === renderToken && !view.contains(target)) {
+      // An outdated page replaced the area shell while this tab was loading: draw it again.
+      router();
+      return;
+    }
     if (token !== renderToken) {
       // A slower, outdated page finished after the current one and drew over it: draw the current one again.
       if (router.finished === renderToken) router();

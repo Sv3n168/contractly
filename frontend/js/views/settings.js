@@ -19,6 +19,17 @@ export async function renderSettings(view) {
 
   view.innerHTML = `
     <div class="page-head"><div><h1>Einstellungen</h1><p>Profil, Sicherheit, Benachrichtigungen${isAdmin() ? ", Benutzer und Datensicherung" : ""}.</p></div></div>
+    <div class="grid grid-2" style="margin-bottom:20px">
+      ${[
+        ["#/emergency", "shield", "Notfall-Mappe", "Alles Wichtige für Angehörige – drucken oder als verschlüsselte Datei"],
+        ["#/import", "upload", "Verträge importieren", "Vertragsliste aus Excel oder CSV übernehmen"],
+      ]
+        .map(
+          ([href, ic, t, sub]) => `<a class="card list-item settings-link" href="${href}">
+            <span class="kpi-icon">${icon(ic)}</span><div class="grow"><div class="title">${t}</div><div class="sub">${sub}</div></div>${icon("chevRight")}</a>`,
+        )
+        .join("")}
+    </div>
     <div class="grid grid-2">
       <div class="stack">
         <div class="card">
@@ -468,29 +479,3 @@ function bindBackups(view) {
 }
 
 /** Mobile "Mehr" page: entries that don't fit the bottom bar. */
-export async function renderMore(view) {
-  view.innerHTML = `
-    <div class="page-head"><div><h1>Mehr</h1></div></div>
-    <div class="card" style="padding:8px">
-      <div class="list">
-        ${[
-          ["#/inbox", "mail", "Post & Mails", "Brief fotografieren oder E-Mail auswerten"],
-          ["#/income", "trendUp", "Einnahmen", "Gehalt, Boni und was reinkommt"],
-          ["#/checkup", "refresh", "Jahres-Check", "5 Minuten, einmal im Jahr"],
-          ["#/emergency", "shield", "Notfall-Mappe", "Alles Wichtige für Angehörige"],
-          ["#/timeline", "timeline", "Zeitstrahl", "Abschlüsse, Wechsel & Fristen"],
-          ["#/costs", "chart", "Kosten & Prognose", "Verlauf und Hochrechnung"],
-          ["#/report", "printer", "Jahresbericht", "Überblick, Steuer-Export, PDF"],
-          ["#/import", "upload", "Importieren", "Vertragsliste aus Excel oder CSV"],
-          ["#/settings", "settings", "Einstellungen", "Konto, Sicherheit, Benachrichtigungen"],
-        ]
-          .map(
-            ([href, ic, t, s]) => `<a class="list-item" href="${href}" style="padding:14px 10px">
-              <span class="kpi-icon">${icon(ic)}</span><div class="grow"><div class="title">${t}</div><div class="sub">${s}</div></div>${icon("chevRight")}</a>`,
-          )
-          .join("")}
-        <button class="list-item" data-action="logout" style="padding:14px 10px;border:0;background:none;width:100%;text-align:left;cursor:pointer">
-          <span class="kpi-icon">${icon("logout")}</span><div class="grow"><div class="title">Abmelden</div><div class="sub">Daten wieder verschlüsseln</div></div></button>
-      </div>
-    </div>`;
-}

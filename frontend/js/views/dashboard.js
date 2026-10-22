@@ -1,7 +1,7 @@
 import { api } from "../api.js";
 import { legendHtml, stackedBars } from "../charts.js";
-import { GROUPS, catColorVar, catIcon, catLabel, groupOf, slotColor, state } from "../store.js";
-import { esc, fmtDate, icon, isoDate, money, signedMoney, toast } from "../ui.js";
+import { GROUPS, groupOf, slotColor, state } from "../store.js";
+import { esc, icon, isoDate, money, signedMoney, toast } from "../ui.js";
 import { bindReminderActions, emptyState, reminderItem } from "./components.js";
 import { router } from "../app.js";
 
@@ -47,8 +47,6 @@ export async function renderDashboard(view) {
   }
 
   const delta = summary.monthly_total - summary.monthly_year_ago;
-  const urgent = summary.deadlines.filter((d) => d.type === "deadline" && d.days_left <= 14);
-  const checkupDue = upcoming.items.some((i) => i.kind === "checkup" && i.due);
   const currentMonth = isoDate(now).slice(0, 7);
 
   // Fold category series into the eight fixed groups.
@@ -59,15 +57,7 @@ export async function renderDashboard(view) {
   }
   const visible = grouped.filter((g) => g.values.some((v) => v > 0));
 
-  const groupTotals = GROUPS.map((g) => ({
-    ...g,
-    monthly: summary.by_category.filter((c) => groupOf(c.category) === g.key).reduce((s, c) => s + c.monthly, 0),
-    count: summary.by_category.filter((c) => groupOf(c.category) === g.key).reduce((s, c) => s + c.count, 0),
-  }))
-    .filter((g) => g.monthly > 0)
-    .sort((a, b) => b.monthly - a.monthly);
-  const maxGroup = Math.max(...groupTotals.map((g) => g.monthly), 1);
-
+  // One number, what to do next, one chart – everything else lives in Auswertung.
   view.innerHTML = `
     <div class="page-head">
       <div>
@@ -75,74 +65,30 @@ export async function renderDashboard(view) {
         <p>Dein Vertragsüberblick für ${monthName}.</p>
       </div>
       <div class="page-actions">
-        <a class="btn" href="#/inbox">${icon("mail")}<span class="label">Post erfassen</span></a>
         <a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a>
       </div>
     </div>
 
-    ${
-      urgent.length
-        ? `<div class="callout warn" style="margin-bottom:20px">${icon("alert")}
-            <div><b>${urgent.length === 1 ? "Eine Kündigungsfrist läuft" : `${urgent.length} Kündigungsfristen laufen`} bald ab.</b>
-            ${urgent.map((d) => `<a href="#/contracts/${d.contract_id}">${esc(d.name)}</a> (bis ${fmtDate(d.date)})`).join(", ")}.
-            Kündigen oder bewusst weiterlaufen lassen?</div></div>`
-        : ""
-    }
-
-    ${
-      checkupDue
-        ? `<div class="callout" style="margin-bottom:20px">${icon("refresh")}
-            <div class="grow"><b>Zeit für deinen Jahres-Check.</b> 5 Minuten – Contractly zeigt dir nur die Verträge, bei denen sich ein Blick lohnt.</div>
-            <a class="btn btn-sm btn-primary" href="#/checkup">Starten</a></div>`
-        : ""
-    }
-
-    <div class="kpis">
-      <div class="card kpi hero">
+    <div class="dash-top">
+      <div class="card kpi hero dash-hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Fixkosten pro Monat</div>
         <div class="kpi-value num" data-count="${summary.monthly_total}" data-format="money">${money(summary.monthly_total)}</div>
+        <div class="kpi-sub">${money(summary.yearly_total, true)} im Jahr · ${summary.active_count} ${summary.active_count === 1 ? "Vertrag" : "Verträge"}</div>
         ${
           summary.fixed_cost_ratio != null
             ? `<div class="kpi-sub"><a href="#/income" style="color:inherit"><b style="color:var(--emerald)">${Math.round(summary.fixed_cost_ratio * 100)} %</b> deines Nettos · ${money(summary.free_monthly, true)} bleiben</a></div>`
             : ""
         }
-        <div class="kpi-sub">${
+        ${
           summary.monthly_year_ago
-            ? `<span class="delta">${icon(delta > 0 ? "trendUp" : "trendDown")} ${signedMoney(delta)}</span> ggü. Vorjahr`
-            : "aktuelle Monatsbelastung"
-        }</div>
-      </div>
-      <div class="card kpi">
-        <div class="kpi-label"><span class="kpi-icon">${icon("calendar")}</span>Pro Jahr</div>
-        <div class="kpi-value num" data-count="${summary.yearly_total}" data-format="money0">${money(summary.yearly_total, true)}</div>
-        <div class="kpi-sub">${money(summary.ytd_total, true)} bisher in ${now.getFullYear()}${
-          summary.extras_12m ? ` · + ${money(summary.extras_12m, true)} Zusatzkosten (12 M.)` : ""
-        }</div>
-      </div>
-      <div class="card kpi">
-        <div class="kpi-label"><span class="kpi-icon">${icon("file")}</span>Laufende Verträge</div>
-        <div class="kpi-value num" data-count="${summary.active_count}">${summary.active_count}</div>
-        <div class="kpi-sub">${summary.deadlines.length ? `${summary.deadlines.length} ${summary.deadlines.length === 1 ? "Frist" : "Fristen"} in 60 Tagen` : "keine Fristen in Sicht ✨"}</div>
-      </div>
-      <div class="card kpi">
-        <div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>Durch Wechsel gespart</div>
-        <div class="kpi-value num ${summary.switch_savings > 0 ? "money" : summary.switch_savings < 0 ? "worse" : ""}" data-count="${summary.switch_savings}" data-format="money0">${money(summary.switch_savings, true)}</div>
-        <div class="kpi-sub">${summary.switch_count ? `aus ${summary.switch_count} Wechsel${summary.switch_count > 1 ? "n" : ""}` : "Vergleich lohnt sich oft!"}</div>
-      </div>
-    </div>
-
-    <div class="grid grid-main" style="margin-bottom:20px;align-items:start">
-      <div class="card">
-        <div class="card-head">
-          <div><h2>Kostenverlauf</h2><p>Monatliche Kosten nach Kategorie · helle Balken = Vorschau</p></div>
-          <a class="btn btn-sm btn-ghost" href="#/costs">Details ${icon("chevRight")}</a>
-        </div>
-        <div class="chart-box"><canvas id="dash-chart" aria-label="Kostenverlauf nach Kategorie"></canvas></div>
-        ${legendHtml(visible.map((g) => ({ label: g.label, color: `var(--series-${g.slot})` })))}
+            ? `<div class="kpi-sub"><span class="delta">${icon(delta > 0 ? "trendUp" : "trendDown")} ${signedMoney(delta)}</span> ggü. Vorjahr</div>`
+            : ""
+        }
+        ${summary.switch_savings > 0 ? `<div class="kpi-sub">${icon("piggy")} ${money(summary.switch_savings, true)} durch Wechsel gespart</div>` : ""}
       </div>
       <div class="card">
         <div class="card-head">
-          <div><h2>Als Nächstes</h2><p>Fristen & Erinnerungen</p></div>
+          <div><h2>Als Nächstes zu tun</h2><p>Fristen, Erinnerungen und Post</p></div>
           <a class="btn btn-sm btn-ghost" href="#/reminders">Alle ${icon("chevRight")}</a>
         </div>
         <div class="list" id="dash-reminders">
@@ -155,52 +101,13 @@ export async function renderDashboard(view) {
       </div>
     </div>
 
-    <div class="grid grid-3">
-      <div class="card">
-        <div class="card-head"><div><h2>Wofür geht's drauf?</h2><p>Monatlich nach Bereich</p></div></div>
-        <div class="bar-list">
-          ${groupTotals
-            .map(
-              (g) => `<div class="bar-row">
-                <div class="bar-label"><span><span class="dot" style="background:var(--series-${g.slot})"></span>${esc(g.label)}
-                  <span class="muted small">(${g.count})</span></span>
-                  <span class="num">${money(g.monthly)} <span class="muted small">${Math.round((g.monthly / summary.monthly_total) * 100)}%</span></span></div>
-                <div class="bar-track"><div class="bar-fill" style="width:${(g.monthly / maxGroup) * 100}%;background:var(--series-${g.slot})"></div></div>
-              </div>`,
-            )
-            .join("")}
-        </div>
+    <div class="card">
+      <div class="card-head">
+        <div><h2>Kostenverlauf</h2><p>Monatliche Kosten nach Bereich · helle Balken = Vorschau</p></div>
+        <a class="btn btn-sm btn-ghost" href="#/costs">Auswertung ${icon("chevRight")}</a>
       </div>
-      <div class="card">
-        <div class="card-head"><div><h2>Größte Posten</h2><p>Die teuersten laufenden Verträge</p></div></div>
-        <div class="list">
-          ${summary.top_contracts
-            .map(
-              (c) => `<a class="list-item" href="#/contracts/${c.id}">
-                <span class="cat-icon sm" style="--c:${catColorVar(c.category)}">${catIcon(c.category)}</span>
-                <div class="grow"><div class="title">${esc(c.name)}</div><div class="sub">${esc(c.provider || catLabel(c.category))}</div></div>
-                <div class="end num"><b>${money(c.monthly_cost)}</b><div class="sub">${money(c.yearly_cost, true)}/J</div></div></a>`,
-            )
-            .join("")}
-        </div>
-      </div>
-      <div class="card">
-        <div class="card-head"><div><h2>Preisänderungen</h2><p>Letzte 6 und nächste 3 Monate</p></div></div>
-        <div class="list">
-          ${
-            summary.price_changes.length
-              ? summary.price_changes
-                  .map(
-                    (p) => `<a class="list-item" href="#/contracts/${p.contract_id}">
-                <span class="cat-icon sm" style="--c:${catColorVar(p.category)}">${catIcon(p.category)}</span>
-                <div class="grow"><div class="title">${esc(p.name)}</div><div class="sub">ab ${fmtDate(p.date)} · ${money(p.old_monthly)} → ${money(p.new_monthly)}</div></div>
-                <span class="badge ${p.diff > 0 ? "bad" : "good"}">${icon(p.diff > 0 ? "trendUp" : "trendDown")} ${signedMoney(p.diff)}</span></a>`,
-                  )
-                  .join("")
-              : `<p class="muted">Keine Preisänderungen – stabil! 👌</p>`
-          }
-        </div>
-      </div>
+      <div class="chart-box"><canvas id="dash-chart" aria-label="Kostenverlauf nach Bereich"></canvas></div>
+      ${legendHtml(visible.map((g) => ({ label: g.label, color: `var(--series-${g.slot})` })))}
     </div>`;
 
   stackedBars(

@@ -164,6 +164,30 @@ CATEGORIES: list[dict] = [
         ],
     },
     {
+        "key": "loan",
+        "label": "Kredite & Finanzierung",
+        "icon": "🏦",
+        # Borrowers can repay at any time (consumer loans) – no notice-period alarms.
+        "defaults": {"min_term_months": None, "renewal_months": 1, "notice_value": 0, "notice_unit": "days"},
+        "fields": [
+            _f("loan_type", "Art", "select", options=["Ratenkredit", "Baufinanzierung", "Autokredit", "Sonstiges"]),
+            _f("principal", "Kreditbetrag", "number", "€"),
+            _f("interest_rate", "Sollzins", "number", "% p.a."),
+            _f("effective_rate", "Effektivzins", "number", "% p.a."),
+            _f("fixed_until", "Zinsbindung bis", "date"),
+            _f("special_repayment_pct", "Sondertilgung erlaubt", "number", "% pro Jahr"),
+            _f(
+                "balance",
+                "Restschuld laut Bank",
+                "number",
+                "€",
+                placeholder="optional, z. B. aus dem Jahreskontoauszug",
+            ),
+            _f("balance_date", "Restschuld Stand vom", "date"),
+            _f("debt_insurance", "Restschuldversicherung", "bool"),
+        ],
+    },
+    {
         "key": "other",
         "label": "Sonstiges",
         "icon": "📄",

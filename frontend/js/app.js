@@ -2,7 +2,7 @@
 
 import { api } from "./api.js";
 import { loadMeta, state } from "./store.js";
-import { $, $$, esc, icon, modal, money, toast } from "./ui.js";
+import { $, $$, countUp, esc, icon, modal, money, toast } from "./ui.js";
 import { catColorVar, catIcon, catLabel } from "./store.js";
 import { renderDashboard } from "./views/dashboard.js";
 import { renderContracts } from "./views/contracts.js";
@@ -17,6 +17,7 @@ import { renderImport } from "./views/import.js";
 import { renderInbox, setSharedMessage } from "./views/inbox.js";
 import { renderCheckup } from "./views/checkup.js";
 import { renderEmergency } from "./views/emergency.js";
+import { renderIncome } from "./views/income.js";
 import { renderReport } from "./views/report.js";
 
 const routes = [
@@ -33,6 +34,7 @@ const routes = [
   [/^\/inbox$/, "inbox", renderInbox],
   [/^\/checkup$/, "checkup", renderCheckup],
   [/^\/emergency$/, "emergency", renderEmergency],
+  [/^\/income$/, "income", renderIncome],
   [/^\/report$/, "report", renderReport],
   [/^\/more$/, "more", renderMore],
 ];
@@ -56,12 +58,22 @@ export async function router() {
     return;
   }
   const [re, name, render] = match;
+  // A dialog belongs to the page it was opened on (a page refreshing itself keeps it).
+  if (path !== router.lastPath) $$(".modal-backdrop").forEach((b) => b.remove());
+  router.lastPath = path;
   $$("[data-route]").forEach((a) => a.classList.toggle("active", a.dataset.route === name));
   view.innerHTML = `<div class="skeleton" style="height:120px;margin-bottom:20px"></div><div class="skeleton" style="height:300px"></div>`;
   try {
     await loadMeta();
     if (token !== renderToken) return;
     await render(view, path.match(re), query);
+    if (token !== renderToken) {
+      // A slower, outdated page finished after the current one and drew over it: draw the current one again.
+      if (router.finished === renderToken) router();
+      return;
+    }
+    router.finished = token;
+    enter(view);
   } catch (err) {
     console.error(err);
     view.innerHTML = `<div class="card empty"><div class="art">😕</div><h2>Da ist etwas schiefgelaufen</h2>
@@ -69,6 +81,16 @@ export async function router() {
   }
   if (!location.hash.includes("tab=")) window.scrollTo({ top: 0 });
   refreshBadge();
+}
+
+/** Let the new page rise in (CSS does the motion; the class is removed once it's done). */
+function enter(view) {
+  view.classList.remove("entering");
+  void view.offsetWidth; // restart the animation for consecutive navigations
+  view.classList.add("entering");
+  clearTimeout(enter.timer);
+  enter.timer = setTimeout(() => view.classList.remove("entering"), 900);
+  countUp(view);
 }
 
 export async function refreshBadge() {

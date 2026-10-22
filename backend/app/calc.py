@@ -8,8 +8,10 @@ import calendar
 from dataclasses import dataclass
 from datetime import date, timedelta
 
+from . import loans
 from .categories import INTERVALS, is_energy
 from .forecast import forecast
+from .loans import is_loan
 from .models import Contract, Offer, PriceEntry
 
 # --------------------------------------------------------------------------- dates
@@ -132,6 +134,8 @@ def _segments(contract: Contract, until: date):
     if not prices:
         return
     end = contract.end_date or until
+    if contract.end_date is None and is_loan(contract.category):
+        end = loans.payoff_date(contract) or end  # no more payments once the loan is repaid
     end = min(end, until)
     for i, p in enumerate(prices):
         seg_from = max(p.valid_from, contract.start_date)

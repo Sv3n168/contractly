@@ -17,7 +17,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-from . import calc
+from . import calc, loans
 from .categories import CATEGORY_MAP, INTERVALS
 from .models import Contract
 
@@ -46,6 +46,8 @@ DEATH_HINTS = {
     "insurance": "Versicherer mit Sterbeurkunde informieren; bei Lebens-/Sterbegeldversicherung Auszahlung beantragen.",
     "streaming": "Mit Sterbeurkunde kündigen und die Abbuchung stoppen.",
     "fitness": "Mitgliedschaften enden meist mit dem Tod – mit Sterbeurkunde kündigen und Abbuchung stoppen.",
+    "loan": "Schulden gehen auf die Erben über – das Erbe kann innerhalb von sechs Wochen ausgeschlagen werden. "
+    "Prüfen, ob eine Restschuldversicherung besteht, und die Bank mit Sterbeurkunde informieren.",
 }
 CHECKLIST = [
     "Sterbeurkunde mehrfach beglaubigt kopieren lassen – fast jeder Anbieter verlangt eine Kopie.",
@@ -74,6 +76,20 @@ def _notice(c: Contract) -> str:
 
 def _money(v: float) -> str:
     return f"{v:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _loan_details(c: Contract, today: date) -> list[dict]:
+    if not loans.is_loan(c.category):
+        return []
+    a = loans.analysis(c, today) or {}
+    out = []
+    if a.get("balance") is not None:
+        out.append({"label": "Restschuld (berechnet)", "value": f"{_money(a['balance'])} am {today:%d.%m.%Y}"})
+    if a.get("payoff_date"):
+        out.append({"label": "Abbezahlt am", "value": f"{a['payoff_date']:%d.%m.%Y}"})
+    insured = (c.attributes or {}).get("debt_insurance")
+    out.append({"label": "Restschuldversicherung", "value": "ja" if insured else "nein / unbekannt"})
+    return out
 
 
 def death_letter(c: Contract, owner: dict) -> str:
@@ -139,7 +155,8 @@ def build(contracts: list[Contract], owner: dict, note: str, today: date) -> dic
                     {"label": label, "value": str(attrs[key])}
                     for key, label in HIGHLIGHT_ATTRIBUTES.items()
                     if attrs.get(key)
-                ],
+                ]
+                + _loan_details(c, today),
                 "price": f"{_money(price.amount)} {interval}".strip() if price else None,
                 "monthly_cost": round(calc.current_monthly_cost(c, today), 2),
                 "start_date": c.start_date,

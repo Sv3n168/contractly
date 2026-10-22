@@ -14,7 +14,8 @@ function base() {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 350 },
+    // charts build up with the same soft ease-out as the rest of the app
+    animation: { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700, easing: "easeOutQuart" },
     interaction: { mode: "index", intersect: false },
     plugins: {
       legend: { display: false },
@@ -150,10 +151,10 @@ export function chainLine(canvas, months, series, colors, { currentMonth, extras
 }
 
 /** Single total line with optional comparison line (projection). */
-export function lines(canvas, months, datasets) {
+export function lines(canvas, months, datasets, { beginAtZero = false } = {}) {
   const opts = base();
   // Projections differ by a few percent – a zero baseline would flatten the difference.
-  opts.scales.y.beginAtZero = false;
+  opts.scales.y.beginAtZero = beginAtZero;
   opts.plugins.tooltip.callbacks.title = (items) => fmtMonth(months[items[0].dataIndex]);
   return mount(canvas, {
     type: "line",
@@ -205,4 +206,38 @@ export function legendHtml(items) {
   return `<div class="legend">${items
     .map((i) => `<span><span class="sw" style="background:${i.color}"></span>${i.label}</span>`)
     .join("")}</div>`;
+}
+
+/**
+ * Income per month (regular + one-off payments, stacked) against the fixed costs as a line –
+ * one euro axis, so the gap between bar and line is what is left.
+ */
+export function incomeChart(canvas, months, { regular, oneOff, costs }) {
+  const opts = base();
+  opts.scales.x.stacked = true;
+  // bonuses sit on top of the regular income; the cost line is its own stack
+  opts.scales.y.stacked = true;
+  opts.plugins.tooltip.callbacks.title = (items) => fmtMonth(months[items[0].dataIndex]);
+  const good = cssVar("--good");
+  const bar = {
+    borderColor: cssVar("--surface"),
+    borderWidth: { top: 2, left: 0, right: 0, bottom: 0 },
+    borderSkipped: false,
+    borderRadius: 4,
+    maxBarThickness: 22,
+    categoryPercentage: 0.78,
+    stack: "income",
+  };
+  return mount(canvas, {
+    type: "bar",
+    data: {
+      labels: months.map(fmtMonth),
+      datasets: [
+        { type: "line", label: "Fixkosten", data: costs, borderColor: cssVar("--text"), borderWidth: 2, pointRadius: 0, pointHoverRadius: 5, tension: 0.25, order: 0, stack: "costs" },
+        { type: "bar", label: "Regelmäßig", data: regular, backgroundColor: good, ...bar, order: 1 },
+        { type: "bar", label: "Boni & Sonderzahlungen", data: oneOff.map((v) => v || null), backgroundColor: good + "70", ...bar, order: 1 },
+      ],
+    },
+    options: opts,
+  });
 }

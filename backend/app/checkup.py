@@ -10,7 +10,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
-from . import calc
+from . import calc, loans
 from .categories import SUBSCRIPTION_CATEGORIES, is_energy
 from .models import AppSetting, Contract
 
@@ -78,6 +78,12 @@ def reasons(c: Contract, today: date) -> list[dict]:
                     "text": f"Abschlag reicht nicht – etwa {_money(-e['settlement_estimate'])} Nachzahlung",
                 }
             )
+    # Loan: fixed-rate period ends – the time to compare follow-up financing
+    fixed = loans.fixed_until(c)
+    if fixed and today <= fixed <= today + timedelta(days=550):
+        out.append(
+            {"code": "fixed_rate", "text": f"Zinsbindung endet am {fixed:%d.%m.%Y} – Anschlussfinanzierung vergleichen"}
+        )
     # A real cancellation deadline coming up
     terms = calc.term_info(c, today)
     if terms.cancellation_deadline and not terms.flexible and terms.cancellation_deadline <= today + timedelta(days=60):
@@ -138,7 +144,7 @@ def overview(db: Session, contracts: list[Contract], today: date) -> dict:
                 "decision": decided.get(str(c.id)),
             }
         )
-    order = {"deadline": 0, "backpayment": 1, "promo_ended": 2, "price_up": 2, "guarantee": 3}
+    order = {"deadline": 0, "backpayment": 1, "fixed_rate": 1, "promo_ended": 2, "price_up": 2, "guarantee": 3}
     items.sort(key=lambda i: (min((order.get(r["code"], 5) for r in i["reasons"]), default=9), -i["monthly_cost"]))
     return {
         "year": run["year"],

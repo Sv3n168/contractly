@@ -27,6 +27,7 @@ import { renderCompare } from "./compare.js";
 import { setupDrop } from "./contract-form.js";
 import { contractPayload, suggestionPicker } from "./ocr.js";
 import { openLetter } from "./letter.js";
+import { bindLoan, loanCard } from "./loan.js";
 import { navigate, refreshBadge } from "../app.js";
 import { reminderForm } from "./reminders.js";
 import { basePriceAt, extraModal, isExtra, monthLabel } from "./extras.js";
@@ -35,10 +36,12 @@ export async function renderContractDetail(view, id, query = {}) {
   const c = await api.contract(id);
   const tab = query.tab || "overview";
   const energy = isEnergy(c.category);
+  const loan = c.category === "loan";
   const tabs = [
     ["overview", "Übersicht"],
     ["prices", "Preise", c.prices.length],
-    ["compare", "Vergleich", c.offer_count || null],
+    // Loans are compared with the refinancing check on the overview, not with tariff offers.
+    ...(loan ? [] : [["compare", "Vergleich", c.offer_count || null]]),
     ["documents", "Dokumente", c.documents.length || null],
     ...(energy ? [["readings", "Zählerstände", c.meter_readings.length || null]] : []),
     ["reminders", "Erinnerungen", c.reminders.length || null],
@@ -52,7 +55,7 @@ export async function renderContractDetail(view, id, query = {}) {
         <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))} ${stateBadge(c)}</div>
       </div>
       <div class="page-actions">
-        ${c.state !== "ended" ? `<a class="btn btn-primary" href="#/contracts/${id}?tab=compare">${icon("scale")} Vergleichen</a>` : ""}
+        ${c.state !== "ended" && !loan ? `<a class="btn btn-primary" href="#/contracts/${id}?tab=compare">${icon("scale")} Vergleichen</a>` : ""}
         <a class="btn" href="#/contracts/${id}/edit">${icon("edit")}<span class="label">Bearbeiten</span></a>
         <div class="menu">
           <button class="btn btn-icon" data-menu aria-label="Mehr Aktionen">${icon("more")}</button>
@@ -176,7 +179,11 @@ async function overviewTab(el, c, reload) {
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("layers")}</span>Bisher bezahlt</div>
         <div class="kpi-value num">${money(c.total_paid, true)}</div><div class="kpi-sub">in ${durationText(Math.max(runtime, 0))} Laufzeit</div></div>
       ${
-        c.switch_savings != null
+        c.loan?.balance != null
+          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("trendDown")}</span>Restschuld</div>
+             <div class="kpi-value num">${money(c.loan.balance, true)}</div>
+             <div class="kpi-sub">${c.loan.payoff_date ? `schuldenfrei ${new Date(c.loan.payoff_date).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}` : ""}</div></div>`
+          : c.switch_savings != null
           ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>Seit dem Wechsel</div>
              <div class="kpi-value num ${c.switch_savings >= 0 ? "better" : "worse"}">${signedMoney(c.switch_savings)}</div>
              <div class="kpi-sub">${c.switch_savings >= 0 ? "gespart ggü. altem Vertrag" : "Mehrkosten ggü. altem Vertrag"}</div></div>`
@@ -220,6 +227,7 @@ async function overviewTab(el, c, reload) {
           </div>
         </div>
         ${energyCard(c)}
+        ${loanCard(c)}
         ${c.notes ? `<div class="card"><div class="card-head"><h2>Notizen</h2></div><p style="margin:0;white-space:pre-wrap">${esc(c.notes)}</p></div>` : ""}
       </div>
       <div class="card">
@@ -273,6 +281,7 @@ async function overviewTab(el, c, reload) {
     reload();
   });
   $("#letter-btn", el)?.addEventListener("click", () => openLetter(c));
+  bindLoan(el, c, reload);
 }
 
 function deadlineCallout(c) {
@@ -483,6 +492,12 @@ export function priceModal(c, existing, done) {
              <div class="field span-all"><small>Tipp: Preis = neuer Abschlag. Grund- & Arbeitspreis werden zusätzlich als aktueller Tarif gespeichert.</small></div>`
           : ""
       }
+      ${
+        c.category === "loan" && !isOnce
+          ? `<label class="field"><span>Sollzins ab hier</span><div class="input-group"><input type="number" step="0.01" name="interest_rate" value="${esc(p.details?.interest_rate ?? "")}" placeholder="${esc(c.attributes?.interest_rate ?? "")}"/><span class="addon">%</span></div></label>
+             <div class="field span-all"><small>Für eine Anschlussfinanzierung: neue Rate und neuen Zins ab dem Ende der Zinsbindung eintragen.</small></div>`
+          : ""
+      }
       <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(p.note ?? "")}" placeholder="${isOnce ? "z. B. Neukundenbonus, Anschlussgebühr" : "z. B. Preiserhöhung, Aktionspreis endet"}"/></label>
     </form>`,
     foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
@@ -493,6 +508,7 @@ export function priceModal(c, existing, done) {
     const details = {};
     if (d.base_price_month != null) details.base_price_month = d.base_price_month;
     if (d.unit_price_ct != null) details.unit_price_ct = d.unit_price_ct;
+    if (d.interest_rate != null) details.interest_rate = d.interest_rate;
     const payload = { valid_from: d.valid_from, amount: d.amount, interval: d.interval || "monthly", note: d.note, details };
     busy(e.currentTarget);
     try {

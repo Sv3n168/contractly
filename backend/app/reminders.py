@@ -23,7 +23,7 @@ from urllib.parse import urlparse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from . import calc, checkup
+from . import calc, checkup, loans
 from . import db as database
 from .categories import CATEGORY_MAP, SUBSCRIPTION_CATEGORIES, is_energy
 from .config import settings
@@ -234,6 +234,9 @@ def _scenario_items(c: Contract, ref: date, horizon: date) -> list[dict]:
             title = f"Nachzahlung droht: {c.name} (ca. {gap:.0f} €)"
             detail = f"Abschlag auf {amount} € erhöhen, dann bleibt die Jahresabrechnung ohne Nachzahlung."
             out.append(_item(c, "installment_check", e["billing_year_end"], title, ref, detail))
+    # Loans: end of the fixed-rate period, last payment, unused special repayment
+    if loans.is_loan(c.category) and running:
+        out.extend(_loan_items(c, ref, horizon))
     # Yearly "do I still use this?" for subscriptions
     if c.category in SUBSCRIPTION_CATEGORIES and c.end_date is None and c.start_date <= ref:
         # Yearly on the anniversary; an unanswered check stays open for two months, then waits a year.
@@ -245,6 +248,54 @@ def _scenario_items(c: Contract, ref: date, horizon: date) -> list[dict]:
         if due <= horizon:
             title = f"Abo-Check: {c.name} noch genutzt?"
             out.append(_item(c, "subscription_check", due, title, due, "Wenn nicht: kündigen spart Geld."))
+    return out
+
+
+def _loan_items(c: Contract, ref: date, horizon: date) -> list[dict]:
+    out = []
+    a = loans.analysis(c, ref) or {}
+    fixed = a.get("fixed_until")
+    if fixed and fixed >= ref and a.get("balance_at_fixed_until"):
+        notify = fixed - timedelta(days=365)  # banks offer follow-up financing about a year ahead
+        if notify <= horizon:
+            rest = f"{a['balance_at_fixed_until']:,.0f}".replace(",", ".")
+            out.append(
+                _item(
+                    c,
+                    "fixed_rate_end",
+                    fixed,
+                    f"Zinsbindung endet: {c.name}",
+                    notify,
+                    f"Dann noch ca. {rest} € offen – Anschlussfinanzierung vergleichen (Contractly rechnet mit).",
+                )
+            )
+    payoff = a.get("payoff_date")
+    if payoff and payoff >= ref and payoff - timedelta(days=14) <= horizon:
+        out.append(
+            _item(
+                c,
+                "loan_payoff",
+                payoff,
+                f"Letzte Rate: {c.name} 🎉",
+                payoff - timedelta(days=14),
+                "Danach prüfen, ob die Lastschrift endet – und den Vertrag in Contractly beenden.",
+            )
+        )
+    if a.get("special_repayment_allowed") and a.get("balance"):
+        due = date(ref.year, 11, 15)  # most contracts allow it once per calendar year
+        done = any(d.year == ref.year for d, _ in loans.special_repayments(c))
+        if not done and ref <= date(ref.year, 12, 31) and due <= horizon:
+            allowed = f"{a['special_repayment_allowed']:,.0f}".replace(",", ".")
+            out.append(
+                _item(
+                    c,
+                    "special_repayment",
+                    due,
+                    f"Sondertilgung {ref.year}: {c.name}",
+                    due,
+                    f"Bis zu {allowed} € extra tilgen spart Zinsen – sonst verfällt das Recht für dieses Jahr.",
+                )
+            )
     return out
 
 
@@ -294,6 +345,9 @@ def _neutral_title(item: dict) -> str:
         "confirmation": "Kündigungsbestätigung fehlt",
         "subscription_check": "Abo-Check",
         "installment_check": "Abschlag prüfen – Nachzahlung droht",
+        "fixed_rate_end": "Zinsbindung endet",
+        "loan_payoff": "Letzte Kreditrate",
+        "special_repayment": "Sondertilgung möglich",
     }
     if item["kind"] in neutral:
         return f"{neutral[item['kind']]} ({what})"

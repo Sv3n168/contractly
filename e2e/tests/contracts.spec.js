@@ -20,7 +20,7 @@ test("create a contract with the wizard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "USC M" })).toBeVisible();
   await expect(page.locator(".kpi.hero .kpi-value")).toContainText("49,00");
   await page.goto("/#/contracts");
-  await expect(page.locator(".contract-card", { hasText: "USC M" })).toBeVisible();
+  await expect(page.locator(".contract-row", { hasText: "USC M" })).toBeVisible();
   check();
 });
 

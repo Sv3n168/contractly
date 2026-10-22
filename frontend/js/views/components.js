@@ -72,6 +72,23 @@ export function contractCard(c) {
   </a>`;
 }
 
+/** One compact line per contract: the default contract list. */
+export function contractRow(c) {
+  const price = c.current_price;
+  const sub = price && price.interval !== "monthly" ? `${money(price.amount)} ${intervalLabel(price.interval)}` : `${money(c.yearly_cost, true)}/Jahr`;
+  const flags = `${c.state !== "active" ? stateBadge(c) : ""}${
+    c.current_price?.details?.kind === "pause" ? `<span class="badge warn">${icon("clock")} pausiert</span>` : ""
+  }${c.share_percent != null && c.share_percent !== 100 ? `<span class="badge info">Anteil ${c.share_percent} %</span>` : ""}`;
+  return `
+  <a class="contract-row ${c.state === "ended" ? "ended" : ""}" href="#/contracts/${c.id}">
+    <div class="cat-icon sm" style="--c:${catColorVar(c.category)}">${catIcon(c.category)}</div>
+    <div class="cr-title"><b>${esc(c.name)}</b><span>${esc(c.provider || catLabel(c.category))}</span></div>
+    <div class="cr-meta">${flags}${attrChips(c, 2)}</div>
+    <div class="cr-deadline">${deadlineHint(c)}</div>
+    <div class="cr-price"><b class="num">${money(c.monthly_cost)}</b><span class="num">${sub}</span></div>
+  </a>`;
+}
+
 export function datePill(d, urgency = "") {
   const x = new Date(d);
   return `<div class="date-pill ${urgency}"><b>${x.getDate()}</b><span>${x.toLocaleDateString("de-DE", { month: "short" })}</span></div>`;

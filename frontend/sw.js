@@ -1,6 +1,6 @@
 // Minimal service worker: caches the app shell so Contractly opens instantly and offline.
 // API requests always go to the network.
-const CACHE = "contractly-v1";
+const CACHE = "contractly-v2";
 const SHELL = ["/", "/static/css/app.css", "/static/vendor/chart.umd.min.js", "/icon.svg", "/manifest.webmanifest"];
 
 self.addEventListener("install", (e) => {

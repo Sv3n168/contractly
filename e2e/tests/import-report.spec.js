@@ -9,7 +9,7 @@ test("contract list import", async ({ page }) => {
   await expect(page.locator("#list-result")).toContainText("Yoga-Studio Sonnenschein");
   await page.click("#apply");
   await expect(page).toHaveURL(/#\/contracts$/);
-  await expect(page.locator(".contract-card", { hasText: "Yoga-Studio Sonnenschein" })).toBeVisible();
+  await expect(page.locator(".contract-row", { hasText: "Yoga-Studio Sonnenschein" })).toBeVisible();
   check();
 });
 

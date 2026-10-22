@@ -475,6 +475,7 @@ export async function renderMore(view) {
       <div class="list">
         ${[
           ["#/inbox", "mail", "Post & Mails", "Brief fotografieren oder E-Mail auswerten"],
+          ["#/income", "trendUp", "Einnahmen", "Gehalt, Boni und was reinkommt"],
           ["#/checkup", "refresh", "Jahres-Check", "5 Minuten, einmal im Jahr"],
           ["#/emergency", "shield", "Notfall-Mappe", "Alles Wichtige für Angehörige"],
           ["#/timeline", "timeline", "Zeitstrahl", "Abschlüsse, Wechsel & Fristen"],

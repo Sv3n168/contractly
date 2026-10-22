@@ -4,13 +4,14 @@ from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import Response
-from sqlalchemy.orm import Session
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 
-from .. import calc, ocr
+from .. import calc, income, ocr
 from ..categories import CATEGORIES, CATEGORY_MAP, INTERVALS, TAX_RELEVANT_DEFAULT, tax_relevant
 from ..config import settings
 from ..db import get_db
-from ..models import AppSetting
+from ..models import AppSetting, IncomeSource
 from ..reminders import load_outbox, refresh_outbox
 from ..schemas import OfferOut, ProfileIn
 from ..security import vault
@@ -130,7 +131,12 @@ def summary(
     extras_12m = round(sum(calc.average_extras(c, ref) * 12 for c in contracts), 2)
 
     top = sorted(running, key=lambda s: s.monthly_cost, reverse=True)[:5]
+    sources = list(db.scalars(select(IncomeSource).options(selectinload(IncomeSource.entries))).unique())
+    money_in = income.overview(sources, contracts, ref, months_back=12) if sources else None
     return {
+        "income_monthly_net": money_in["monthly_net"] if money_in else None,
+        "fixed_cost_ratio": money_in["fixed_cost_ratio"] if money_in else None,
+        "free_monthly": money_in["free_monthly"] if money_in else None,
         "today": ref,
         "active_count": len(running),
         "total_count": len(summaries),

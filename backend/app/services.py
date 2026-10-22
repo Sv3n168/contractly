@@ -5,7 +5,7 @@ from datetime import date
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from . import calc
+from . import calc, loans
 from .categories import is_energy, tax_relevant
 from .models import Contract, PriceEntry
 from .schemas import (
@@ -130,4 +130,5 @@ def contract_detail(c: Contract, ref: date | None = None) -> ContractOut:
         **_extras_fields(c, ref),
         switch_savings=calc.switch_savings(c, ref),
         energy=calc.energy_analysis(c, ref) if is_energy(c.category) else None,
+        loan=loans.analysis(c, ref) if loans.is_loan(c.category) else None,
     )

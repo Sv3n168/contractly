@@ -83,11 +83,11 @@ function folderHtml(f) {
     ${f.note ? `<div class="card"><h2>Persönliche Hinweise</h2><p style="white-space:pre-wrap;margin:0">${esc(f.note)}</p></div>` : ""}
     <div class="card"><h2>Was jetzt zu tun ist</h2><ol class="emergency-list">${f.checklist.map((x) => `<li>${esc(x)}</li>`).join("")}</ol></div>
     <div class="card"><h2>Alle Verträge auf einen Blick</h2>
-      <div class="table-wrap"><table class="table"><thead><tr><th>Vertrag</th><th>Anbieter</th><th>Kunden-/Vertragsnr.</th><th class="r">Kosten</th><th>Frist</th></tr></thead><tbody>
+      <div class="table-wrap"><table class="table"><thead><tr><th>Vertrag</th><th class="hide-sm">Anbieter</th><th class="hide-sm">Kunden-/Vertragsnr.</th><th class="r">Kosten</th><th>Frist</th></tr></thead><tbody>
       ${f.contracts
         .map(
-          (c) => `<tr><td>${c.icon} <b>${esc(c.name)}</b></td><td>${esc(c.provider || "")}</td>
-          <td class="num">${esc(c.customer_number || c.contract_number || "")}</td><td class="r num">${esc(c.price || "")}</td><td>${esc(c.notice)}</td></tr>`,
+          (c) => `<tr><td>${c.icon} <b>${esc(c.name)}</b></td><td class="hide-sm">${esc(c.provider || "")}</td>
+          <td class="num hide-sm">${esc(c.customer_number || c.contract_number || "")}</td><td class="r num">${esc(c.price || "")}</td><td>${esc(c.notice)}</td></tr>`,
         )
         .join("")}
       </tbody></table></div></div>

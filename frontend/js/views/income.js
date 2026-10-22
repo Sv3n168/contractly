@@ -101,9 +101,8 @@ function sourceCard(s) {
       <button class="btn btn-ghost btn-sm" data-edit-source="${s.id}" aria-label="Bearbeiten">${icon("edit")}</button>
     </div>
     <div class="income-now">
-      <div><div class="small muted">Netto</div><div class="big num money">${money(s.current_net)}</div></div>
-      ${s.current_gross ? `<div><div class="small muted">Brutto</div><div class="big num">${money(s.current_gross)}</div></div>` : ""}
-      <div class="small muted" style="align-self:end">pro Monat</div>
+      <div><div class="small muted">Netto pro Monat</div><div class="big num money">${money(s.current_net)}</div></div>
+      ${s.current_gross ? `<div><div class="small muted">Brutto pro Monat</div><div class="big num">${money(s.current_gross)}</div></div>` : ""}
     </div>
     <div class="list" style="margin-top:12px">${s.entries
       .map(

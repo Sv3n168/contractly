@@ -6,8 +6,10 @@ export const state = { meta: null, profile: null, dueCount: 0, user: null };
 
 // Fixed category -> color-slot mapping (color follows the entity, never its rank).
 // Thirteen categories share eight validated slots; related categories share a hue family.
+// Loans take the blue of banks; red goes to streaming (and stays away from loans and money).
 const CATEGORY_SLOT = {
-  mobile: 1,
+  loan: 1,
+  other: 1,
   electricity: 2,
   car_insurance: 3,
   liability: 3,
@@ -15,21 +17,21 @@ const CATEGORY_SLOT = {
   legal_protection: 3,
   insurance: 3,
   gas: 4,
-  streaming: 5,
+  mobile: 5,
   fitness: 6,
   internet: 7,
-  loan: 8,
-  other: 8,
+  streaming: 8,
 };
+// In slot order: neighbouring slots were validated for colour-blind separation.
 export const GROUPS = [
-  { key: "mobile", label: "Mobilfunk", slot: 1 },
+  { key: "other", label: "Kredite & Sonstiges", slot: 1 },
   { key: "electricity", label: "Strom", slot: 2 },
   { key: "insurance", label: "Versicherungen", slot: 3 },
   { key: "gas", label: "Gas", slot: 4 },
-  { key: "streaming", label: "Streaming & Abos", slot: 5 },
+  { key: "mobile", label: "Mobilfunk", slot: 5 },
   { key: "fitness", label: "Fitness & Vereine", slot: 6 },
   { key: "internet", label: "Festnetz & Internet", slot: 7 },
-  { key: "other", label: "Kredite & Sonstiges", slot: 8 },
+  { key: "streaming", label: "Streaming & Abos", slot: 8 },
 ];
 export const groupOf = (category) => GROUPS.find((g) => g.slot === CATEGORY_SLOT[category])?.key || "other";
 

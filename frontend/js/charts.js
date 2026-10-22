@@ -14,7 +14,8 @@ function base() {
   return {
     responsive: true,
     maintainAspectRatio: false,
-    animation: { duration: 350 },
+    // charts build up with the same soft ease-out as the rest of the app
+    animation: { duration: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 700, easing: "easeOutQuart" },
     interaction: { mode: "index", intersect: false },
     plugins: {
       legend: { display: false },

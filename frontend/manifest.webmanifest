@@ -4,8 +4,8 @@
   "description": "Alle laufenden Verträge im Blick – Kosten, Fristen, Preisverläufe und Wechsel.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f6fa",
-  "theme_color": "#4f46e5",
+  "background_color": "#f5f4f0",
+  "theme_color": "#0b0f14",
   "lang": "de",
   "share_target": {
     "action": "/",

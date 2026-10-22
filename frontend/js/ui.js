@@ -150,10 +150,38 @@ export function toast(message, type = "ok", duration = null) {
   el.innerHTML = `${icon(type === "error" ? "alert" : "check")}<span>${esc(message)}</span>`;
   root.append(el);
   setTimeout(() => {
-    el.style.transition = "opacity .3s";
-    el.style.opacity = "0";
-    setTimeout(() => el.remove(), 300);
+    el.classList.add("leaving");
+    setTimeout(() => el.remove(), 320);
   }, duration ?? (type === "error" ? 5000 : 2600));
+}
+
+const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/**
+ * Numbers count up to their value (elements with data-count="<number>" and
+ * data-format="money" | "money0" | "int"), like the balance in a banking app.
+ */
+export function countUp(root) {
+  const fmt = {
+    money: (v) => money(v),
+    money0: (v) => money(v, true),
+    int: (v) => String(Math.round(v)),
+  };
+  root.querySelectorAll("[data-count]").forEach((el) => {
+    const target = Number(el.dataset.count);
+    const format = fmt[el.dataset.format] || fmt.int;
+    if (!Number.isFinite(target) || reducedMotion()) return;
+    const start = performance.now();
+    const duration = 900;
+    const step = (now) => {
+      const t = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - t, 4);
+      el.textContent = format(target * eased);
+      if (t < 1) requestAnimationFrame(step);
+      else el.textContent = format(target);
+    };
+    requestAnimationFrame(step);
+  });
 }
 
 // ------------------------------------------------------------------ modal
@@ -169,8 +197,11 @@ export function modal({ title, body, foot = "", wide = false, onOpen, className 
       ${foot ? `<div class="modal-foot">${foot}</div>` : ""}
     </div>`;
   const close = () => {
-    backdrop.remove();
     document.removeEventListener("keydown", onKey);
+    if (reducedMotion()) return backdrop.remove();
+    // animate out (sheet slides down on phones), then remove
+    backdrop.classList.add("closing");
+    setTimeout(() => backdrop.remove(), 260);
   };
   const onKey = (e) => e.key === "Escape" && close();
   backdrop.addEventListener("mousedown", (e) => {

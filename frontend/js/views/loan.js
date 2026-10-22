@@ -85,7 +85,7 @@ export function bindLoan(el, c, reload) {
   const canvas = $("#loan-chart", el);
   if (canvas) {
     lines(canvas, a.curve.map((p) => p.date.slice(0, 7)), [
-      { label: "Restschuld", values: a.curve.map((p) => p.balance), color: slotColor(8), fill: true },
+      { label: "Restschuld", values: a.curve.map((p) => p.balance), color: slotColor(1), fill: true },
     ], { beginAtZero: true });
   }
   $("#repayment-form", el)?.addEventListener("submit", async (e) => {

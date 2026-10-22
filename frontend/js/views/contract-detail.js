@@ -36,10 +36,12 @@ export async function renderContractDetail(view, id, query = {}) {
   const c = await api.contract(id);
   const tab = query.tab || "overview";
   const energy = isEnergy(c.category);
+  const loan = c.category === "loan";
   const tabs = [
     ["overview", "Übersicht"],
     ["prices", "Preise", c.prices.length],
-    ["compare", "Vergleich", c.offer_count || null],
+    // Loans are compared with the refinancing check on the overview, not with tariff offers.
+    ...(loan ? [] : [["compare", "Vergleich", c.offer_count || null]]),
     ["documents", "Dokumente", c.documents.length || null],
     ...(energy ? [["readings", "Zählerstände", c.meter_readings.length || null]] : []),
     ["reminders", "Erinnerungen", c.reminders.length || null],
@@ -53,7 +55,7 @@ export async function renderContractDetail(view, id, query = {}) {
         <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))} ${stateBadge(c)}</div>
       </div>
       <div class="page-actions">
-        ${c.state !== "ended" ? `<a class="btn btn-primary" href="#/contracts/${id}?tab=compare">${icon("scale")} Vergleichen</a>` : ""}
+        ${c.state !== "ended" && !loan ? `<a class="btn btn-primary" href="#/contracts/${id}?tab=compare">${icon("scale")} Vergleichen</a>` : ""}
         <a class="btn" href="#/contracts/${id}/edit">${icon("edit")}<span class="label">Bearbeiten</span></a>
         <div class="menu">
           <button class="btn btn-icon" data-menu aria-label="Mehr Aktionen">${icon("more")}</button>
@@ -177,7 +179,11 @@ async function overviewTab(el, c, reload) {
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("layers")}</span>Bisher bezahlt</div>
         <div class="kpi-value num">${money(c.total_paid, true)}</div><div class="kpi-sub">in ${durationText(Math.max(runtime, 0))} Laufzeit</div></div>
       ${
-        c.switch_savings != null
+        c.loan?.balance != null
+          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("trendDown")}</span>Restschuld</div>
+             <div class="kpi-value num">${money(c.loan.balance, true)}</div>
+             <div class="kpi-sub">${c.loan.payoff_date ? `schuldenfrei ${new Date(c.loan.payoff_date).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}` : ""}</div></div>`
+          : c.switch_savings != null
           ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>Seit dem Wechsel</div>
              <div class="kpi-value num ${c.switch_savings >= 0 ? "better" : "worse"}">${signedMoney(c.switch_savings)}</div>
              <div class="kpi-sub">${c.switch_savings >= 0 ? "gespart ggü. altem Vertrag" : "Mehrkosten ggü. altem Vertrag"}</div></div>`

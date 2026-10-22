@@ -100,7 +100,7 @@ export async function renderDashboard(view) {
     <div class="kpis">
       <div class="card kpi hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Fixkosten pro Monat</div>
-        <div class="kpi-value num">${money(summary.monthly_total)}</div>
+        <div class="kpi-value num" data-count="${summary.monthly_total}" data-format="money">${money(summary.monthly_total)}</div>
         <div class="kpi-sub">${
           summary.monthly_year_ago
             ? `<span class="delta">${icon(delta > 0 ? "trendUp" : "trendDown")} ${signedMoney(delta)}</span> ggü. Vorjahr`
@@ -109,19 +109,19 @@ export async function renderDashboard(view) {
       </div>
       <div class="card kpi">
         <div class="kpi-label"><span class="kpi-icon">${icon("calendar")}</span>Pro Jahr</div>
-        <div class="kpi-value num">${money(summary.yearly_total, true)}</div>
+        <div class="kpi-value num" data-count="${summary.yearly_total}" data-format="money0">${money(summary.yearly_total, true)}</div>
         <div class="kpi-sub">${money(summary.ytd_total, true)} bisher in ${now.getFullYear()}${
           summary.extras_12m ? ` · + ${money(summary.extras_12m, true)} Zusatzkosten (12 M.)` : ""
         }</div>
       </div>
       <div class="card kpi">
         <div class="kpi-label"><span class="kpi-icon">${icon("file")}</span>Laufende Verträge</div>
-        <div class="kpi-value num">${summary.active_count}</div>
+        <div class="kpi-value num" data-count="${summary.active_count}">${summary.active_count}</div>
         <div class="kpi-sub">${summary.deadlines.length ? `${summary.deadlines.length} ${summary.deadlines.length === 1 ? "Frist" : "Fristen"} in 60 Tagen` : "keine Fristen in Sicht ✨"}</div>
       </div>
       <div class="card kpi">
         <div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>Durch Wechsel gespart</div>
-        <div class="kpi-value num ${summary.switch_savings >= 0 ? "" : "worse"}">${money(summary.switch_savings, true)}</div>
+        <div class="kpi-value num ${summary.switch_savings > 0 ? "money" : summary.switch_savings < 0 ? "worse" : ""}" data-count="${summary.switch_savings}" data-format="money0">${money(summary.switch_savings, true)}</div>
         <div class="kpi-sub">${summary.switch_count ? `aus ${summary.switch_count} Wechsel${summary.switch_count > 1 ? "n" : ""}` : "Vergleich lohnt sich oft!"}</div>
       </div>
     </div>

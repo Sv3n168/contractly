@@ -5,7 +5,7 @@ import { api } from "./api.js";
 export const state = { meta: null, profile: null, dueCount: 0, user: null };
 
 // Fixed category -> color-slot mapping (color follows the entity, never its rank).
-// Twelve categories share eight validated slots; related categories share a hue family.
+// Thirteen categories share eight validated slots; related categories share a hue family.
 const CATEGORY_SLOT = {
   mobile: 1,
   electricity: 2,
@@ -18,6 +18,7 @@ const CATEGORY_SLOT = {
   streaming: 5,
   fitness: 6,
   internet: 7,
+  loan: 8,
   other: 8,
 };
 export const GROUPS = [
@@ -28,7 +29,7 @@ export const GROUPS = [
   { key: "streaming", label: "Streaming & Abos", slot: 5 },
   { key: "fitness", label: "Fitness & Vereine", slot: 6 },
   { key: "internet", label: "Festnetz & Internet", slot: 7 },
-  { key: "other", label: "Sonstiges", slot: 8 },
+  { key: "other", label: "Kredite & Sonstiges", slot: 8 },
 ];
 export const groupOf = (category) => GROUPS.find((g) => g.slot === CATEGORY_SLOT[category])?.key || "other";
 

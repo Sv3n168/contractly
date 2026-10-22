@@ -88,3 +88,21 @@ test("emergency folder: encrypted file opens offline with the passphrase", async
   expect(errors).toEqual([]);
   check();
 });
+
+test("loan: balance, special repayment and refinancing check", async ({ page }) => {
+  const check = watchErrors(page);
+  const contracts = await (await page.request.get("/api/contracts")).json();
+  const loan = contracts.find((c) => c.category === "loan");
+  await page.goto(`/#/contracts/${loan.id}`);
+  await expect(page.locator(".loan-card")).toContainText("Restschuld heute");
+  const before = await page.locator(".loan-balance .big").textContent();
+  await page.locator(".loan-card summary", { hasText: "Sondertilgungen" }).click();
+  await page.fill("#repayment-form [name=amount]", "500");
+  await page.click("#repayment-form button[type=submit]");
+  await expect(page.locator(".loan-balance .big")).not.toHaveText(before);
+  await page.locator(".loan-card summary", { hasText: "Umschuldung" }).click();
+  await page.fill("[name=new_rate]", "3.9");
+  await page.click("#loan-compare button[type=submit]");
+  await expect(page.locator("#loan-compare-result")).toContainText("weniger Zinsen");
+  check();
+});

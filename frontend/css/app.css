@@ -2513,3 +2513,19 @@ body:not(.is-admin) .admin-only {
     display: none;
   }
 }
+
+/* ------------------------------------------------------------------ loans */
+
+.loan-balance {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.loan-balance .big {
+  font-size: 26px;
+  font-weight: 700;
+}
+.loan-balance .grow {
+  min-width: 180px;
+}

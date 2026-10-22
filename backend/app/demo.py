@@ -175,6 +175,29 @@ def seed(db: Session, ref: date | None = None) -> int:
         start = day
         gas.meter_readings.append(MeterReading(reading_date=day, value=round(value)))
 
+    # Car loan: 15.000 € at 5,9 % over four years, 14 months in, with one special repayment
+    loan_start = _m(ref, -14)
+    contract(
+        name="Autokredit Golf",
+        category="loan",
+        provider="Santander Consumer Bank",
+        contract_number="KR-4471190",
+        start_date=loan_start,
+        renewal_months=1,
+        notice_value=0,
+        notice_unit="days",
+        reminder_days=None,
+        attributes={
+            "loan_type": "Autokredit",
+            "principal": 15000,
+            "interest_rate": 5.9,
+            "effective_rate": 6.07,
+            "special_repayment_pct": 10,
+            "special_repayments": [{"date": _m(ref, -3).isoformat(), "amount": 1000}],
+        },
+        prices=[(loan_start, 351.57, "monthly", "Monatsrate")],
+    )
+
     year_start = date(ref.year - 2, 1, 1)
     contract(
         name="Kfz-Versicherung Golf",

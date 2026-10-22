@@ -146,6 +146,7 @@ class ContractOut(ContractSummary):
     extras_months_12m: int = 0
     switch_savings: float | None = None
     energy: dict[str, Any] | None = None
+    loan: dict[str, Any] | None = None
 
 
 class CancelIn(BaseModel):

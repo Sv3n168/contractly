@@ -14,7 +14,20 @@ from .backup import backup_loop
 from .config import settings
 from .models import Contract
 from .reminders import notifier_loop, refresh_outbox
-from .routers import auth, backups, checkup, contracts, documents, emergency, imports, inbox, offers, reminders, stats
+from .routers import (
+    auth,
+    backups,
+    checkup,
+    contracts,
+    documents,
+    emergency,
+    imports,
+    inbox,
+    loans,
+    offers,
+    reminders,
+    stats,
+)
 from .routers.auth import COOKIE
 from .security import vault
 
@@ -139,6 +152,7 @@ def create_app(background: bool = True) -> FastAPI:
         inbox.router,
         checkup.router,
         emergency.router,
+        loans.router,
     ):
         app.include_router(r)
 

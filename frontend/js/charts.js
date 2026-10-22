@@ -150,10 +150,10 @@ export function chainLine(canvas, months, series, colors, { currentMonth, extras
 }
 
 /** Single total line with optional comparison line (projection). */
-export function lines(canvas, months, datasets) {
+export function lines(canvas, months, datasets, { beginAtZero = false } = {}) {
   const opts = base();
   // Projections differ by a few percent – a zero baseline would flatten the difference.
-  opts.scales.y.beginAtZero = false;
+  opts.scales.y.beginAtZero = beginAtZero;
   opts.plugins.tooltip.callbacks.title = (items) => fmtMonth(months[items[0].dataIndex]);
   return mount(canvas, {
     type: "line",

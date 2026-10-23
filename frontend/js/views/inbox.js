@@ -1,7 +1,7 @@
 // "Post & Mails": a letter (photo/PDF), an e-mail (.eml) or pasted text -> what changes for which contract.
 
 import { api } from "../api.js";
-import { catIcon } from "../store.js";
+import { contractIcon } from "../store.js";
 import { $, busy, esc, fmtDate, icon, toast } from "../ui.js";
 import { setupDrop } from "./contract-form.js";
 
@@ -86,7 +86,7 @@ export async function renderInbox(view) {
 async function showResult(view, out, res) {
   const contracts = await api.contracts({ include_ended: true });
   const options = contracts
-    .map((c) => `<option value="${c.id}" ${c.id === res.contract_id ? "selected" : ""}>${catIcon(c.category)} ${esc(c.name)}${c.provider ? ` · ${esc(c.provider)}` : ""}</option>`)
+    .map((c) => `<option value="${c.id}" ${c.id === res.contract_id ? "selected" : ""}>${esc(contractIcon(c))} ${esc(c.name)}${c.provider ? ` · ${esc(c.provider)}` : ""}</option>`)
     .join("");
   const best = res.candidates.find((c) => c.contract_id === res.contract_id);
   const f = res.facts;

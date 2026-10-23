@@ -19,6 +19,7 @@ from .routers import (
     backups,
     checkup,
     contracts,
+    data,
     documents,
     emergency,
     imports,
@@ -155,6 +156,7 @@ def create_app(background: bool = True) -> FastAPI:
         emergency.router,
         loans.router,
         income.router,
+        data.router,
     ):
         app.include_router(r)
 

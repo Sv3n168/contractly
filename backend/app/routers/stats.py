@@ -119,6 +119,7 @@ def summary(
                         "contract_id": c.id,
                         "name": c.name,
                         "category": c.category,
+                        "icon": c.icon,
                         "date": cur.valid_from,
                         "old_monthly": round(old_m, 2),
                         "new_monthly": round(new_m, 2),
@@ -177,7 +178,14 @@ def _series(
             key = str(c.id)
             label = c.name
         entry = grouped.setdefault(
-            key, {"key": key, "label": label, "category": c.category, "values": defaultdict(float)}
+            key,
+            {
+                "key": key,
+                "label": label,
+                "category": c.category,
+                "icon": None if group == "category" else c.icon,
+                "values": defaultdict(float),
+            },
         )
         for m, v in costs.items():
             entry["values"][m] += v
@@ -355,6 +363,7 @@ def _year_report(db: Session, year: int) -> dict:
                     "name": c.name,
                     "provider": c.provider,
                     "category": c.category,
+                    "icon": c.icon,
                     "total": total,
                     "extras": round(extras, 2),
                     "share_percent": c.share_percent,

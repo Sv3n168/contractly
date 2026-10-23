@@ -145,6 +145,7 @@ export const api = {
   },
 
   demo: () => request("POST", "/api/demo"),
+  resetData: (data) => request("POST", "/api/data/reset", data),
 
   pauseContract: (id, data) => request("POST", `/api/contracts/${id}/pause`, data),
   confirmCancellation: (id, data = {}) => request("POST", `/api/contracts/${id}/cancellation-confirmed`, data),

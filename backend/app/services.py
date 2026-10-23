@@ -65,6 +65,7 @@ def _summary_fields(c: Contract, ref: date) -> dict:
         "id": c.id,
         "name": c.name,
         "category": c.category,
+        "icon": c.icon,
         "provider": c.provider,
         "start_date": c.start_date,
         "end_date": c.end_date,

@@ -1,7 +1,7 @@
 // "Jahres-Check": five minutes once a year, one card per contract that needs a decision.
 
 import { api } from "../api.js";
-import { catColorVar, catIcon } from "../store.js";
+import { catColorVar, contractIcon } from "../store.js";
 import { $, esc, fmtDate, icon, money, toast } from "../ui.js";
 import { openLetter } from "./letter.js";
 
@@ -54,7 +54,7 @@ function card(view, ov, item) {
       <div class="card checkup-card">
         <div class="small muted">${pos} von ${total}</div>
         <div class="checkup-title">
-          <span class="cat-icon" style="--c:${catColorVar(item.category)}">${catIcon(item.category)}</span>
+          <span class="cat-icon" style="--c:${catColorVar(item.category)}">${esc(contractIcon(item))}</span>
           <div><h2>${esc(item.name)}</h2><div class="muted">${esc(item.provider || "")}${item.monthly_cost ? ` · ${money(item.monthly_cost)} / Monat` : ""}</div></div>
         </div>
         <ul class="checkup-reasons">
@@ -94,7 +94,7 @@ function done(view, ov) {
   const compare = ov.items.filter((i) => i.decision === "compare");
   const cancel = ov.items.filter((i) => i.decision === "cancel");
   const row = (i, action) => `<div class="list-item">
-      <span class="cat-icon sm" style="--c:${catColorVar(i.category)}">${catIcon(i.category)}</span>
+      <span class="cat-icon sm" style="--c:${catColorVar(i.category)}">${esc(contractIcon(i))}</span>
       <div class="grow"><div class="title">${esc(i.name)}</div><div class="sub">${money(i.monthly_cost)} / Monat</div></div>${action}</div>`;
   view.innerHTML = `
     <div class="checkup">

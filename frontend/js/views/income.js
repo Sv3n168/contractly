@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { incomeChart, legendHtml } from "../charts.js";
 import { cssVar } from "../store.js";
 import { $, busy, confirmDialog, esc, fmtDate, formData, icon, modal, money, signedMoney, toast, today } from "../ui.js";
+import { bindIconPicker, iconPicker } from "./components.js";
 
 const pct = (v) => `${(v * 100).toLocaleString("de-DE", { maximumFractionDigits: 0 })} %`;
 
@@ -135,6 +136,9 @@ function sourceModal(kinds, s = null) {
   const m = modal({
     title: s ? "Einnahme bearbeiten" : "Einnahme hinzufügen",
     body: `<form class="form-grid" id="sf">
+      <div class="field span-all" style="flex-direction:row;align-items:center;gap:12px">
+        ${iconPicker(s?.own_icon || "", (kinds.find((k) => k.key === (s?.kind || "salary")) || kinds[0]).icon, "var(--good)")}
+        <small class="muted">Symbol antippen zum Ändern</small></div>
       <label class="field"><span>Art</span><select name="kind">${kinds
         .map((k) => `<option value="${k.key}" ${(s?.kind || "salary") === k.key ? "selected" : ""}>${k.icon} ${esc(k.label)}</option>`)
         .join("")}</select></label>
@@ -153,9 +157,23 @@ function sourceModal(kinds, s = null) {
     foot: `${s ? `<button class="btn btn-ghost btn-danger" data-delete>${icon("trash")} Löschen</button>` : ""}
       <button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
+  bindIconPicker(m);
+  // without an own emoji the kind's emoji is shown
+  $("[name=kind]", m).addEventListener("change", (e) => {
+    const pick = $(".icon-pick", m);
+    pick.dataset.fallback = kinds.find((k) => k.key === e.target.value)?.icon || "💶";
+    if (!$("[name=icon]", m).value) pick.textContent = pick.dataset.fallback;
+  });
   $("[data-save]", m).addEventListener("click", async (e) => {
     const f = formData($("#sf", m));
-    const payload = { name: f.name, kind: f.kind, payer: f.payer || null, start_date: f.start_date, end_date: f.end_date || null };
+    const payload = {
+      name: f.name,
+      kind: f.kind,
+      icon: f.icon || null,
+      payer: f.payer || null,
+      start_date: f.start_date,
+      end_date: f.end_date || null,
+    };
     if (!s) {
       if (f.net == null) return toast("Bitte den Netto-Betrag angeben", "error");
       payload.first = { valid_from: f.start_date, net: f.net, gross: f.gross ?? null, interval: f.interval || "monthly" };

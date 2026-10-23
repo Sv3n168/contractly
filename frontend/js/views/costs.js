@@ -2,7 +2,7 @@
 
 import { api } from "../api.js";
 import { legendHtml, lines, stackedBars } from "../charts.js";
-import { GROUPS, catColor, catIcon, catLabel, cssVar, groupOf, slotColor } from "../store.js";
+import { GROUPS, catColor, contractIcon, catLabel, cssVar, groupOf, slotColor } from "../store.js";
 import { $, esc, fmtMonth, icon, isoDate, money } from "../ui.js";
 
 const prefs = { range: 24, group: "category", months: 24, increase: 3, extras: true };
@@ -115,7 +115,7 @@ export async function renderCosts(view) {
         const c = byId[s.key];
         const sum = s.values.reduce((a, b) => a + b, 0);
         return `<a class="list-item" href="#/contracts/${s.key}">
-          <span class="cat-icon sm" style="--c:${catColor(s.category)}">${catIcon(s.category)}</span>
+          <span class="cat-icon sm" style="--c:${catColor(s.category)}">${esc(contractIcon(s))}</span>
           <div class="grow"><div class="title">${esc(s.label)}</div><div class="sub">${esc(c?.provider || catLabel(s.category))}${c?.end_date ? " · endet " + new Date(c.end_date).toLocaleDateString("de-DE") : ""}</div></div>
           <div class="end num"><b>${money(sum, true)}</b></div></a>`;
       })

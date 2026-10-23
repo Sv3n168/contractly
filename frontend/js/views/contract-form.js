@@ -4,6 +4,7 @@
 import { api } from "../api.js";
 import { catColorVar, category, catIcon, isEnergy, state } from "../store.js";
 import { $, $$, busy, esc, formData, icon, today, toast } from "../ui.js";
+import { bindIconPicker, iconPicker } from "./components.js";
 import { applySuggestionsToForm } from "./ocr.js";
 
 const form_q = (root, sel) => root.querySelector(sel);
@@ -128,8 +129,8 @@ export async function renderContractForm(view, id, query = {}) {
         <div class="card">
           <div class="card-head">
             <div style="display:flex;gap:14px;align-items:center">
-              <div class="cat-icon" style="--c:${catColorVar(cat)}">${catIcon(cat)}</div>
-              <div><h2>${esc(c.label)}</h2><p>Das Wichtigste</p></div>
+              ${iconPicker(src.icon || "", catIcon(cat), catColorVar(cat))}
+              <div><h2>${esc(c.label)}</h2><p>Das Wichtigste · Symbol antippen zum Ändern</p></div>
             </div>
             ${editing ? "" : `<button type="button" class="btn btn-sm btn-ghost" id="change-cat">Kategorie ändern</button>`}
           </div>
@@ -249,6 +250,7 @@ export async function renderContractForm(view, id, query = {}) {
       });
     }
     const form = $("#form", view);
+    bindIconPicker(form);
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
       toast("Erkannte Daten übernommen – bitte kurz prüfen");
@@ -260,6 +262,7 @@ export async function renderContractForm(view, id, query = {}) {
       const payload = {
         name: data.name || [data.provider, category(cat).label].filter(Boolean).join(" ") || category(cat).label,
         category: cat,
+        icon: data.icon || null,
         provider: data.provider,
         provider_address: data.provider_address,
         customer_number: data.customer_number,

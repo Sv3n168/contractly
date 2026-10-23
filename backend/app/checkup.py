@@ -136,6 +136,7 @@ def overview(db: Session, contracts: list[Contract], today: date) -> dict:
                 "name": c.name,
                 "provider": c.provider,
                 "category": c.category,
+                "icon": c.icon,
                 "monthly_cost": round(calc.current_monthly_cost(c, today), 2),
                 "reasons": why,
                 "cancellation_deadline": terms.cancellation_deadline,

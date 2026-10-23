@@ -127,3 +127,26 @@ test("income: salary with net only, raise and bonus", async ({ page }) => {
   await expect(page.locator(".kpi.hero")).toContainText("%");
   check();
 });
+
+test("settings: 'Alle Daten löschen' only fires after typing the confirmation word", async ({ page }) => {
+  const check = watchErrors(page);
+  let sent = null;
+  // the real deletion is covered by the backend tests; here it would wipe the shared test data
+  await page.route("**/api/data/reset", async (route) => {
+    sent = route.request().postDataJSON();
+    await route.fulfill({ json: { contracts: 9, income_sources: 2, documents: 0 } });
+  });
+  await page.goto("/#/settings");
+  await page.click("#reset");
+  const ok = page.locator(".modal [data-ok]");
+  await expect(ok).toBeDisabled();
+  await page.fill(".modal [name=confirm]", "loeschen");
+  await expect(ok).toBeDisabled();
+  await page.fill(".modal [name=confirm]", "löschen");
+  await expect(ok).toBeEnabled();
+  await ok.click();
+  await expect(page.locator(".toast").last()).toContainText("Gelöscht: 9 Verträge");
+  expect(sent).toEqual({ confirm: "löschen" });
+  await expect(page).toHaveURL(/#\/$/);
+  check();
+});

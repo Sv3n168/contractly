@@ -48,6 +48,8 @@ export async function loadMeta() {
 export const category = (key) => state.meta?.categories.find((c) => c.key === key) || { key, label: key, icon: "📄", fields: [] };
 export const catLabel = (key) => category(key).label;
 export const catIcon = (key) => category(key).icon;
+/** A contract's own emoji, else its category's. */
+export const contractIcon = (c) => c.icon || catIcon(c.category);
 export const intervalLabel = (key) => state.meta?.intervals[key]?.label || key;
 export const isEnergy = (key) => !!category(key).energy;
 

@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { chainLine, legendHtml } from "../charts.js";
-import { catColorVar, category, catIcon, catLabel, catSlot, intervalLabel, isEnergy, slotColor, state } from "../store.js";
+import { catColorVar, category, contractIcon, catLabel, catSlot, intervalLabel, isEnergy, slotColor, state } from "../store.js";
 import {
   $,
   $$,
@@ -49,7 +49,7 @@ export async function renderContractDetail(view, id, query = {}) {
   view.innerHTML = `
     <a class="back-link" href="#/contracts">${icon("back")} Alle Verträge</a>
     <div class="detail-head">
-      <div class="cat-icon lg" style="--c:${catColorVar(c.category)}">${catIcon(c.category)}</div>
+      <div class="cat-icon lg" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
       <div class="title">
         <h1>${esc(c.name)}</h1>
         <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))} ${stateBadge(c)}</div>

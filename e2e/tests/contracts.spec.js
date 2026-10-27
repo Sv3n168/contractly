@@ -24,6 +24,24 @@ test("create a contract with the wizard", async ({ page }) => {
   check();
 });
 
+test("new contract that is already cancelled ends on the given date", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Streaming" }).click();
+  await page.fill("[name=name]", "Jahresabo Zeitung");
+  await page.fill("[name=price_amount]", "150");
+  await page.selectOption("[name=price_interval]", "yearly");
+  await page.check("#already-cancelled");
+  // prefilled with the end of the current term
+  await expect(page.locator("[name=cancel_end]")).not.toHaveValue("");
+  const year = new Date().getFullYear() + 1;
+  await page.fill("[name=cancel_end]", `${year}-01-31`);
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Jahresabo Zeitung" })).toBeVisible();
+  await expect(page.locator(".detail-head .badge, .page-head .badge").first()).toContainText("Gekündigt");
+  check();
+});
+
 test("own emoji for a contract", async ({ page }) => {
   const check = watchErrors(page);
   await page.goto("/#/contracts/new");

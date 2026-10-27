@@ -159,7 +159,13 @@ export async function renderContractForm(view, id, query = {}) {
             editing
               ? ""
               : `<label class="check small" style="margin-top:14px"><input type="checkbox" name="withdrawal" checked/>
-                  Gerade erst abgeschlossen? An die 14-tägige Widerrufsfrist erinnern</label>`
+                  Gerade erst abgeschlossen? An die 14-tägige Widerrufsfrist erinnern</label>
+                <label class="check small" style="margin-top:8px"><input type="checkbox" name="already_cancelled" id="already-cancelled"/>
+                  Schon gekündigt – der Vertrag endet zu einem festen Datum</label>
+                <div class="form-grid" id="cancel-fields" hidden style="margin-top:10px">
+                  <label class="field"><span>Gekündigt zum</span><input type="date" name="cancel_end"/>
+                    <small>Letzter Vertragstag – danach entstehen keine Kosten und keine Verlängerung mehr.</small></label>
+                </div>`
           }
           ${
             isEnergy(cat) && !editing
@@ -251,6 +257,7 @@ export async function renderContractForm(view, id, query = {}) {
     }
     const form = $("#form", view);
     bindIconPicker(form);
+    bindAlreadyCancelled(form);
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
       toast("Erkannte Daten übernommen – bitte kurz prüfen");
@@ -314,6 +321,16 @@ export async function renderContractForm(view, id, query = {}) {
             interval: data.price_interval || "monthly",
             details: energyDetails(payload.attributes),
           };
+          if (data.already_cancelled) {
+            if (!data.cancel_end || data.cancel_end < payload.start_date) {
+              busy(btn, false);
+              form.querySelector("[name=cancel_end]").focus();
+              toast("Bitte das Vertragsende angeben (nicht vor dem Beginn)", "error");
+              return;
+            }
+            payload.end_date = data.cancel_end;
+            payload.cancelled_on = data.cancel_end < today() ? data.cancel_end : today();
+          }
           if (predecessor) payload.predecessor_id = predecessor.id;
           payload.document_ids = attachments.map((a) => a.id);
           result = await api.createContract(payload);
@@ -396,5 +413,48 @@ const CATEGORY_HINTS = [
 function guessCategory(text) {
   const hit = CATEGORY_HINTS.find(([, re]) => re.test(text || ""));
   return hit ? hit[0] : null;
+}
+
+function addMonths(iso, months) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  t.setUTCDate(Math.min(d, last));
+  return t.toISOString().slice(0, 10);
+}
+
+function addDays(iso, days) {
+  const t = new Date(`${iso}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + days);
+  return t.toISOString().slice(0, 10);
+}
+
+/** End of the term a contract signed on `start` is in today: minimum term, then renewals. */
+export function suggestedEnd(start, minTerm, renewal) {
+  const min = Number(minTerm) || 0;
+  const step = Number(renewal) || 1;
+  if (!start) return null;
+  let months = min || step;
+  let end = addDays(addMonths(start, months), -1);
+  while (end < today() && months < 1200) {
+    months += step;
+    end = addDays(addMonths(start, months), -1);
+  }
+  return end;
+}
+
+/** "Schon gekündigt": show the end date, prefilled with the end of the current term. */
+function bindAlreadyCancelled(form) {
+  const box = form.querySelector("#already-cancelled");
+  if (!box) return;
+  const fields = form.querySelector("#cancel-fields");
+  const end = form.querySelector("[name=cancel_end]");
+  box.addEventListener("change", () => {
+    fields.hidden = !box.checked;
+    if (box.checked && !end.value) {
+      const v = (name) => form.querySelector(`[name=${name}]`)?.value;
+      end.value = suggestedEnd(v("start_date"), v("min_term_months"), v("renewal_months")) || "";
+    }
+  });
 }
 

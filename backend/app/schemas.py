@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .categories import CATEGORY_KEYS, INTERVALS
 
@@ -72,6 +72,8 @@ class ContractBase(BaseModel):
     notes: str | None = None
     reminder_days: int | None = Field(default=30, ge=0, le=365)
     share_percent: int | None = Field(default=None, ge=0, le=100)
+    partner_amount: float | None = Field(default=None, ge=0, le=1_000_000)
+    account: str | None = Field(default=None, max_length=60)
     cancellation_confirmed_on: date | None = None
     tax_relevant: bool | None = None
     withdrawal_until: date | None = None
@@ -88,6 +90,22 @@ class ContractBase(BaseModel):
     @classmethod
     def _icon(cls, v: str | None) -> str | None:
         return clean_icon(v)
+
+    @field_validator("account")
+    @classmethod
+    def _account(cls, v: str | None) -> str | None:
+        # empty or "Mein Konto" = the own account
+        v = (v or "").strip()
+        return None if not v or v.lower() in ("mein konto", "eigenes konto") else v
+
+    @model_validator(mode="after")
+    def _one_kind_of_share(self):
+        # either a percentage or the partner's fixed amount, not both
+        if not self.partner_amount:
+            self.partner_amount = None
+        else:
+            self.share_percent = None
+        return self
 
 
 class ContractCreate(ContractBase):
@@ -132,6 +150,8 @@ class ContractSummary(ORM):
     cancellation_deadline: date | None
     monthly_cancellable: bool = False
     share_percent: int | None = None
+    partner_amount: float | None = None
+    account: str | None = None
     full_monthly_cost: float = 0
     tax_relevant: bool = False
     cancellation_confirmed_on: date | None = None

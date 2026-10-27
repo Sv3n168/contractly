@@ -1,9 +1,10 @@
 // Cost history and projection ("Hochrechnung").
 
 import { api } from "../api.js";
-import { legendHtml, lines, stackedBars } from "../charts.js";
-import { GROUPS, catColor, contractIcon, catLabel, cssVar, groupOf, slotColor } from "../store.js";
-import { $, esc, fmtMonth, icon, isoDate, money } from "../ui.js";
+import { chartHint, legendHtml, lines, showLast, stackedBars } from "../charts.js";
+import { GROUPS, catColor, contractIcon, catLabel, cssVar, groupOf, slotColor, state } from "../store.js";
+import { accountSwitch, otherAccounts } from "./components.js";
+import { $, esc, fmtMonth, icon, money } from "../ui.js";
 
 const prefs = { range: 24, group: "category", months: 24, increase: 3, extras: true };
 
@@ -17,8 +18,11 @@ function fold(series, months) {
 }
 
 export async function renderCosts(view) {
+  const accounts = otherAccounts(await api.contracts());
+  if (!accounts.includes(state.account) && state.account !== "all") state.account = "own";
   view.innerHTML = `
-    <div class="page-head"><div><h1>Kosten & Prognose</h1><p>Was haben deine Verträge gekostet – und was kommt auf dich zu?</p></div></div>
+    <div class="page-head"><div><h1>Kosten & Prognose</h1><p>Was haben deine Verträge gekostet – und was kommt auf dich zu?</p></div>
+      ${accountSwitch(accounts, state.account)}</div>
     <div class="card" style="margin-bottom:20px">
       <div class="card-head">
         <div><h2>Kostenverlauf</h2><p>Tatsächliche Monatskosten inkl. Einmalzahlungen</p></div>
@@ -28,6 +32,7 @@ export async function renderCosts(view) {
         </div>
       </div>
       <div class="chart-box lg"><canvas id="hist"></canvas></div>
+      ${chartHint()}
       <div id="hist-legend"></div>
     </div>
 
@@ -51,18 +56,16 @@ export async function renderCosts(view) {
       <div class="card"><div class="card-head"><div><h2>Je Vertrag</h2><p>Kosten im Prognosezeitraum</p></div></div><div id="per-contract" class="list"></div></div>
     </div>`;
 
+  let history = null;
   const markActive = () => {
     view.querySelectorAll("#group button").forEach((b) => b.classList.toggle("active", b.dataset.g === prefs.group));
     view.querySelectorAll("#range button").forEach((b) => b.classList.toggle("active", Number(b.dataset.r) === prefs.range));
   };
   const drawHistory = async () => {
     markActive();
-    const now = new Date();
-    const params = { group: prefs.group };
-    if (prefs.range) params.start = isoDate(new Date(now.getFullYear(), now.getMonth() - prefs.range + 1, 1)).slice(0, 7);
-    else params.start = "2000-01";
-    const ts = await api.timeseries(params);
-    // Trim leading empty months for "Alles".
+    // always the whole history; the range buttons only choose the visible part
+    const ts = await api.timeseries({ group: prefs.group, start: "2000-01", account: state.account });
+    // Trim leading empty months.
     let first = ts.totals.findIndex((v) => v);
     if (first < 0) first = 0;
     const months = ts.months.slice(first);
@@ -76,12 +79,18 @@ export async function renderCosts(view) {
         series.push({ label: `Weitere (${rest.length})`, color: cssVar("--muted"), values: ts.months.map((_, i) => rest.reduce((sum, s) => sum + s.values[i], 0)) });
     }
     series = series.map((s) => ({ ...s, values: s.values.slice(first) }));
-    stackedBars($("#hist", view), months, series);
+    history = stackedBars($("#hist", view), months, series, { window: prefs.range || months.length });
     $("#hist-legend", view).innerHTML = legendHtml(series.map((s) => ({ label: esc(s.label), color: s.color })));
   };
 
   const drawProjection = async () => {
-    const p = await api.projection({ months: prefs.months, increase_pct: prefs.increase, group: "contract", include_extras: prefs.extras });
+    const p = await api.projection({
+      months: prefs.months,
+      increase_pct: prefs.increase,
+      group: "contract",
+      include_extras: prefs.extras,
+      account: state.account,
+    });
     $("#x-out", view).textContent = p.extras_monthly ? `(≈ ${money(p.extras_monthly)}/Monat)` : "(bisher keine)";
     const extra = p.sum - p.sum_without_increase;
     $("#proj-kpis", view).innerHTML = `
@@ -91,7 +100,13 @@ export async function renderCosts(view) {
         <div class="kpi-sub">bei ${prefs.increase} % p.a.</div></div>
       <div class="card kpi"><div class="kpi-label">Letzter Monat</div><div class="kpi-value num">${money(p.totals[p.totals.length - 1])}</div>
         <div class="kpi-sub">${fmtMonth(p.months[p.months.length - 1])}</div></div>`;
-    const base = await api.projection({ months: prefs.months, increase_pct: 0, group: "contract", include_extras: prefs.extras });
+    const base = await api.projection({
+      months: prefs.months,
+      increase_pct: 0,
+      group: "contract",
+      include_extras: prefs.extras,
+      account: state.account,
+    });
     lines($("#proj", view), p.months, [
       { label: `Mit ${prefs.increase} % Steigerung`, values: p.totals, color: slotColor(1), fill: true },
       { label: "Ohne Steigerung", values: base.totals, color: cssVar("--muted"), dash: true },
@@ -122,6 +137,14 @@ export async function renderCosts(view) {
       .join("");
   };
 
+  view.querySelector(".account-switch")?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-account]");
+    if (!b) return;
+    state.account = b.dataset.account;
+    view.querySelectorAll(".account-switch button").forEach((x) => x.classList.toggle("active", x === b));
+    drawHistory();
+    drawProjection();
+  });
   view.querySelector("#group").addEventListener("click", (e) => {
     const b = e.target.closest("[data-g]");
     if (b) {
@@ -133,7 +156,8 @@ export async function renderCosts(view) {
     const b = e.target.closest("[data-r]");
     if (b) {
       prefs.range = Number(b.dataset.r);
-      drawHistory();
+      markActive();
+      if (history) showLast(history, prefs.range);
     }
   });
   let t;

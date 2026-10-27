@@ -37,11 +37,15 @@ export async function renderContracts(view) {
   const counts = {};
   running.forEach((c) => (counts[c.category] = (counts[c.category] || 0) + 1));
   const usedCats = state.meta.categories.filter((c) => counts[c.key]);
-  const monthly = running.reduce((s, c) => s + c.monthly_cost, 0);
+  // the own costs; contracts on another account (joint account …) are mentioned separately
+  const monthly = running.filter((c) => !c.account).reduce((s, c) => s + c.monthly_cost, 0);
+  const elsewhere = running.filter((c) => c.account).reduce((s, c) => s + c.monthly_cost, 0);
 
   view.innerHTML = `
     <div class="page-head">
-      <div><h1>Verträge</h1><p>${running.length} laufend · ${money(monthly)} im Monat · ${money(monthly * 12, true)} im Jahr</p></div>
+      <div><h1>Verträge</h1><p>${running.length} laufend · ${money(monthly)} im Monat · ${money(monthly * 12, true)} im Jahr${
+        elsewhere ? ` · zzgl. ${money(elsewhere)} über andere Konten` : ""
+      }</p></div>
       <div class="page-actions"><a class="btn" href="#/import">${icon("upload")}<span class="label">Importieren</span></a>
         <a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a></div>
     </div>

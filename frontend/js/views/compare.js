@@ -282,7 +282,13 @@ function currentCard(c, ev) {
       <dt>Pro Jahr</dt><dd class="num">${money(ev.current_monthly * 12)}</dd>
       ${c.extras_12m ? `<dt>Ø Zusatzkosten</dt><dd class="num">${money(c.extras_12m / 12)}/M</dd>` : ""}
     </dl>
-    ${c.share_percent != null && c.share_percent !== 100 ? `<p class="small muted" style="margin:0">Verglichen werden die vollen Preise – dein Anteil sind ${c.share_percent} %.</p>` : ""}
+    ${
+      c.partner_amount
+        ? `<p class="small muted" style="margin:0">Verglichen werden die vollen Preise – Partner:in übernimmt ${money(c.partner_amount)} im Monat.</p>`
+        : c.share_percent != null && c.share_percent !== 100
+          ? `<p class="small muted" style="margin:0">Verglichen werden die vollen Preise – dein Anteil sind ${c.share_percent} %.</p>`
+          : ""
+    }
     ${c.extras_12m ? `<p class="small muted" style="margin:0">Zusatzkosten (z. B. Ausland) sind im Vergleich nicht eingerechnet – prüfe, ob das neue Angebot sie abdeckt.</p>` : ""}
   </div>`;
 }

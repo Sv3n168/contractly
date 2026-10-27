@@ -85,6 +85,9 @@ export async function renderDashboard(view) {
             : ""
         }
         ${summary.switch_savings > 0 ? `<div class="kpi-sub">${icon("piggy")} ${money(summary.switch_savings, true)} durch Wechsel gespart</div>` : ""}
+        ${(summary.other_accounts || [])
+          .map((a) => `<div class="kpi-sub">🏦 zzgl. ${money(a.monthly)} über ${esc(a.name)}</div>`)
+          .join("")}
       </div>
       <div class="card">
         <div class="card-head">

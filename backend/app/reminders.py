@@ -385,11 +385,11 @@ def refresh_outbox(user_id: str) -> None:
 
 
 def _summary(user_id: str, items: list[dict]) -> dict:
-    from .services import contract_summary, load_contracts
+    from .services import contract_summary, load_contracts, on_account
 
     ref = date.today()
     with database.session(user_id) as db:
-        summaries = [contract_summary(c, ref) for c in load_contracts(db)]
+        summaries = [contract_summary(c, ref) for c in on_account(load_contracts(db))]
     running = [s for s in summaries if s.state in ("active", "cancelled")]
     monthly = round(sum(s.monthly_cost for s in running), 2)
     upcoming = [i for i in items if i["date"] >= ref.isoformat()]

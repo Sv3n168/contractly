@@ -1,7 +1,7 @@
 // Chart.js helpers that follow the app's design tokens (light/dark aware).
 
 import { cssVar } from "./store.js";
-import { fmtMonth, money } from "./ui.js";
+import { fmtMonth, icon, money } from "./ui.js";
 
 const registry = new WeakMap();
 
@@ -56,7 +56,43 @@ function mount(canvas, config) {
   registry.get(canvas)?.destroy();
   const chart = new Chart(canvas, config);
   registry.set(canvas, chart);
+  // Pan sideways with a finger, but let vertical swipes scroll the page (and pinch zoom the chart).
+  if (config.options?.plugins?.zoom) {
+    canvas.style.touchAction = "pan-y";
+    canvas.classList.add("explorable");
+  }
   return chart;
+}
+
+/** How to move through an explorable chart – worded for touch or mouse. */
+export function chartHint() {
+  return `<p class="chart-hint">${icon("move")}
+    <span class="hint-touch">Wischen zum Verschieben · mit zwei Fingern zoomen</span>
+    <span class="hint-mouse">Ziehen zum Verschieben · Strg + Mausrad zum Zoomen</span></p>`;
+}
+
+/**
+ * Make a monthly chart explorable: drag/swipe to move through time, pinch or Ctrl + wheel
+ * (trackpad pinch) to zoom. Starts with the last `window` months of all loaded months.
+ */
+function explorable(opts, count, window) {
+  opts.plugins.zoom = {
+    pan: { enabled: true, mode: "x", threshold: 6 },
+    zoom: { mode: "x", wheel: { enabled: true, modifierKey: "ctrl" }, pinch: { enabled: true } },
+    // bounds are the first and last month loaded ("original" would be the initial window)
+    limits: { x: { min: 0, max: count - 1, minRange: 2 } },
+  };
+  if (window && count > window) {
+    opts.scales.x.min = count - window;
+    opts.scales.x.max = count - 1;
+  }
+}
+
+/** Show the last `months` months (0 = all) of an explorable chart. */
+export function showLast(chart, months) {
+  const count = chart.data.labels.length;
+  const min = !months || months >= count ? 0 : count - months;
+  chart.zoomScale("x", { min, max: count - 1 }, "default");
 }
 
 const totalFooter = (items) => {
@@ -65,8 +101,9 @@ const totalFooter = (items) => {
 };
 
 /** Stacked monthly bars. series: [{label, color, values}] */
-export function stackedBars(canvas, months, series, { highlightFrom = null } = {}) {
+export function stackedBars(canvas, months, series, { highlightFrom = null, window = 0 } = {}) {
   const opts = base();
+  if (window) explorable(opts, months.length, window);
   opts.scales.x.stacked = true;
   opts.scales.y.stacked = true;
   opts.plugins.tooltip.callbacks.footer = totalFooter;
@@ -212,8 +249,9 @@ export function legendHtml(items) {
  * Income per month (regular + one-off payments, stacked) against the fixed costs as a line –
  * one euro axis, so the gap between bar and line is what is left.
  */
-export function incomeChart(canvas, months, { regular, oneOff, costs }) {
+export function incomeChart(canvas, months, { regular, oneOff, costs }, { window = 24 } = {}) {
   const opts = base();
+  explorable(opts, months.length, window);
   opts.scales.x.stacked = true;
   // bonuses sit on top of the regular income; the cost line is its own stack
   opts.scales.y.stacked = true;

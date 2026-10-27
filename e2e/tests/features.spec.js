@@ -150,3 +150,44 @@ test("settings: 'Alle Daten löschen' only fires after typing the confirmation w
   await expect(page).toHaveURL(/#\/$/);
   check();
 });
+
+test("charts: whole history loaded, last two years shown, drag to go back, 'Alles' shows everything", async ({ page }) => {
+  const check = watchErrors(page);
+  // a contract with four years of history
+  const start = `${new Date().getFullYear() - 4}-01-01`;
+  await page.request.post("/api/contracts", {
+    data: { name: "Altvertrag", category: "other", start_date: start, initial_price: { valid_from: start, amount: 20 } },
+  });
+  await page.goto("/#/costs");
+  const state = () =>
+    page.evaluate(() => {
+      const c = Chart.getChart(document.getElementById("hist"));
+      if (!c) return { count: 0, min: 0, max: 0 };
+      return { count: c.data.labels.length, min: Math.round(c.scales.x.min), max: Math.round(c.scales.x.max) };
+    });
+  await expect.poll(async () => (await state()).count).toBeGreaterThan(40);
+  let s = await state();
+  expect(s.max - s.min + 1).toBe(24);
+  expect(s.max).toBe(s.count - 1);
+  // drag to the right = back in time
+  const box = await page.locator("#hist").boundingBox();
+  await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width * 0.8, box.y + box.height / 2, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(async () => (await state()).max).toBeLessThan(s.max);
+  await page.click("#range [data-r='0']");
+  await expect.poll(async () => (await state()).min).toBe(0);
+  s = await state();
+  expect(s.max).toBe(s.count - 1);
+
+  await page.goto("/#/income");
+  await page.click("#income-range [data-r='12']");
+  await page.waitForTimeout(300);
+  const inc = await page.evaluate(() => {
+    const c = Chart.getChart(document.getElementById("income-chart"));
+    return { count: c.data.labels.length, min: Math.round(c.scales.x.min), max: Math.round(c.scales.x.max) };
+  });
+  expect(inc.max - inc.min + 1).toBe(12);
+  check();
+});

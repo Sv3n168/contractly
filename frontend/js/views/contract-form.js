@@ -159,7 +159,13 @@ export async function renderContractForm(view, id, query = {}) {
             editing
               ? ""
               : `<label class="check small" style="margin-top:14px"><input type="checkbox" name="withdrawal" checked/>
-                  Gerade erst abgeschlossen? An die 14-tägige Widerrufsfrist erinnern</label>`
+                  Gerade erst abgeschlossen? An die 14-tägige Widerrufsfrist erinnern</label>
+                <label class="check small" style="margin-top:8px"><input type="checkbox" name="already_cancelled" id="already-cancelled"/>
+                  Schon gekündigt – der Vertrag endet zu einem festen Datum</label>
+                <div class="form-grid" id="cancel-fields" hidden style="margin-top:10px">
+                  <label class="field"><span>Gekündigt zum</span><input type="date" name="cancel_end"/>
+                    <small>Letzter Vertragstag – danach entstehen keine Kosten und keine Verlängerung mehr.</small></label>
+                </div>`
           }
           ${
             isEnergy(cat) && !editing
@@ -205,9 +211,22 @@ export async function renderContractForm(view, id, query = {}) {
         <details class="more" ${editing ? "open" : ""}>
           <summary>${icon("file")} Nummern, Kostenanteil & Notizen${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
-            <label class="field"><span>Mein Anteil</span><div class="input-group">
-              <input name="share_percent" type="number" min="0" max="100" value="${esc(src.share_percent ?? 100)}"/><span class="addon">%</span></div>
-              <small>z. B. 50, wenn Partner:in die Hälfte zahlt</small></label>
+            <div class="field share-field">
+              <span>Mein Anteil</span>
+              <div class="segmented" id="share-mode" role="group" aria-label="Anteil als">
+                <button type="button" data-mode="percent" class="${src.partner_amount ? "" : "active"}">Prozent</button>
+                <button type="button" data-mode="amount" class="${src.partner_amount ? "active" : ""}">Fester Betrag</button>
+              </div>
+              <div class="input-group" data-share="percent" ${src.partner_amount ? "hidden" : ""}>
+                <input name="share_percent" type="number" min="0" max="100" value="${esc(src.share_percent ?? 100)}" ${src.partner_amount ? "disabled" : ""}/><span class="addon">%</span></div>
+              <div class="input-group" data-share="amount" ${src.partner_amount ? "" : "hidden"}>
+                <input name="partner_amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="z. B. 20" value="${esc(src.partner_amount ?? "")}" ${src.partner_amount ? "" : "disabled"}/><span class="addon">€ / Monat</span></div>
+              <small data-share="percent" ${src.partner_amount ? "hidden" : ""}>z. B. 50, wenn Partner:in die Hälfte zahlt</small>
+              <small data-share="amount" ${src.partner_amount ? "" : "hidden"}>So viel übernimmt Partner:in jeden Monat – der Rest zählt als deine Kosten, auch wenn der Preis steigt.</small>
+            </div>
+            <label class="field"><span>Bezahlt über</span>
+              <input name="account" list="accounts" maxlength="60" autocomplete="off" placeholder="Mein Konto" value="${esc(src.account ?? pred.account ?? "")}"/>
+              <small>z. B. Gemeinschaftskonto – zählt dann nicht zu deinen eigenen Kosten</small></label>
             <label class="check" style="align-self:center"><input type="checkbox" name="tax_relevant" ${
               (src.tax_relevant ?? category(cat).tax_default) ? "checked" : ""
             }/> Steuerlich relevant</label>
@@ -230,7 +249,8 @@ export async function renderContractForm(view, id, query = {}) {
           <button class="btn btn-primary" type="submit" id="save">${icon("check")} ${editing ? "Speichern" : "Vertrag anlegen"}</button>
         </div>
       </form>
-      <datalist id="providers"></datalist>`;
+      <datalist id="providers"></datalist>
+      <datalist id="accounts"></datalist>`;
 
     $("#change-cat", view)?.addEventListener("click", drawCategoryStep);
     fillProviderList();
@@ -251,6 +271,8 @@ export async function renderContractForm(view, id, query = {}) {
     }
     const form = $("#form", view);
     bindIconPicker(form);
+    bindAlreadyCancelled(form);
+    bindShareMode(form);
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
       toast("Erkannte Daten übernommen – bitte kurz prüfen");
@@ -260,7 +282,8 @@ export async function renderContractForm(view, id, query = {}) {
       e.preventDefault();
       const data = formData(form);
       const payload = {
-        name: data.name || [data.provider, category(cat).label].filter(Boolean).join(" ") || category(cat).label,
+        // without an own name the contract is called like its provider; the category shows anyway
+        name: data.name || data.provider || category(cat).label,
         category: cat,
         icon: data.icon || null,
         provider: data.provider,
@@ -276,6 +299,8 @@ export async function renderContractForm(view, id, query = {}) {
         notes: data.notes,
         attributes: { ...(editing?.attributes || {}), ...collectAttributes(data) },
         share_percent: data.share_percent == null || data.share_percent === 100 ? null : data.share_percent,
+        partner_amount: data.partner_amount || null,
+        account: data.account || null,
         tax_relevant: data.tax_relevant === category(cat).tax_default ? null : data.tax_relevant,
         // keep values that this form doesn't edit
         cancellation_confirmed_on: editing?.cancellation_confirmed_on ?? null,
@@ -314,6 +339,16 @@ export async function renderContractForm(view, id, query = {}) {
             interval: data.price_interval || "monthly",
             details: energyDetails(payload.attributes),
           };
+          if (data.already_cancelled) {
+            if (!data.cancel_end || data.cancel_end < payload.start_date) {
+              busy(btn, false);
+              form.querySelector("[name=cancel_end]").focus();
+              toast("Bitte das Vertragsende angeben (nicht vor dem Beginn)", "error");
+              return;
+            }
+            payload.end_date = data.cancel_end;
+            payload.cancelled_on = data.cancel_end < today() ? data.cancel_end : today();
+          }
           if (predecessor) payload.predecessor_id = predecessor.id;
           payload.document_ids = attachments.map((a) => a.id);
           result = await api.createContract(payload);
@@ -355,6 +390,9 @@ async function fillProviderList() {
     const names = [...new Set(list.map((c) => c.provider).filter(Boolean))];
     const dl = document.getElementById("providers");
     if (dl) dl.innerHTML = names.map((n) => `<option value="${esc(n)}">`).join("");
+    const accounts = ["Gemeinschaftskonto", ...list.map((c) => c.account).filter(Boolean)];
+    const al = document.getElementById("accounts");
+    if (al) al.innerHTML = [...new Set(accounts)].map((n) => `<option value="${esc(n)}">`).join("");
   } catch {
     /* optional */
   }
@@ -396,5 +434,65 @@ const CATEGORY_HINTS = [
 function guessCategory(text) {
   const hit = CATEGORY_HINTS.find(([, re]) => re.test(text || ""));
   return hit ? hit[0] : null;
+}
+
+function addMonths(iso, months) {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + months, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  t.setUTCDate(Math.min(d, last));
+  return t.toISOString().slice(0, 10);
+}
+
+function addDays(iso, days) {
+  const t = new Date(`${iso}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + days);
+  return t.toISOString().slice(0, 10);
+}
+
+/** End of the term a contract signed on `start` is in today: minimum term, then renewals. */
+export function suggestedEnd(start, minTerm, renewal) {
+  const min = Number(minTerm) || 0;
+  const step = Number(renewal) || 1;
+  if (!start) return null;
+  let months = min || step;
+  let end = addDays(addMonths(start, months), -1);
+  while (end < today() && months < 1200) {
+    months += step;
+    end = addDays(addMonths(start, months), -1);
+  }
+  return end;
+}
+
+/** "Schon gekündigt": show the end date, prefilled with the end of the current term. */
+function bindAlreadyCancelled(form) {
+  const box = form.querySelector("#already-cancelled");
+  if (!box) return;
+  const fields = form.querySelector("#cancel-fields");
+  const end = form.querySelector("[name=cancel_end]");
+  box.addEventListener("change", () => {
+    fields.hidden = !box.checked;
+    if (box.checked && !end.value) {
+      const v = (name) => form.querySelector(`[name=${name}]`)?.value;
+      end.value = suggestedEnd(v("start_date"), v("min_term_months"), v("renewal_months")) || "";
+    }
+  });
+}
+
+/** "Mein Anteil" as a percentage or as the fixed amount the partner pays. */
+function bindShareMode(form) {
+  const group = form.querySelector("#share-mode");
+  if (!group) return;
+  group.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-mode]");
+    if (!b) return;
+    group.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+    form.querySelectorAll("[data-share]").forEach((el) => {
+      const on = el.dataset.share === b.dataset.mode;
+      el.hidden = !on;
+      el.querySelectorAll("input").forEach((i) => (i.disabled = !on));
+    });
+    form.querySelector(`[data-share="${b.dataset.mode}"] input`)?.focus();
+  });
 }
 

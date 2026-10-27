@@ -15,7 +15,7 @@ from ..models import AppSetting, IncomeSource
 from ..reminders import load_outbox, refresh_outbox
 from ..schemas import OfferOut, ProfileIn
 from ..security import vault
-from ..services import contract_detail, contract_summary, load_contracts, today
+from ..services import ALL_ACCOUNTS, OWN_ACCOUNT, contract_detail, contract_summary, load_contracts, on_account, today
 from .auth import current_user_id
 
 router = APIRouter(prefix="/api", tags=["stats"])
@@ -49,15 +49,22 @@ def put_profile(data: ProfileIn, db: Session = Depends(get_db)):
     return data
 
 
+ACCOUNT_QUERY = Query(OWN_ACCOUNT, max_length=60, description='"own" (default), "all" or an account name')
+
+
 @router.get("/stats/summary")
 def summary(
     deadline_days: int = Query(60, ge=1, le=365),
+    account: str = ACCOUNT_QUERY,
     db: Session = Depends(get_db),
 ):
     ref = today()
-    contracts = load_contracts(db)
-    summaries = [contract_summary(c, ref) for c in contracts]
-    running = [s for s in summaries if s.state in ("active", "cancelled")]
+    every = load_contracts(db)
+    # costs count for the chosen account only; deadlines and price changes concern every contract
+    contracts = on_account(every, account)
+    summaries = [contract_summary(c, ref) for c in every]
+    counted = {c.id for c in contracts}
+    running = [s for s in summaries if s.state in ("active", "cancelled") and s.id in counted]
 
     by_category: dict[str, dict] = {}
     for s in running:
@@ -108,7 +115,7 @@ def summary(
     deadlines.sort(key=lambda d: d["date"])
 
     price_changes = []
-    for c in contracts:
+    for c in every:
         prices = calc.recurring_prices(c)
         for prev, cur in zip(prices, prices[1:], strict=False):
             if ref - timedelta(days=180) <= cur.valid_from <= ref + timedelta(days=90):
@@ -134,7 +141,14 @@ def summary(
     top = sorted(running, key=lambda s: s.monthly_cost, reverse=True)[:5]
     sources = list(db.scalars(select(IncomeSource).options(selectinload(IncomeSource.entries))).unique())
     money_in = income.overview(sources, contracts, ref, months_back=12) if sources else None
+    # what runs over other accounts (e.g. a joint account), shown separately
+    others: dict[str, float] = defaultdict(float)
+    for c in every:
+        if c.account and calc.is_active_on(c, ref):
+            others[c.account] += calc.current_monthly_cost(c, ref)
     return {
+        "account": account,
+        "other_accounts": [{"name": k, "monthly": round(v, 2)} for k, v in sorted(others.items())],
         "income_monthly_net": money_in["monthly_net"] if money_in else None,
         "fixed_cost_ratio": money_in["fixed_cost_ratio"] if money_in else None,
         "free_monthly": money_in["free_monthly"] if money_in else None,
@@ -203,10 +217,11 @@ def timeseries(
     start: str | None = Query(None, description="YYYY-MM"),
     end: str | None = Query(None, description="YYYY-MM"),
     group: str = Query("category", pattern="^(category|contract)$"),
+    account: str = ACCOUNT_QUERY,
     db: Session = Depends(get_db),
 ):
     ref = today()
-    contracts = load_contracts(db)
+    contracts = on_account(load_contracts(db), account)
     if start:
         first = calc.parse_month(start)
     elif contracts:
@@ -225,11 +240,12 @@ def projection(
     increase_pct: float = Query(0.0, ge=-50, le=100),
     group: str = Query("category", pattern="^(category|contract)$"),
     include_extras: bool = Query(False, description="Add the average additional charges of the last 12 months"),
+    account: str = ACCOUNT_QUERY,
     db: Session = Depends(get_db),
 ):
     """Forecast of future costs based on current prices, known end dates and an optional yearly increase."""
     ref = today()
-    contracts = load_contracts(db)
+    contracts = on_account(load_contracts(db), account)
     first = calc.add_months(calc.month_start(ref), 1)
     last = calc.month_end(calc.add_months(first, months - 1))
     labels, series, totals = _series(contracts, first, last, group, increase_pct, ref, include_extras)
@@ -341,7 +357,7 @@ def home_assistant_summary(request: Request):
 # --------------------------------------------------------------------------- yearly report & tax export
 
 
-def _year_report(db: Session, year: int) -> dict:
+def _year_report(db: Session, year: int, account: str = OWN_ACCOUNT) -> dict:
     first, last = date(year, 1, 1), date(year, 12, 31)
     ref = today()
     rows = []
@@ -349,7 +365,7 @@ def _year_report(db: Session, year: int) -> dict:
     monthly = dict.fromkeys(months, 0.0)
     switches, price_changes = [], []
     extras_total = 0.0
-    for c in load_contracts(db):
+    for c in on_account(load_contracts(db), account):
         costs = calc.monthly_costs(c, first, min(last, ref) if year == ref.year else last, clip=True)
         total = round(sum(costs.values()), 2)
         for m, v in costs.items():
@@ -367,6 +383,7 @@ def _year_report(db: Session, year: int) -> dict:
                     "total": total,
                     "extras": round(extras, 2),
                     "share_percent": c.share_percent,
+                    "partner_amount": c.partner_amount,
                     "tax_relevant": tax_relevant(c.category, c.tax_relevant),
                     "contract_number": c.contract_number,
                 }
@@ -415,9 +432,11 @@ def _year_report(db: Session, year: int) -> dict:
 
 @router.get("/stats/report")
 def yearly_report(
-    year: int = Query(default_factory=lambda: today().year, ge=2000, le=2100), db: Session = Depends(get_db)
+    year: int = Query(default_factory=lambda: today().year, ge=2000, le=2100),
+    account: str = ACCOUNT_QUERY,
+    db: Session = Depends(get_db),
 ):
-    return _year_report(db, year)
+    return _year_report(db, year, account)
 
 
 @router.get("/stats/tax.csv")
@@ -427,7 +446,8 @@ def tax_export(
     db: Session = Depends(get_db),
 ):
     """Yearly sums for the tax return (Excel-friendly CSV, German number format)."""
-    report = _year_report(db, year)
+    # every account: a contract paid from a joint account can still be deductible
+    report = _year_report(db, year, ALL_ACCOUNTS)
     lines = [
         "Vertrag;Anbieter;Kategorie;Vertragsnummer;Eigener Anteil;Betrag " + str(year) + " (EUR);Steuerlich relevant"
     ]
@@ -441,7 +461,11 @@ def tax_export(
             r["provider"] or "",
             CATEGORY_MAP.get(r["category"], {}).get("label", r["category"]),
             r["contract_number"] or "",
-            f"{r['share_percent'] or 100} %",
+            (
+                f"abzgl. {r['partner_amount']:.2f} €/Monat Partner".replace(".", ",")
+                if r.get("partner_amount")
+                else f"{r['share_percent'] or 100} %"
+            ),
             f"{r['total']:.2f}".replace(".", ","),
             "ja" if r["tax_relevant"] else "nein",
         ]

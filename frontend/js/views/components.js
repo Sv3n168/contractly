@@ -45,6 +45,39 @@ export function deadlineHint(c) {
   return "";
 }
 
+/** Under the name: the provider – or the category when the contract is just named after the provider. */
+function subtitle(c) {
+  return c.provider && c.provider.trim() !== c.name.trim() ? c.provider : catLabel(c.category);
+}
+
+/** Own share: a percentage, or the partner's fixed monthly amount. */
+export function shareText(c) {
+  if (c.partner_amount) return `Partner:in zahlt ${money(c.partner_amount)}`;
+  if (c.share_percent != null && c.share_percent !== 100) return `Anteil ${c.share_percent} %`;
+  return "";
+}
+
+function shareBadge(c) {
+  const t = shareText(c);
+  return `${t ? `<span class="badge info">${esc(t)}</span>` : ""}${
+    c.account ? `<span class="badge" title="Bezahlt über ${esc(c.account)}">🏦 ${esc(c.account)}</span>` : ""
+  }`;
+}
+
+/** Accounts other than the own one that contracts are paid from. */
+export function otherAccounts(contracts) {
+  return [...new Set(contracts.map((c) => c.account).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
+}
+
+/** "Mein Konto | Gemeinschaftskonto | Alle" – only when some contract runs over another account. */
+export function accountSwitch(accounts, current) {
+  if (!accounts.length) return "";
+  const options = [["own", "Mein Konto"], ...accounts.map((a) => [a, a]), ["all", "Alle"]];
+  return `<div class="segmented account-switch" role="group" aria-label="Konto">${options
+    .map(([v, l]) => `<button type="button" data-account="${esc(v)}" class="${v === current ? "active" : ""}">${esc(l)}</button>`)
+    .join("")}</div>`;
+}
+
 export function contractCard(c) {
   const price = c.current_price;
   const priceLine =
@@ -57,13 +90,13 @@ export function contractCard(c) {
       <div class="cat-icon" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
       <div class="cc-title">
         <h3>${esc(c.name)}</h3>
-        <div class="provider">${esc(c.provider || catLabel(c.category))}</div>
+        <div class="provider">${esc(subtitle(c))}</div>
       </div>
       ${c.state !== "active" ? stateBadge(c) : ""}
     </div>
     <div class="cc-price"><strong class="num">${money(c.monthly_cost)}</strong>${priceLine}</div>
     <div class="cc-meta">${c.current_price?.details?.kind === "pause" ? `<span class="badge warn">${icon("clock")} pausiert</span>` : ""}${
-      c.share_percent != null && c.share_percent !== 100 ? `<span class="badge info">Anteil ${c.share_percent} %</span>` : ""
+      shareBadge(c)
     }${attrChips(c)}${c.predecessor_id ? `<span class="badge info">${icon("swap")} gewechselt</span>` : ""}</div>
     <div class="cc-foot">
       ${deadlineHint(c) || `<span>seit ${fmtDate(c.start_date)}</span>`}
@@ -78,11 +111,11 @@ export function contractRow(c) {
   const sub = price && price.interval !== "monthly" ? `${money(price.amount)} ${intervalLabel(price.interval)}` : `${money(c.yearly_cost, true)}/Jahr`;
   const flags = `${c.state !== "active" ? stateBadge(c) : ""}${
     c.current_price?.details?.kind === "pause" ? `<span class="badge warn">${icon("clock")} pausiert</span>` : ""
-  }${c.share_percent != null && c.share_percent !== 100 ? `<span class="badge info">Anteil ${c.share_percent} %</span>` : ""}`;
+  }${shareBadge(c)}`;
   return `
   <a class="contract-row ${c.state === "ended" ? "ended" : ""}" href="#/contracts/${c.id}">
     <div class="cat-icon sm" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
-    <div class="cr-title"><b>${esc(c.name)}</b><span>${esc(c.provider || catLabel(c.category))}</span></div>
+    <div class="cr-title"><b>${esc(c.name)}</b><span>${esc(subtitle(c))}</span></div>
     <div class="cr-meta">${flags}${attrChips(c, 2)}</div>
     <div class="cr-deadline">${deadlineHint(c)}</div>
     <div class="cr-price"><b class="num">${money(c.monthly_cost)}</b><span class="num">${sub}</span></div>

@@ -3129,6 +3129,10 @@ canvas.explorable:active {
   }
 }
 
+.share-field .segmented {
+  align-self: flex-start;
+}
+
 /* ------------------------------------------------------------------ own emoji */
 
 .icon-picker {

@@ -100,6 +100,7 @@ export function contractPayload(c) {
   return {
     name: c.name,
     category: c.category,
+    icon: c.icon ?? null,
     provider: c.provider,
     provider_address: c.provider_address,
     customer_number: c.customer_number,
@@ -116,6 +117,7 @@ export function contractPayload(c) {
     notes: c.notes,
     predecessor_id: c.predecessor_id,
     share_percent: c.share_percent,
+    partner_amount: c.partner_amount ?? null,
     cancellation_confirmed_on: c.cancellation_confirmed_on,
     tax_relevant: c.tax_relevant,
     withdrawal_until: c.withdrawal_until,

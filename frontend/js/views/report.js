@@ -77,7 +77,7 @@ export async function renderReport(view, _m, query = {}) {
           .map(
             (c) => `<tr><td><b>${esc(c.name)}</b><div class="small muted">${esc(c.provider || "")}</div></td>
               <td class="hide-sm">${catIcon(c.category)} ${esc(catLabel(c.category))}</td>
-              <td class="r num hide-sm">${c.share_percent ?? 100} %</td>
+              <td class="r num hide-sm">${c.partner_amount ? `− ${money(c.partner_amount)}/M` : `${c.share_percent ?? 100} %`}</td>
               <td class="r num"><b>${money(c.total)}</b>${c.extras ? `<div class="small muted">inkl. ${money(c.extras)} extra</div>` : ""}</td>
               <td>${c.tax_relevant ? icon("check") : ""}</td></tr>`,
           )

@@ -36,6 +36,9 @@ class Contract(Base):
     reminder_days: Mapped[int | None] = mapped_column(Integer, default=30)
     # Own share of the costs in percent (e.g. 50 when a partner pays half); None = 100.
     share_percent: Mapped[int | None] = mapped_column(Integer)
+    # Alternatively a fixed monthly amount the partner pays (e.g. 20 € of the 95 € electricity);
+    # the own cost is the price minus that amount. Replaces share_percent when set.
+    partner_amount: Mapped[float | None] = mapped_column(Float)
     # Provider confirmed the cancellation (cancelled_on = cancellation sent).
     cancellation_confirmed_on: Mapped[date | None] = mapped_column(Date)
     # Relevant for the tax return; None = default of the category.

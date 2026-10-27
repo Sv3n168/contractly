@@ -165,6 +165,8 @@ async function overviewTab(el, c, reload) {
         <div class="kpi-sub">${
           c.current_price?.details?.kind === "pause"
             ? "pausiert – keine Kosten"
+            : c.partner_amount
+            ? `${money(c.full_monthly_cost)} abzgl. ${money(c.partner_amount)} von Partner:in`
             : c.share_percent != null && c.share_percent !== 100
             ? `dein Anteil ${c.share_percent} % von ${money(c.full_monthly_cost)}`
             : c.current_price && c.current_price.interval !== "monthly"

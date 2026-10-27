@@ -211,9 +211,19 @@ export async function renderContractForm(view, id, query = {}) {
         <details class="more" ${editing ? "open" : ""}>
           <summary>${icon("file")} Nummern, Kostenanteil & Notizen${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
-            <label class="field"><span>Mein Anteil</span><div class="input-group">
-              <input name="share_percent" type="number" min="0" max="100" value="${esc(src.share_percent ?? 100)}"/><span class="addon">%</span></div>
-              <small>z. B. 50, wenn Partner:in die Hälfte zahlt</small></label>
+            <div class="field share-field">
+              <span>Mein Anteil</span>
+              <div class="segmented" id="share-mode" role="group" aria-label="Anteil als">
+                <button type="button" data-mode="percent" class="${src.partner_amount ? "" : "active"}">Prozent</button>
+                <button type="button" data-mode="amount" class="${src.partner_amount ? "active" : ""}">Fester Betrag</button>
+              </div>
+              <div class="input-group" data-share="percent" ${src.partner_amount ? "hidden" : ""}>
+                <input name="share_percent" type="number" min="0" max="100" value="${esc(src.share_percent ?? 100)}" ${src.partner_amount ? "disabled" : ""}/><span class="addon">%</span></div>
+              <div class="input-group" data-share="amount" ${src.partner_amount ? "" : "hidden"}>
+                <input name="partner_amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="z. B. 20" value="${esc(src.partner_amount ?? "")}" ${src.partner_amount ? "" : "disabled"}/><span class="addon">€ / Monat</span></div>
+              <small data-share="percent" ${src.partner_amount ? "hidden" : ""}>z. B. 50, wenn Partner:in die Hälfte zahlt</small>
+              <small data-share="amount" ${src.partner_amount ? "" : "hidden"}>So viel übernimmt Partner:in jeden Monat – der Rest zählt als deine Kosten, auch wenn der Preis steigt.</small>
+            </div>
             <label class="check" style="align-self:center"><input type="checkbox" name="tax_relevant" ${
               (src.tax_relevant ?? category(cat).tax_default) ? "checked" : ""
             }/> Steuerlich relevant</label>
@@ -258,6 +268,7 @@ export async function renderContractForm(view, id, query = {}) {
     const form = $("#form", view);
     bindIconPicker(form);
     bindAlreadyCancelled(form);
+    bindShareMode(form);
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
       toast("Erkannte Daten übernommen – bitte kurz prüfen");
@@ -267,7 +278,8 @@ export async function renderContractForm(view, id, query = {}) {
       e.preventDefault();
       const data = formData(form);
       const payload = {
-        name: data.name || [data.provider, category(cat).label].filter(Boolean).join(" ") || category(cat).label,
+        // without an own name the contract is called like its provider; the category shows anyway
+        name: data.name || data.provider || category(cat).label,
         category: cat,
         icon: data.icon || null,
         provider: data.provider,
@@ -283,6 +295,7 @@ export async function renderContractForm(view, id, query = {}) {
         notes: data.notes,
         attributes: { ...(editing?.attributes || {}), ...collectAttributes(data) },
         share_percent: data.share_percent == null || data.share_percent === 100 ? null : data.share_percent,
+        partner_amount: data.partner_amount || null,
         tax_relevant: data.tax_relevant === category(cat).tax_default ? null : data.tax_relevant,
         // keep values that this form doesn't edit
         cancellation_confirmed_on: editing?.cancellation_confirmed_on ?? null,
@@ -455,6 +468,23 @@ function bindAlreadyCancelled(form) {
       const v = (name) => form.querySelector(`[name=${name}]`)?.value;
       end.value = suggestedEnd(v("start_date"), v("min_term_months"), v("renewal_months")) || "";
     }
+  });
+}
+
+/** "Mein Anteil" as a percentage or as the fixed amount the partner pays. */
+function bindShareMode(form) {
+  const group = form.querySelector("#share-mode");
+  if (!group) return;
+  group.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-mode]");
+    if (!b) return;
+    group.querySelectorAll("button").forEach((x) => x.classList.toggle("active", x === b));
+    form.querySelectorAll("[data-share]").forEach((el) => {
+      const on = el.dataset.share === b.dataset.mode;
+      el.hidden = !on;
+      el.querySelectorAll("input").forEach((i) => (i.disabled = !on));
+    });
+    form.querySelector(`[data-share="${b.dataset.mode}"] input`)?.focus();
   });
 }
 

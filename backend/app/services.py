@@ -80,6 +80,7 @@ def _summary_fields(c: Contract, ref: date) -> dict:
         "cancellation_deadline": terms.cancellation_deadline,
         "monthly_cancellable": terms.flexible,
         "share_percent": c.share_percent,
+        "partner_amount": c.partner_amount,
         "full_monthly_cost": round(_full_monthly(c, ref), 2),
         "tax_relevant": tax_relevant(c.category, c.tax_relevant),
         "cancellation_confirmed_on": c.cancellation_confirmed_on,

@@ -111,6 +111,7 @@ def switch_to_offer(contract_id: int, offer_id: int, data: SwitchIn, db: Session
         predecessor_id=old.id,
         # A shared contract usually stays shared; the tax setting is a property of the kind of contract.
         share_percent=old.share_percent,
+        partner_amount=old.partner_amount,
         tax_relevant=old.tax_relevant,
     )
     regular_from = data.switch_date

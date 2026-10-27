@@ -111,9 +111,23 @@ def is_active_on(contract: Contract, day: date) -> bool:
 
 
 def share(contract: Contract) -> float:
-    """Own share of the costs (e.g. 0.5 when a partner pays half)."""
+    """Own share of the costs (e.g. 0.5 when a partner pays half); 1 when the partner pays a fixed amount."""
+    if partner_amount(contract):
+        return 1.0
     pct = contract.share_percent
     return 1.0 if pct is None else max(0, min(pct, 100)) / 100
+
+
+def partner_amount(contract: Contract) -> float:
+    """Fixed monthly amount a partner pays towards the contract (0 if none)."""
+    return max(0.0, getattr(contract, "partner_amount", None) or 0.0)
+
+
+def own_monthly(contract: Contract, monthly: float) -> float:
+    """Own part of a monthly price: by percentage, or the price minus the partner's fixed amount."""
+    if partner_amount(contract):
+        return max(0.0, monthly - partner_amount(contract))
+    return monthly * share(contract)
 
 
 def current_monthly_cost(contract: Contract, today: date) -> float:
@@ -125,7 +139,7 @@ def current_monthly_cost(contract: Contract, today: date) -> float:
         # Contract not started billing yet but active: use the first known price.
         prices = recurring_prices(contract)
         p = prices[0] if prices else None
-    return monthly_equivalent(p.amount, p.interval) * share(contract) if p else 0.0
+    return own_monthly(contract, monthly_equivalent(p.amount, p.interval)) if p else 0.0
 
 
 def _segments(contract: Contract, until: date):
@@ -164,6 +178,7 @@ def monthly_costs(
     months. With ``clip`` the costs stop exactly at ``last`` instead of covering its whole month.
     """
     result = {month_key(m): 0.0 for m in iter_months(first, last)}
+    partner = partner_amount(contract)
     horizon_end = last if clip else month_end(last)
     for seg_from, seg_to, monthly in _segments(contract, horizon_end):
         for m in iter_months(max(seg_from, month_start(first)), seg_to):
@@ -173,10 +188,13 @@ def monthly_costs(
                 continue
             factor = overlap / m_last.day
             amount = monthly * factor
+            if today and m_first > today and increase_pct:
+                years = (m_first - today).days / 365.25
+                amount *= (1 + increase_pct / 100) ** years
+            if partner:
+                # the partner's fixed amount covers part of the regular price, never more than all of it
+                amount = max(0.0, amount - partner * factor)
             if today and m_first > today:
-                if increase_pct:
-                    years = (m_first - today).days / 365.25
-                    amount *= (1 + increase_pct / 100) ** years
                 amount += extra_monthly * factor
             key = month_key(m)
             if key in result:
@@ -433,7 +451,7 @@ def switch_savings(contract: Contract, today: date) -> float | None:
     old_price = price_at(pred, pred.end_date or contract.start_date)
     if old_price is None:
         return None
-    old_monthly = monthly_equivalent(old_price.amount, old_price.interval) * share(pred)
+    old_monthly = own_monthly(pred, monthly_equivalent(old_price.amount, old_price.interval))
     until = min(contract.end_date or today, today)
     if until < contract.start_date:
         return None

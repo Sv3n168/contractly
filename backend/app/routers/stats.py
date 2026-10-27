@@ -367,6 +367,7 @@ def _year_report(db: Session, year: int) -> dict:
                     "total": total,
                     "extras": round(extras, 2),
                     "share_percent": c.share_percent,
+                    "partner_amount": c.partner_amount,
                     "tax_relevant": tax_relevant(c.category, c.tax_relevant),
                     "contract_number": c.contract_number,
                 }
@@ -441,7 +442,11 @@ def tax_export(
             r["provider"] or "",
             CATEGORY_MAP.get(r["category"], {}).get("label", r["category"]),
             r["contract_number"] or "",
-            f"{r['share_percent'] or 100} %",
+            (
+                f"abzgl. {r['partner_amount']:.2f} €/Monat Partner".replace(".", ",")
+                if r.get("partner_amount")
+                else f"{r['share_percent'] or 100} %"
+            ),
             f"{r['total']:.2f}".replace(".", ","),
             "ja" if r["tax_relevant"] else "nein",
         ]

@@ -341,3 +341,11 @@ def test_report_average_for_future_year(client):
     )
     r = client.get(f"/api/stats/report?year={date.today().year + 1}").json()
     assert r["monthly_average"] == pytest.approx(r["total"] / 12, abs=0.01)
+
+
+def test_app_files_are_revalidated(anon_client):
+    """After an update browsers and proxies (Cloudflare) must not keep serving the old app."""
+    r = anon_client.get("/static/js/app.js")
+    assert r.status_code == 200
+    assert r.headers["cache-control"] == "no-cache"
+    assert anon_client.get("/").headers["cache-control"] == "no-cache"

@@ -191,3 +191,25 @@ test("charts: whole history loaded, last two years shown, drag to go back, 'Alle
   expect(inc.max - inc.min + 1).toBe(12);
   check();
 });
+
+test("costs: filter by payment interval, monthly reserve, when paid", async ({ page }) => {
+  const check = watchErrors(page);
+  const y = new Date().getFullYear() - 1;
+  await page.request.post("/api/contracts", {
+    data: { name: "Haftpflicht Jahr", category: "liability", start_date: `${y}-03-10`, initial_price: { valid_from: `${y}-03-10`, amount: 120, interval: "yearly" } },
+  });
+  await page.goto("/#/costs");
+  await page.click("#f-int [data-int='yearly']");
+  await expect(page.locator("#selection .kpi.hero")).toContainText("Monatliche Rücklage");
+  await expect(page.locator("#selection .list")).toContainText("Haftpflicht Jahr");
+  await expect(page.locator("#selection .list")).toContainText("nächste Zahlung");
+  // only yearly contracts in the history
+  await expect
+    .poll(() => page.evaluate(() => Chart.getChart(document.getElementById("hist"))?.data.datasets.length || 0))
+    .toBeGreaterThan(0);
+  await page.click("#f-mode [data-mode='paid']");
+  await expect(page.locator("#hist-sub")).toContainText("Fälligkeit");
+  await page.click("#f-reset");
+  await expect(page.locator("#selection")).toBeEmpty();
+  check();
+});

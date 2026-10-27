@@ -95,6 +95,7 @@ def _summary_fields(c: Contract, ref: date) -> dict:
         "share_percent": c.share_percent,
         "partner_amount": c.partner_amount,
         "account": c.account,
+        "max_total": c.max_total,
         "full_monthly_cost": round(_full_monthly(c, ref), 2),
         "tax_relevant": tax_relevant(c.category, c.tax_relevant),
         "cancellation_confirmed_on": c.cancellation_confirmed_on,
@@ -108,11 +109,14 @@ def contract_summary(c: Contract, ref: date | None = None) -> ContractSummary:
     return ContractSummary(**_summary_fields(c, ref or today()))
 
 
-def total_paid(c: Contract, ref: date) -> float:
-    last = min(c.end_date or ref, ref)
-    if last < c.start_date:
-        return 0.0
-    return round(sum(calc.monthly_costs(c, c.start_date, last, clip=True).values()), 2)
+def total_paid(c: Contract, ref: date, full: bool = False) -> float:
+    """Paid so far – the own part, or with ``full`` the whole contract (incl. a partner's part).
+
+    Counts the payments actually due by today (a monthly price from 01.09. paid on the 1st of each
+    month), not the costs spread over the days – that is what left the account."""
+    regular = sum(amount for _, amount in calc.payment_dates(c, ref, full=full))
+    once = sum(p.amount for p in c.prices if p.interval == "once" and p.valid_from <= ref)
+    return round(regular + once * (1.0 if full else calc.share(c)), 2)
 
 
 def _extras_fields(c: Contract, ref: date) -> dict:
@@ -143,6 +147,9 @@ def contract_detail(c: Contract, ref: date | None = None) -> ContractOut:
         meter_readings=[MeterReadingOut.model_validate(m) for m in c.meter_readings],
         reminders=[ReminderOut.model_validate(r) for r in c.reminders if r.done_at is None],
         total_paid=total_paid(c, ref),
+        full_total_paid=total_paid(c, ref, full=True),
+        payments=calc.payments_made(c, ref),
+        budget=calc.total_budget(c, ref),
         **_extras_fields(c, ref),
         switch_savings=calc.switch_savings(c, ref),
         energy=calc.energy_analysis(c, ref) if is_energy(c.category) else None,

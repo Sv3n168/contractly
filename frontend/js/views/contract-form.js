@@ -199,6 +199,9 @@ export async function renderContractForm(view, id, query = {}) {
             <label class="field"><span>Erinnern vor Frist</span><div class="input-group">
               <input name="reminder_days" type="number" min="0" value="${esc(editing ? src.reminder_days ?? "" : 30)}" placeholder="aus" /><span class="addon">Tage</span></div>
               <small>Leer lassen = keine Erinnerung</small></label>
+            <label class="field"><span>Gesamtsumme <span class="muted">(optional)</span></span><div class="input-group">
+              <input name="max_total" type="number" min="0" step="0.01" inputmode="decimal" placeholder="z. B. 19900" value="${esc(src.max_total ?? "")}"/><span class="addon">€</span></div>
+              <small>Fester Gesamtbetrag, z. B. Studiengebühren: Contractly sagt dir, wann er erreicht ist, wie hoch die letzte Zahlung sein muss – und warnt, wenn mehr bezahlt wurde.</small></label>
             ${
               editing
                 ? `<label class="field"><span>Vertragsende</span><input name="end_date" type="date" value="${esc(src.end_date ?? "")}" />
@@ -301,6 +304,7 @@ export async function renderContractForm(view, id, query = {}) {
         share_percent: data.share_percent == null || data.share_percent === 100 ? null : data.share_percent,
         partner_amount: data.partner_amount || null,
         account: data.account || null,
+        max_total: data.max_total || null,
         tax_relevant: data.tax_relevant === category(cat).tax_default ? null : data.tax_relevant,
         // keep values that this form doesn't edit
         cancellation_confirmed_on: editing?.cancellation_confirmed_on ?? null,

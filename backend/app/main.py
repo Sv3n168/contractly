@@ -139,6 +139,10 @@ def create_app(background: bool = True) -> FastAPI:
             response.headers.setdefault("Content-Security-Policy", CSP)
         if path.startswith("/api/"):
             response.headers.setdefault("Cache-Control", "no-store")
+        elif path.startswith("/static/"):
+            # Revalidate every time (cheap 304s): otherwise browsers and proxies like Cloudflare keep
+            # serving the old app for hours after an update.
+            response.headers.setdefault("Cache-Control", "no-cache")
         return response
 
     for r in (

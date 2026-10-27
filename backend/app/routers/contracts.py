@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from .. import calc
 from ..db import documents_dir, get_db
 from ..models import Contract, Document, MeterReading, PriceEntry
+from ..reminders import NO_CONFIRMATION
 from ..schemas import (
     CancelIn,
     ConfirmIn,
@@ -312,6 +313,16 @@ def confirm_cancellation(contract_id: int, data: ConfirmIn, db: Session = Depend
     if not c.cancelled_on:
         raise HTTPException(400, "Der Vertrag ist nicht gekündigt")
     c.cancellation_confirmed_on = data.confirmed_on or today()
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)
+
+
+@router.post("/{contract_id}/no-confirmation", response_model=ContractOut)
+def no_confirmation(contract_id: int, db: Session = Depends(get_db)):
+    """Not every provider confirms a cancellation: stop asking for it."""
+    c = get_contract(db, contract_id)
+    c.attributes = {**(c.attributes or {}), NO_CONFIRMATION: True}
     db.commit()
     db.refresh(c)
     return contract_detail(c)

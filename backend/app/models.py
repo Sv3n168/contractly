@@ -42,6 +42,9 @@ class Contract(Base):
     # Account the contract is paid from, e.g. "Gemeinschaftskonto"; None = the own account.
     # Contracts on another account don't count towards the own costs.
     account: Mapped[str | None] = mapped_column(String(60))
+    # Agreed total, e.g. tuition of 19,900 € paid monthly: tells when it is reached, how much the
+    # last payment has to be and warns when more was paid.
+    max_total: Mapped[float | None] = mapped_column(Float)
     # Provider confirmed the cancellation (cancelled_on = cancellation sent).
     cancellation_confirmed_on: Mapped[date | None] = mapped_column(Date)
     # Relevant for the tax return; None = default of the category.

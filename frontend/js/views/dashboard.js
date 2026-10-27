@@ -76,7 +76,7 @@ export async function renderDashboard(view) {
         <div class="kpi-sub">${money(summary.yearly_total, true)} im Jahr · ${summary.active_count} ${summary.active_count === 1 ? "Vertrag" : "Verträge"}</div>
         ${
           summary.fixed_cost_ratio != null
-            ? `<div class="kpi-sub"><a href="#/income" style="color:inherit"><b style="color:var(--emerald)">${Math.round(summary.fixed_cost_ratio * 100)} %</b> deines Nettos · ${money(summary.free_monthly, true)} bleiben</a></div>`
+            ? `<div class="kpi-sub"><a href="#/income" style="color:inherit"><b style="color:var(--money)">${Math.round(summary.fixed_cost_ratio * 100)} %</b> deines Nettos · ${money(summary.free_monthly, true)} bleiben</a></div>`
             : ""
         }
         ${

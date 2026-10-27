@@ -39,6 +39,31 @@ test("new contract that is already cancelled ends on the given date", async ({ p
   await page.click("#save");
   await expect(page.getByRole("heading", { name: "Jahresabo Zeitung" })).toBeVisible();
   await expect(page.locator(".detail-head .badge, .page-head .badge").first()).toContainText("Gekündigt");
+  // not every provider confirms – the hint can be dismissed
+  await expect(page.getByText("Bestätigung des Anbieters steht noch aus")).toBeVisible();
+  await page.click("#no-confirm-btn");
+  await expect(page.getByText("Bestätigung des Anbieters steht noch aus")).toHaveCount(0);
+  check();
+});
+
+test("agreed total: last payment is smaller, so the total comes out exactly", async ({ page }) => {
+  const check = watchErrors(page);
+  const d = new Date();
+  const start = new Date(Date.UTC(d.getFullYear(), d.getMonth() - 13, 1)).toISOString().slice(0, 10);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Streaming" }).click();
+  await page.fill("[name=name]", "Master");
+  await page.fill("[name=price_amount]", "1105");
+  await page.fill("[name=start_date]", start);
+  await page.click("summary:has-text('Laufzeit, Kündigung')");
+  await page.fill("[name=max_total]", "19900");
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Master" })).toBeVisible();
+  const card = page.locator(".budget-card");
+  await expect(card).toContainText("15.470,00 € von 19.900,00 € bezahlt");
+  await expect(card).toContainText("4 × 1.105,00 €");
+  await expect(card).toContainText("10,00 € statt 1.105,00 €");
+  await expect(page.locator(".kpi", { hasText: "Bisher bezahlt" })).toContainText("14 Buchungen");
   check();
 });
 
@@ -54,7 +79,8 @@ test("partner pays a fixed amount; a contract without own name is called like it
   await page.click("#save");
   await expect(page.getByRole("heading", { name: "Stadtwerke Musterstadt", exact: true })).toBeVisible();
   await expect(page.locator(".kpi.hero .kpi-value")).toContainText("75,00");
-  await expect(page.locator(".kpi.hero")).toContainText("abzgl. 20,00");
+  await expect(page.locator(".kpi.hero")).toContainText("Gesamt 95,00");
+  await expect(page.locator(".kpi.hero")).toContainText("Partner:in zahlt 20,00");
   await page.goto("/#/contracts");
   const row = page.locator(".contract-row", { hasText: "Stadtwerke Musterstadt" });
   // under the name the category instead of the provider a second time

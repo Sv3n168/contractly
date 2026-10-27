@@ -142,15 +142,158 @@ def current_monthly_cost(contract: Contract, today: date) -> float:
     return own_monthly(contract, monthly_equivalent(p.amount, p.interval)) if p else 0.0
 
 
+def _billing_end(contract: Contract, until: date) -> date:
+    end = contract.end_date or until
+    if contract.end_date is None and is_loan(contract.category):
+        end = loans.payoff_date(contract) or end  # no more payments once the loan is repaid
+    return min(end, until)
+
+
+def _price_spans(contract: Contract, until: date):
+    """Yield (price, from, to_inclusive) for the contract's recurring prices."""
+    prices = recurring_prices(contract)
+    if not prices:
+        return
+    end = _billing_end(contract, until)
+    for i, p in enumerate(prices):
+        seg_from = max(p.valid_from, contract.start_date)
+        seg_to = prices[i + 1].valid_from - timedelta(days=1) if i + 1 < len(prices) else end
+        seg_to = min(seg_to, end)
+        if i == 0 and p.valid_from > contract.start_date:
+            # The first price also covers the time before its valid_from date.
+            seg_from = contract.start_date
+        if seg_from <= seg_to:
+            yield p, seg_from, seg_to
+
+
+def payment_interval(contract: Contract, today: date) -> str | None:
+    """How the contract is paid now (or was paid last): monthly, quarterly, half_yearly, yearly."""
+    p = price_at(contract, today) or (recurring_prices(contract) or [None])[-1]
+    return p.interval if p else None
+
+
+def payment_dates(contract: Contract, until: date, full: bool = False):
+    """Yield (due_date, own_amount) for every recurring payment up to ``until``: the first when a price
+    starts, then every interval. A partner's fixed monthly amount covers the months of each interval."""
+    partner = 0.0 if full else partner_amount(contract)
+    factor = 1.0 if full else share(contract)
+    for p, seg_from, seg_to in _price_spans(contract, until):
+        months = INTERVALS.get(p.interval, {}).get("months") or 1
+        k = 0
+        while (due := add_months(seg_from, k * months)) <= seg_to:
+            k += 1
+            yield due, (max(0.0, p.amount - partner * months) if partner else p.amount * factor)
+
+
+def payments_made(contract: Contract, today: date) -> dict:
+    """Bookings so far (regular payments, plus one-off ones) and the next regular payment."""
+    regular = list(payment_dates(contract, today))
+    once = [p for p in contract.prices if p.interval == "once" and p.valid_from <= today]
+    upcoming = next(
+        (d for d, _ in payment_dates(contract, add_months(today, 13)) if d > today),
+        None,
+    )
+    return {
+        "count": len(regular) + len(once),
+        "regular_count": len(regular),
+        "first": regular[0][0] if regular else None,
+        "last": regular[-1][0] if regular else None,
+        "next": upcoming,
+    }
+
+
+def total_budget(contract: Contract, today: date) -> dict | None:
+    """Progress towards the agreed total (``max_total``), on whole amounts by due date.
+
+    Says how much is paid and open, how many regular payments are left, how much the last one has
+    to be so the total comes out exactly, and whether more than the total was paid (or would be
+    by the contract's end date)."""
+    total = getattr(contract, "max_total", None)
+    if not total:
+        return None
+    once = [p for p in contract.prices if p.interval == "once" and p.amount > 0]
+    paid = sum(a for _, a in payment_dates(contract, today, full=True))
+    paid += sum(p.amount for p in once if p.valid_from <= today)
+    left = round(total - paid, 2)
+    info: dict = {
+        "total": round(total, 2),
+        "paid": round(paid, 2),
+        "left": max(left, 0.0),
+        "over": max(-left, 0.0),
+        "exceeded": left < -0.005,
+        "percent": round(min(paid / total, 1) * 100, 1),
+        "regular_left": 0,
+        "regular_amount": None,
+        "last_regular_date": None,
+        "last_date": None,
+        "last_amount": None,
+        "planned_amount": None,
+        "projected_over": 0.0,
+        "short": 0.0,
+    }
+    if left <= 0.005:
+        return info
+    sum_ahead, regular = 0.0, []
+    future_once = sorted((p.valid_from, p.amount) for p in once if p.valid_from > today)
+    ahead = sorted(
+        [*(x for x in payment_dates(contract, add_months(today, 12 * 60), full=True) if x[0] > today), *future_once]
+    )
+    for due, amount in ahead:
+        if sum_ahead + amount >= left - 0.005:
+            rest = round(left - sum_ahead, 2)
+            info.update(last_date=due, last_amount=rest, planned_amount=amount)  # instead of amount
+            if contract.end_date and contract.end_date >= due:
+                after = sum(a for d, a in ahead if d > due) + (amount - rest)
+                info["projected_over"] = round(after, 2)
+            break
+        sum_ahead += amount
+        regular.append((due, amount))
+    else:
+        info["short"] = round(left - sum_ahead, 2)  # ends before the total is reached
+    info["regular_left"] = len(regular)
+    if regular:
+        info.update(last_regular_date=regular[-1][0], regular_amount=regular[-1][1])
+    return info
+
+
+def payments_by_month(
+    contract: Contract,
+    first: date,
+    last: date,
+    increase_pct: float = 0.0,
+    today: date | None = None,
+    full: bool = False,
+) -> dict[str, float]:
+    """Own payments in the months they fall due (a yearly price in one month, not spread over twelve).
+
+    The first payment of a price is due when it starts, then every interval; a partner's fixed
+    monthly amount covers the months of each interval.
+    """
+    result = {month_key(m): 0.0 for m in iter_months(first, last)}
+    factor = 1.0 if full else share(contract)
+    horizon_end = month_end(last)
+    for due, amount in payment_dates(contract, horizon_end, full):
+        if due < month_start(first):
+            continue
+        if today and due > today and increase_pct:
+            amount *= (1 + increase_pct / 100) ** ((due - today).days / 365.25)
+        key = month_key(due)
+        if key in result:
+            result[key] += amount
+    for p in contract.prices:
+        if p.interval == "once" and p.valid_from <= horizon_end:
+            key = month_key(p.valid_from)
+            if key in result:
+                result[key] += p.amount * factor
+    return {k: round(v, 2) for k, v in result.items()}
+
+
 def _segments(contract: Contract, until: date):
     """Yield (from, to_inclusive, monthly_amount) for the contract's recurring prices."""
     prices = recurring_prices(contract)
     if not prices:
         return
-    end = contract.end_date or until
-    if contract.end_date is None and is_loan(contract.category):
-        end = loans.payoff_date(contract) or end  # no more payments once the loan is repaid
-    end = min(end, until)
+    end = _billing_end(contract, until)
     for i, p in enumerate(prices):
         seg_from = max(p.valid_from, contract.start_date)
         seg_to = prices[i + 1].valid_from - timedelta(days=1) if i + 1 < len(prices) else end
@@ -170,15 +313,17 @@ def monthly_costs(
     today: date | None = None,
     clip: bool = False,
     extra_monthly: float = 0.0,
+    full: bool = False,
 ) -> dict[str, float]:
     """Own cost per month (prorated by days, times the own share) between ``first`` and ``last``.
 
     ``increase_pct`` applies a compounding yearly increase to months after ``today``
     (used for projections), ``extra_monthly`` adds expected additional charges to those
     months. With ``clip`` the costs stop exactly at ``last`` instead of covering its whole month.
+    ``full`` gives the whole contract's costs, ignoring the own share and a partner's amount.
     """
     result = {month_key(m): 0.0 for m in iter_months(first, last)}
-    partner = partner_amount(contract)
+    partner = 0.0 if full else partner_amount(contract)
     horizon_end = last if clip else month_end(last)
     for seg_from, seg_to, monthly in _segments(contract, horizon_end):
         for m in iter_months(max(seg_from, month_start(first)), seg_to):
@@ -204,7 +349,7 @@ def monthly_costs(
             key = month_key(p.valid_from)
             if key in result:
                 result[key] += p.amount
-    factor = share(contract)
+    factor = 1.0 if full else share(contract)
     return {k: round(v * factor, 2) for k, v in result.items()}
 
 

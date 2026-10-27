@@ -62,3 +62,15 @@ def test_projection_takes_the_filters(client):
     _contract(client, "Haftpflicht", "liability", 120, "yearly", f"{year - 1}-03-10")
     p = client.get("/api/stats/projection", params={"months": 12, "intervals": "yearly", "mode": "paid"}).json()
     assert p["sum"] == pytest.approx(120)
+
+
+def test_bookings_so_far(client):
+    from app.calc import add_months, month_start
+
+    start = month_start(add_months(date.today(), -23))  # e.g. 01.11.2024 when today is in October 2026
+    c = _contract(client, "Kredit", "other", 454, "monthly", start.isoformat())
+    detail = client.get(f"/api/contracts/{c['id']}").json()
+    assert detail["payments"]["count"] == 24
+    assert detail["payments"]["first"] == start.isoformat()
+    assert detail["payments"]["next"] == add_months(start, 24).isoformat()
+    assert detail["total_paid"] == pytest.approx(24 * 454, rel=0.03)

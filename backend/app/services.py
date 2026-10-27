@@ -145,6 +145,7 @@ def contract_detail(c: Contract, ref: date | None = None) -> ContractOut:
         reminders=[ReminderOut.model_validate(r) for r in c.reminders if r.done_at is None],
         total_paid=total_paid(c, ref),
         full_total_paid=total_paid(c, ref, full=True),
+        payments=calc.payments_made(c, ref),
         **_extras_fields(c, ref),
         switch_savings=calc.switch_savings(c, ref),
         energy=calc.energy_analysis(c, ref) if is_energy(c.category) else None,

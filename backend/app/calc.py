@@ -172,6 +172,36 @@ def payment_interval(contract: Contract, today: date) -> str | None:
     return p.interval if p else None
 
 
+def payment_dates(contract: Contract, until: date, full: bool = False):
+    """Yield (due_date, own_amount) for every recurring payment up to ``until``: the first when a price
+    starts, then every interval. A partner's fixed monthly amount covers the months of each interval."""
+    partner = 0.0 if full else partner_amount(contract)
+    factor = 1.0 if full else share(contract)
+    for p, seg_from, seg_to in _price_spans(contract, until):
+        months = INTERVALS.get(p.interval, {}).get("months") or 1
+        k = 0
+        while (due := add_months(seg_from, k * months)) <= seg_to:
+            k += 1
+            yield due, (max(0.0, p.amount - partner * months) if partner else p.amount * factor)
+
+
+def payments_made(contract: Contract, today: date) -> dict:
+    """Bookings so far (regular payments, plus one-off ones) and the next regular payment."""
+    regular = list(payment_dates(contract, today))
+    once = [p for p in contract.prices if p.interval == "once" and p.valid_from <= today]
+    upcoming = next(
+        (d for d, _ in payment_dates(contract, add_months(today, 13)) if d > today),
+        None,
+    )
+    return {
+        "count": len(regular) + len(once),
+        "regular_count": len(regular),
+        "first": regular[0][0] if regular else None,
+        "last": regular[-1][0] if regular else None,
+        "next": upcoming,
+    }
+
+
 def payments_by_month(
     contract: Contract,
     first: date,
@@ -186,23 +216,16 @@ def payments_by_month(
     monthly amount covers the months of each interval.
     """
     result = {month_key(m): 0.0 for m in iter_months(first, last)}
-    partner = 0.0 if full else partner_amount(contract)
     factor = 1.0 if full else share(contract)
     horizon_end = month_end(last)
-    for p, seg_from, seg_to in _price_spans(contract, horizon_end):
-        months = INTERVALS.get(p.interval, {}).get("months") or 1
-        k = 0
-        while (due := add_months(seg_from, k * months)) <= seg_to:
-            k += 1
-            if due < month_start(first):
-                continue
-            amount = p.amount
-            if today and due > today and increase_pct:
-                amount *= (1 + increase_pct / 100) ** ((due - today).days / 365.25)
-            amount = max(0.0, amount - partner * months) if partner else amount * factor
-            key = month_key(due)
-            if key in result:
-                result[key] += amount
+    for due, amount in payment_dates(contract, horizon_end, full):
+        if due < month_start(first):
+            continue
+        if today and due > today and increase_pct:
+            amount *= (1 + increase_pct / 100) ** ((due - today).days / 365.25)
+        key = month_key(due)
+        if key in result:
+            result[key] += amount
     for p in contract.prices:
         if p.interval == "once" and p.valid_from <= horizon_end:
             key = month_key(p.valid_from)

@@ -185,7 +185,13 @@ async function overviewTab(el, c, reload) {
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("layers")}</span>Bisher bezahlt</div>
         <div class="kpi-value num">${money(c.total_paid, true)}</div><div class="kpi-sub">${
           shared ? `Gesamt ${money(c.full_total_paid, true)} · ` : ""
-        }in ${durationText(Math.max(runtime, 0))} Laufzeit</div></div>
+        }${
+          c.payments?.count
+            ? `${c.payments.count} ${c.payments.count === 1 ? "Buchung" : "Buchungen"}${
+                c.payments.first ? ` seit ${fmtDate(c.payments.first)}` : ""
+              }${c.payments.next ? ` · nächste ${fmtDate(c.payments.next)}` : ""}`
+            : `in ${durationText(Math.max(runtime, 0))} Laufzeit`
+        }</div></div>
       ${
         c.loan?.balance != null
           ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("trendDown")}</span>Restschuld</div>

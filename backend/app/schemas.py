@@ -180,6 +180,8 @@ class ContractOut(ContractSummary):
     reminders: list["ReminderOut"] = []
     total_paid: float = 0
     full_total_paid: float = 0
+    # bookings so far: count, regular_count, first, last, next (due dates)
+    payments: dict[str, Any] | None = None
     extras_12m: float = 0
     extras_months_12m: int = 0
     switch_savings: float | None = None

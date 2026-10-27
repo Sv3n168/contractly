@@ -59,7 +59,23 @@ export function shareText(c) {
 
 function shareBadge(c) {
   const t = shareText(c);
-  return t ? `<span class="badge info">${esc(t)}</span>` : "";
+  return `${t ? `<span class="badge info">${esc(t)}</span>` : ""}${
+    c.account ? `<span class="badge" title="Bezahlt über ${esc(c.account)}">🏦 ${esc(c.account)}</span>` : ""
+  }`;
+}
+
+/** Accounts other than the own one that contracts are paid from. */
+export function otherAccounts(contracts) {
+  return [...new Set(contracts.map((c) => c.account).filter(Boolean))].sort((a, b) => a.localeCompare(b, "de"));
+}
+
+/** "Mein Konto | Gemeinschaftskonto | Alle" – only when some contract runs over another account. */
+export function accountSwitch(accounts, current) {
+  if (!accounts.length) return "";
+  const options = [["own", "Mein Konto"], ...accounts.map((a) => [a, a]), ["all", "Alle"]];
+  return `<div class="segmented account-switch" role="group" aria-label="Konto">${options
+    .map(([v, l]) => `<button type="button" data-account="${esc(v)}" class="${v === current ? "active" : ""}">${esc(l)}</button>`)
+    .join("")}</div>`;
 }
 
 export function contractCard(c) {

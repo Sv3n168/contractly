@@ -3133,6 +3133,11 @@ canvas.explorable:active {
   align-self: flex-start;
 }
 
+/* "hidden" always wins over layout rules like .input-group { display: flex } */
+[hidden] {
+  display: none !important;
+}
+
 /* ------------------------------------------------------------------ own emoji */
 
 .icon-picker {

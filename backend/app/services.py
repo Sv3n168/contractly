@@ -34,6 +34,19 @@ def load_contracts(db: Session) -> list[Contract]:
     return list(db.scalars(stmt).unique())
 
 
+OWN_ACCOUNT = "own"
+ALL_ACCOUNTS = "all"
+
+
+def on_account(contracts: list[Contract], account: str | None = OWN_ACCOUNT) -> list[Contract]:
+    """Contracts paid from ``account``: "own" (no other account set), "all", or an account name."""
+    if account == ALL_ACCOUNTS:
+        return contracts
+    if not account or account == OWN_ACCOUNT:
+        return [c for c in contracts if not c.account]
+    return [c for c in contracts if (c.account or "").lower() == account.lower()]
+
+
 def price_out(p: PriceEntry) -> PriceOut:
     out = PriceOut.model_validate(p)
     out.monthly_equivalent = round(calc.monthly_equivalent(p.amount, p.interval), 2)
@@ -81,6 +94,7 @@ def _summary_fields(c: Contract, ref: date) -> dict:
         "monthly_cancellable": terms.flexible,
         "share_percent": c.share_percent,
         "partner_amount": c.partner_amount,
+        "account": c.account,
         "full_monthly_cost": round(_full_monthly(c, ref), 2),
         "tax_relevant": tax_relevant(c.category, c.tax_relevant),
         "cancellation_confirmed_on": c.cancellation_confirmed_on,

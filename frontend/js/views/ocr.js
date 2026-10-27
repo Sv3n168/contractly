@@ -118,6 +118,7 @@ export function contractPayload(c) {
     predecessor_id: c.predecessor_id,
     share_percent: c.share_percent,
     partner_amount: c.partner_amount ?? null,
+    account: c.account ?? null,
     cancellation_confirmed_on: c.cancellation_confirmed_on,
     tax_relevant: c.tax_relevant,
     withdrawal_until: c.withdrawal_until,

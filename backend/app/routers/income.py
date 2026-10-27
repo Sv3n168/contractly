@@ -11,7 +11,7 @@ from .. import income
 from ..db import get_db
 from ..models import IncomeEntry, IncomeSource
 from ..schemas import clean_icon
-from ..services import load_contracts, today
+from ..services import load_contracts, on_account, today
 
 router = APIRouter(prefix="/api/income", tags=["income"])
 
@@ -78,7 +78,7 @@ def get_income(db: Session = Depends(get_db)):
     first = min((s.start_date for s in sources), default=ref)
     months = (ref.year - first.year) * 12 + ref.month - first.month + 1
     return {
-        **income.overview(sources, load_contracts(db), ref, months_back=min(max(months, 24), 240)),
+        **income.overview(sources, on_account(load_contracts(db)), ref, months_back=min(max(months, 24), 240)),
         "sources": [income.source_out(s, ref) for s in sorted(sources, key=lambda s: (s.end_date is not None, s.name))],
     }
 

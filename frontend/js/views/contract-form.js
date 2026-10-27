@@ -224,6 +224,9 @@ export async function renderContractForm(view, id, query = {}) {
               <small data-share="percent" ${src.partner_amount ? "hidden" : ""}>z. B. 50, wenn Partner:in die Hälfte zahlt</small>
               <small data-share="amount" ${src.partner_amount ? "" : "hidden"}>So viel übernimmt Partner:in jeden Monat – der Rest zählt als deine Kosten, auch wenn der Preis steigt.</small>
             </div>
+            <label class="field"><span>Bezahlt über</span>
+              <input name="account" list="accounts" maxlength="60" autocomplete="off" placeholder="Mein Konto" value="${esc(src.account ?? pred.account ?? "")}"/>
+              <small>z. B. Gemeinschaftskonto – zählt dann nicht zu deinen eigenen Kosten</small></label>
             <label class="check" style="align-self:center"><input type="checkbox" name="tax_relevant" ${
               (src.tax_relevant ?? category(cat).tax_default) ? "checked" : ""
             }/> Steuerlich relevant</label>
@@ -246,7 +249,8 @@ export async function renderContractForm(view, id, query = {}) {
           <button class="btn btn-primary" type="submit" id="save">${icon("check")} ${editing ? "Speichern" : "Vertrag anlegen"}</button>
         </div>
       </form>
-      <datalist id="providers"></datalist>`;
+      <datalist id="providers"></datalist>
+      <datalist id="accounts"></datalist>`;
 
     $("#change-cat", view)?.addEventListener("click", drawCategoryStep);
     fillProviderList();
@@ -296,6 +300,7 @@ export async function renderContractForm(view, id, query = {}) {
         attributes: { ...(editing?.attributes || {}), ...collectAttributes(data) },
         share_percent: data.share_percent == null || data.share_percent === 100 ? null : data.share_percent,
         partner_amount: data.partner_amount || null,
+        account: data.account || null,
         tax_relevant: data.tax_relevant === category(cat).tax_default ? null : data.tax_relevant,
         // keep values that this form doesn't edit
         cancellation_confirmed_on: editing?.cancellation_confirmed_on ?? null,
@@ -385,6 +390,9 @@ async function fillProviderList() {
     const names = [...new Set(list.map((c) => c.provider).filter(Boolean))];
     const dl = document.getElementById("providers");
     if (dl) dl.innerHTML = names.map((n) => `<option value="${esc(n)}">`).join("");
+    const accounts = ["Gemeinschaftskonto", ...list.map((c) => c.account).filter(Boolean)];
+    const al = document.getElementById("accounts");
+    if (al) al.innerHTML = [...new Set(accounts)].map((n) => `<option value="${esc(n)}">`).join("");
   } catch {
     /* optional */
   }

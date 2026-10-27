@@ -56,7 +56,7 @@ export const api = {
   deleteUser: (id) => request("DELETE", `/api/users/${id}`),
 
   meta: () => request("GET", "/api/meta"),
-  summary: () => request("GET", "/api/stats/summary"),
+  summary: (params) => request("GET", `/api/stats/summary${qs(params || {})}`),
   timeseries: (params) => request("GET", `/api/stats/timeseries${qs(params)}`),
   projection: (params) => request("GET", `/api/stats/projection${qs(params)}`),
 
@@ -158,7 +158,7 @@ export const api = {
   },
   applyImport: (data) => request("POST", "/api/import/apply", data),
 
-  report: (year) => request("GET", `/api/stats/report${qs({ year })}`),
+  report: (year, account) => request("GET", `/api/stats/report${qs({ year, account })}`),
 
   totpSetup: () => request("POST", "/api/auth/2fa/setup"),
   totpEnable: (code) => request("POST", "/api/auth/2fa/enable", { code }),

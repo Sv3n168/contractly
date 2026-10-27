@@ -39,6 +39,9 @@ class Contract(Base):
     # Alternatively a fixed monthly amount the partner pays (e.g. 20 € of the 95 € electricity);
     # the own cost is the price minus that amount. Replaces share_percent when set.
     partner_amount: Mapped[float | None] = mapped_column(Float)
+    # Account the contract is paid from, e.g. "Gemeinschaftskonto"; None = the own account.
+    # Contracts on another account don't count towards the own costs.
+    account: Mapped[str | None] = mapped_column(String(60))
     # Provider confirmed the cancellation (cancelled_on = cancellation sent).
     cancellation_confirmed_on: Mapped[date | None] = mapped_column(Date)
     # Relevant for the tax return; None = default of the category.

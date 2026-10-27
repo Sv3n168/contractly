@@ -4,11 +4,14 @@ import { api } from "../api.js";
 import { stackedBars } from "../charts.js";
 import { catColorVar, catIcon, catLabel, slotColor, state } from "../store.js";
 import { $, esc, fmtDate, icon, money, signedMoney } from "../ui.js";
+import { accountSwitch, otherAccounts } from "./components.js";
 
 export async function renderReport(view, _m, query = {}) {
   const now = new Date().getFullYear();
   const year = Number(query.year) || now;
-  const r = await api.report(year);
+  const accounts = otherAccounts(await api.contracts());
+  if (!accounts.includes(state.account) && state.account !== "all") state.account = "own";
+  const r = await api.report(year, state.account);
   const name = state.profile?.name || state.user?.username || "";
   const maxCat = Math.max(...r.by_category.map((c) => c.total), 1);
 
@@ -23,9 +26,12 @@ export async function renderReport(view, _m, query = {}) {
         <button class="btn btn-primary" id="print">${icon("printer")}<span class="label">Drucken / PDF</span></button>
       </div>
     </div>
+    ${accounts.length ? `<div class="no-print" style="margin:-6px 0 18px">${accountSwitch(accounts, state.account)}</div>` : ""}
 
     <div class="kpis">
-      <div class="card kpi hero"><div class="kpi-label">Gesamtkosten ${year}</div><div class="kpi-value num">${money(r.total, true)}</div>
+      <div class="card kpi hero"><div class="kpi-label">Gesamtkosten ${year}${
+        state.account === "own" ? "" : state.account === "all" ? " · alle Konten" : ` · ${esc(state.account)}`
+      }</div><div class="kpi-value num">${money(r.total, true)}</div>
         <div class="kpi-sub">Ø ${money(r.monthly_average)} pro Monat</div></div>
       <div class="card kpi"><div class="kpi-label">Steuerlich relevant</div><div class="kpi-value num">${money(r.tax_total, true)}</div>
         <div class="kpi-sub">z. B. Versicherungen</div></div>
@@ -89,4 +95,10 @@ export async function renderReport(view, _m, query = {}) {
   stackedBars($("#report-chart", view), r.months, [{ label: "Kosten", color: slotColor(1), values: r.monthly }]);
   $("#year", view).addEventListener("change", (e) => (location.hash = `#/report?year=${e.target.value}`));
   $("#print", view).addEventListener("click", () => window.print());
+  view.querySelector(".account-switch")?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-account]");
+    if (!b) return;
+    state.account = b.dataset.account;
+    renderReport(view, _m, query);
+  });
 }

@@ -169,6 +169,22 @@ def summary(
     }
 
 
+INTERVALS_QUERY = Query(None, description="comma list: monthly,quarterly,half_yearly,yearly")
+CATEGORIES_QUERY = Query(None, description="comma list of category keys")
+MODE_QUERY = Query("spread", pattern="^(spread|paid)$", description="spread = per month, paid = when due")
+
+
+def _filtered(contracts, ref: date, intervals: str | None, categories: str | None):
+    """Only contracts paid in one of ``intervals`` and of one of ``categories`` (both optional)."""
+    wanted = {i for i in (intervals or "").split(",") if i}
+    cats = {c for c in (categories or "").split(",") if c}
+    return [
+        c
+        for c in contracts
+        if (not wanted or calc.payment_interval(c, ref) in wanted) and (not cats or c.category in cats)
+    ]
+
+
 def _series(
     contracts,
     first: date,
@@ -177,12 +193,19 @@ def _series(
     increase_pct: float = 0.0,
     ref: date | None = None,
     include_extras: bool = False,
+    mode: str = "spread",
 ):
     months = [calc.month_key(m) for m in calc.iter_months(first, last)]
     grouped: dict[str, dict] = {}
     for c in contracts:
         extra = calc.average_extras(c, ref) if include_extras and ref else 0.0
-        costs = calc.monthly_costs(c, first, last, increase_pct=increase_pct, today=ref, extra_monthly=extra)
+        if mode == "paid":
+            costs = calc.payments_by_month(c, first, last, increase_pct=increase_pct, today=ref)
+            if extra:  # expected additional charges are a monthly figure anyway
+                for m in calc.iter_months(max(first, calc.add_months(calc.month_start(ref), 1)), last):
+                    costs[calc.month_key(m)] = costs.get(calc.month_key(m), 0.0) + extra
+        else:
+            costs = calc.monthly_costs(c, first, last, increase_pct=increase_pct, today=ref, extra_monthly=extra)
         if not any(costs.values()):
             continue
         if group == "category":
@@ -218,10 +241,13 @@ def timeseries(
     end: str | None = Query(None, description="YYYY-MM"),
     group: str = Query("category", pattern="^(category|contract)$"),
     account: str = ACCOUNT_QUERY,
+    intervals: str | None = INTERVALS_QUERY,
+    categories: str | None = CATEGORIES_QUERY,
+    mode: str = MODE_QUERY,
     db: Session = Depends(get_db),
 ):
     ref = today()
-    contracts = on_account(load_contracts(db), account)
+    contracts = _filtered(on_account(load_contracts(db), account), ref, intervals, categories)
     if start:
         first = calc.parse_month(start)
     elif contracts:
@@ -230,7 +256,7 @@ def timeseries(
         first = calc.add_months(ref, -11)
     last = calc.month_end(calc.parse_month(end)) if end else calc.month_end(ref)
     first = calc.month_start(min(first, last))
-    months, series, totals = _series(contracts, first, last, group)
+    months, series, totals = _series(contracts, first, last, group, ref=ref, mode=mode)
     return {"months": months, "series": series, "totals": totals, "current_month": calc.month_key(ref)}
 
 
@@ -241,15 +267,18 @@ def projection(
     group: str = Query("category", pattern="^(category|contract)$"),
     include_extras: bool = Query(False, description="Add the average additional charges of the last 12 months"),
     account: str = ACCOUNT_QUERY,
+    intervals: str | None = INTERVALS_QUERY,
+    categories: str | None = CATEGORIES_QUERY,
+    mode: str = MODE_QUERY,
     db: Session = Depends(get_db),
 ):
     """Forecast of future costs based on current prices, known end dates and an optional yearly increase."""
     ref = today()
-    contracts = on_account(load_contracts(db), account)
+    contracts = _filtered(on_account(load_contracts(db), account), ref, intervals, categories)
     first = calc.add_months(calc.month_start(ref), 1)
     last = calc.month_end(calc.add_months(first, months - 1))
-    labels, series, totals = _series(contracts, first, last, group, increase_pct, ref, include_extras)
-    _, _, base_totals = _series(contracts, first, last, group, 0.0, ref, include_extras)
+    labels, series, totals = _series(contracts, first, last, group, increase_pct, ref, include_extras, mode)
+    _, _, base_totals = _series(contracts, first, last, group, 0.0, ref, include_extras, mode)
     yearly: dict[str, float] = defaultdict(float)
     for m, v in zip(labels, totals, strict=False):
         yearly[m[:4]] += v

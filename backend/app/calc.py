@@ -142,15 +142,81 @@ def current_monthly_cost(contract: Contract, today: date) -> float:
     return own_monthly(contract, monthly_equivalent(p.amount, p.interval)) if p else 0.0
 
 
+def _billing_end(contract: Contract, until: date) -> date:
+    end = contract.end_date or until
+    if contract.end_date is None and is_loan(contract.category):
+        end = loans.payoff_date(contract) or end  # no more payments once the loan is repaid
+    return min(end, until)
+
+
+def _price_spans(contract: Contract, until: date):
+    """Yield (price, from, to_inclusive) for the contract's recurring prices."""
+    prices = recurring_prices(contract)
+    if not prices:
+        return
+    end = _billing_end(contract, until)
+    for i, p in enumerate(prices):
+        seg_from = max(p.valid_from, contract.start_date)
+        seg_to = prices[i + 1].valid_from - timedelta(days=1) if i + 1 < len(prices) else end
+        seg_to = min(seg_to, end)
+        if i == 0 and p.valid_from > contract.start_date:
+            # The first price also covers the time before its valid_from date.
+            seg_from = contract.start_date
+        if seg_from <= seg_to:
+            yield p, seg_from, seg_to
+
+
+def payment_interval(contract: Contract, today: date) -> str | None:
+    """How the contract is paid now (or was paid last): monthly, quarterly, half_yearly, yearly."""
+    p = price_at(contract, today) or (recurring_prices(contract) or [None])[-1]
+    return p.interval if p else None
+
+
+def payments_by_month(
+    contract: Contract,
+    first: date,
+    last: date,
+    increase_pct: float = 0.0,
+    today: date | None = None,
+    full: bool = False,
+) -> dict[str, float]:
+    """Own payments in the months they fall due (a yearly price in one month, not spread over twelve).
+
+    The first payment of a price is due when it starts, then every interval; a partner's fixed
+    monthly amount covers the months of each interval.
+    """
+    result = {month_key(m): 0.0 for m in iter_months(first, last)}
+    partner = 0.0 if full else partner_amount(contract)
+    factor = 1.0 if full else share(contract)
+    horizon_end = month_end(last)
+    for p, seg_from, seg_to in _price_spans(contract, horizon_end):
+        months = INTERVALS.get(p.interval, {}).get("months") or 1
+        k = 0
+        while (due := add_months(seg_from, k * months)) <= seg_to:
+            k += 1
+            if due < month_start(first):
+                continue
+            amount = p.amount
+            if today and due > today and increase_pct:
+                amount *= (1 + increase_pct / 100) ** ((due - today).days / 365.25)
+            amount = max(0.0, amount - partner * months) if partner else amount * factor
+            key = month_key(due)
+            if key in result:
+                result[key] += amount
+    for p in contract.prices:
+        if p.interval == "once" and p.valid_from <= horizon_end:
+            key = month_key(p.valid_from)
+            if key in result:
+                result[key] += p.amount * factor
+    return {k: round(v, 2) for k, v in result.items()}
+
+
 def _segments(contract: Contract, until: date):
     """Yield (from, to_inclusive, monthly_amount) for the contract's recurring prices."""
     prices = recurring_prices(contract)
     if not prices:
         return
-    end = contract.end_date or until
-    if contract.end_date is None and is_loan(contract.category):
-        end = loans.payoff_date(contract) or end  # no more payments once the loan is repaid
-    end = min(end, until)
+    end = _billing_end(contract, until)
     for i, p in enumerate(prices):
         seg_from = max(p.valid_from, contract.start_date)
         seg_to = prices[i + 1].valid_from - timedelta(days=1) if i + 1 < len(prices) else end

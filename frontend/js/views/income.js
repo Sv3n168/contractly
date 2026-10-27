@@ -1,7 +1,7 @@
 // "Einnahmen": salary history (net, gross optional), raises, bonuses and other income.
 
 import { api } from "../api.js";
-import { incomeChart, legendHtml } from "../charts.js";
+import { chartHint, incomeChart, legendHtml, showLast } from "../charts.js";
 import { cssVar } from "../store.js";
 import { $, busy, confirmDialog, esc, fmtDate, formData, icon, modal, money, signedMoney, toast, today } from "../ui.js";
 import { bindIconPicker, iconPicker } from "./components.js";
@@ -34,8 +34,12 @@ export async function renderIncome(view) {
     </div>
 
     <div class="card" style="margin-bottom:20px">
-      <div class="card-head"><div><h2>Einnahmen & Fixkosten</h2><p>Netto pro Monat · die Linie zeigt deine Fixkosten</p></div></div>
+      <div class="card-head"><div><h2>Einnahmen & Fixkosten</h2><p>Netto pro Monat · die Linie zeigt deine Fixkosten</p></div>
+        <div class="segmented" id="income-range">${[12, 24, 60, 0]
+          .map((r) => `<button data-r="${r}" class="${r === 24 ? "active" : ""}">${r ? (r < 24 ? r + " M" : r / 12 + " J") : "Alles"}</button>`)
+          .join("")}</div></div>
       <div class="chart-box"><canvas id="income-chart" aria-label="Einnahmen und Fixkosten pro Monat"></canvas></div>
+      ${chartHint()}
       ${legendHtml([
         { label: "Regelmäßig", color: cssVar("--good") },
         { label: "Boni & Sonderzahlungen", color: cssVar("--good") + "70" },
@@ -73,7 +77,13 @@ export async function renderIncome(view) {
       </div>
     </div>`;
 
-  incomeChart($("#income-chart", view), d.months, { regular: d.regular, oneOff: d.one_off, costs: d.costs });
+  const chart = incomeChart($("#income-chart", view), d.months, { regular: d.regular, oneOff: d.one_off, costs: d.costs });
+  $("#income-range", view).addEventListener("click", (e) => {
+    const b = e.target.closest("[data-r]");
+    if (!b) return;
+    view.querySelectorAll("#income-range button").forEach((x) => x.classList.toggle("active", x === b));
+    showLast(chart, Number(b.dataset.r));
+  });
   $("#add", view).addEventListener("click", () => sourceModal(d.kinds));
   view.querySelectorAll("[data-raise]").forEach((b) => b.addEventListener("click", () => entryModal(Number(b.dataset.raise), "raise")));
   view.querySelectorAll("[data-bonus]").forEach((b) => b.addEventListener("click", () => entryModal(Number(b.dataset.bonus), "bonus")));

@@ -3097,6 +3097,38 @@ details.more[open] > .body {
   }
 }
 
+/* ------------------------------------------------------------------ explorable charts */
+
+.chart-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.chart-hint .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+canvas.explorable {
+  cursor: grab;
+}
+canvas.explorable:active {
+  cursor: grabbing;
+}
+.hint-touch {
+  display: none;
+}
+@media (pointer: coarse) {
+  .hint-touch {
+    display: inline;
+  }
+  .hint-mouse {
+    display: none;
+  }
+}
+
 /* ------------------------------------------------------------------ own emoji */
 
 .icon-picker {

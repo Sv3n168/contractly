@@ -104,3 +104,11 @@ def test_demo_income(client):
     ov = client.get("/api/income").json()
     assert {s["name"] for s in ov["sources"]} == {"Gehalt", "Kindergeld"}
     assert len(ov["raises"]) == 2 and ov["fixed_cost_ratio"] < 0.5
+
+
+def test_chart_covers_whole_history(client):
+    start = month_start(add_months(date.today(), -59))
+    _salary(client, start)
+    ov = client.get("/api/income").json()
+    assert len(ov["months"]) == 60
+    assert ov["months"][0] == start.isoformat()[:7] and ov["regular"][0] == 3000

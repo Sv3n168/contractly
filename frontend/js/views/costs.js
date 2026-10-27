@@ -1,9 +1,9 @@
 // Cost history and projection ("Hochrechnung").
 
 import { api } from "../api.js";
-import { legendHtml, lines, stackedBars } from "../charts.js";
+import { chartHint, legendHtml, lines, showLast, stackedBars } from "../charts.js";
 import { GROUPS, catColor, contractIcon, catLabel, cssVar, groupOf, slotColor } from "../store.js";
-import { $, esc, fmtMonth, icon, isoDate, money } from "../ui.js";
+import { $, esc, fmtMonth, icon, money } from "../ui.js";
 
 const prefs = { range: 24, group: "category", months: 24, increase: 3, extras: true };
 
@@ -28,6 +28,7 @@ export async function renderCosts(view) {
         </div>
       </div>
       <div class="chart-box lg"><canvas id="hist"></canvas></div>
+      ${chartHint()}
       <div id="hist-legend"></div>
     </div>
 
@@ -51,18 +52,16 @@ export async function renderCosts(view) {
       <div class="card"><div class="card-head"><div><h2>Je Vertrag</h2><p>Kosten im Prognosezeitraum</p></div></div><div id="per-contract" class="list"></div></div>
     </div>`;
 
+  let history = null;
   const markActive = () => {
     view.querySelectorAll("#group button").forEach((b) => b.classList.toggle("active", b.dataset.g === prefs.group));
     view.querySelectorAll("#range button").forEach((b) => b.classList.toggle("active", Number(b.dataset.r) === prefs.range));
   };
   const drawHistory = async () => {
     markActive();
-    const now = new Date();
-    const params = { group: prefs.group };
-    if (prefs.range) params.start = isoDate(new Date(now.getFullYear(), now.getMonth() - prefs.range + 1, 1)).slice(0, 7);
-    else params.start = "2000-01";
-    const ts = await api.timeseries(params);
-    // Trim leading empty months for "Alles".
+    // always the whole history; the range buttons only choose the visible part
+    const ts = await api.timeseries({ group: prefs.group, start: "2000-01" });
+    // Trim leading empty months.
     let first = ts.totals.findIndex((v) => v);
     if (first < 0) first = 0;
     const months = ts.months.slice(first);
@@ -76,7 +75,7 @@ export async function renderCosts(view) {
         series.push({ label: `Weitere (${rest.length})`, color: cssVar("--muted"), values: ts.months.map((_, i) => rest.reduce((sum, s) => sum + s.values[i], 0)) });
     }
     series = series.map((s) => ({ ...s, values: s.values.slice(first) }));
-    stackedBars($("#hist", view), months, series);
+    history = stackedBars($("#hist", view), months, series, { window: prefs.range || months.length });
     $("#hist-legend", view).innerHTML = legendHtml(series.map((s) => ({ label: esc(s.label), color: s.color })));
   };
 
@@ -133,7 +132,8 @@ export async function renderCosts(view) {
     const b = e.target.closest("[data-r]");
     if (b) {
       prefs.range = Number(b.dataset.r);
-      drawHistory();
+      markActive();
+      if (history) showLast(history, prefs.range);
     }
   });
   let t;

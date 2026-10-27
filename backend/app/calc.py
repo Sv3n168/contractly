@@ -170,15 +170,17 @@ def monthly_costs(
     today: date | None = None,
     clip: bool = False,
     extra_monthly: float = 0.0,
+    full: bool = False,
 ) -> dict[str, float]:
     """Own cost per month (prorated by days, times the own share) between ``first`` and ``last``.
 
     ``increase_pct`` applies a compounding yearly increase to months after ``today``
     (used for projections), ``extra_monthly`` adds expected additional charges to those
     months. With ``clip`` the costs stop exactly at ``last`` instead of covering its whole month.
+    ``full`` gives the whole contract's costs, ignoring the own share and a partner's amount.
     """
     result = {month_key(m): 0.0 for m in iter_months(first, last)}
-    partner = partner_amount(contract)
+    partner = 0.0 if full else partner_amount(contract)
     horizon_end = last if clip else month_end(last)
     for seg_from, seg_to, monthly in _segments(contract, horizon_end):
         for m in iter_months(max(seg_from, month_start(first)), seg_to):
@@ -204,7 +206,7 @@ def monthly_costs(
             key = month_key(p.valid_from)
             if key in result:
                 result[key] += p.amount
-    factor = share(contract)
+    factor = 1.0 if full else share(contract)
     return {k: round(v * factor, 2) for k, v in result.items()}
 
 

@@ -179,6 +179,7 @@ class ContractOut(ContractSummary):
     meter_readings: list["MeterReadingOut"] = []
     reminders: list["ReminderOut"] = []
     total_paid: float = 0
+    full_total_paid: float = 0
     extras_12m: float = 0
     extras_months_12m: int = 0
     switch_savings: float | None = None

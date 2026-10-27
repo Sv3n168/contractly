@@ -108,11 +108,12 @@ def contract_summary(c: Contract, ref: date | None = None) -> ContractSummary:
     return ContractSummary(**_summary_fields(c, ref or today()))
 
 
-def total_paid(c: Contract, ref: date) -> float:
+def total_paid(c: Contract, ref: date, full: bool = False) -> float:
+    """Paid so far – the own part, or with ``full`` the whole contract (incl. a partner's part)."""
     last = min(c.end_date or ref, ref)
     if last < c.start_date:
         return 0.0
-    return round(sum(calc.monthly_costs(c, c.start_date, last, clip=True).values()), 2)
+    return round(sum(calc.monthly_costs(c, c.start_date, last, clip=True, full=full).values()), 2)
 
 
 def _extras_fields(c: Contract, ref: date) -> dict:
@@ -143,6 +144,7 @@ def contract_detail(c: Contract, ref: date | None = None) -> ContractOut:
         meter_readings=[MeterReadingOut.model_validate(m) for m in c.meter_readings],
         reminders=[ReminderOut.model_validate(r) for r in c.reminders if r.done_at is None],
         total_paid=total_paid(c, ref),
+        full_total_paid=total_paid(c, ref, full=True),
         **_extras_fields(c, ref),
         switch_savings=calc.switch_savings(c, ref),
         energy=calc.energy_analysis(c, ref) if is_energy(c.category) else None,

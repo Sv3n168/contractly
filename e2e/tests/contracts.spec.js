@@ -54,7 +54,8 @@ test("partner pays a fixed amount; a contract without own name is called like it
   await page.click("#save");
   await expect(page.getByRole("heading", { name: "Stadtwerke Musterstadt", exact: true })).toBeVisible();
   await expect(page.locator(".kpi.hero .kpi-value")).toContainText("75,00");
-  await expect(page.locator(".kpi.hero")).toContainText("abzgl. 20,00");
+  await expect(page.locator(".kpi.hero")).toContainText("Gesamt 95,00");
+  await expect(page.locator(".kpi.hero")).toContainText("Partner:in zahlt 20,00");
   await page.goto("/#/contracts");
   const row = page.locator(".contract-row", { hasText: "Stadtwerke Musterstadt" });
   // under the name the category instead of the provider a second time

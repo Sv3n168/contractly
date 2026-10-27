@@ -27,6 +27,9 @@ def test_partner_pays_fixed_amount(client):
     c = _electricity(client, partner_amount=20)
     assert c["partner_amount"] == 20 and c["share_percent"] is None
     assert c["monthly_cost"] == pytest.approx(75) and c["full_monthly_cost"] == pytest.approx(95)
+    # paid so far: three whole months – own part and the whole contract
+    assert c["total_paid"] == pytest.approx(c["full_total_paid"] * 75 / 95, rel=0.02)
+    assert c["full_total_paid"] > c["total_paid"]
     # the amount stays fixed when the price goes up
     client.post(
         f"/api/contracts/{c['id']}/prices",

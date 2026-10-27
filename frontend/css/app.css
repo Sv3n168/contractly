@@ -771,34 +771,38 @@ h3 {
   line-height: 1.1;
   font-variant-numeric: lining-nums tabular-nums;
 }
+.kpi-value.kpi-date {
+  font-size: 22px;
+}
 .kpi-sub {
   margin-top: 6px;
   font-size: 13px;
   color: var(--muted);
 }
 .kpi.hero {
-  /* the "black card": premium frame with a banknote guilloche */
-  background: url("guilloche.svg") right -60px center / 420px auto no-repeat,
-    radial-gradient(circle at 100% 0%, rgba(47, 191, 136, 0.16), transparent 45%),
-    linear-gradient(135deg, var(--ink-2) 0%, var(--ink) 70%);
-  border: 0;
-  color: var(--ink-text);
-  box-shadow: var(--shadow-lg);
+  /* the headline figure: a soft money-green tint and a fine accent line, nothing loud */
+  background: color-mix(in srgb, var(--money) 7%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--money) 16%, var(--border));
+  color: var(--text);
+  box-shadow: none;
 }
 .kpi.hero::after {
   content: "";
   position: absolute;
-  inset: 0 0 auto 0;
-  height: 2px;
-  background: linear-gradient(90deg, var(--emerald), transparent 70%);
+  left: 0;
+  top: 16px;
+  bottom: 16px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--money);
 }
 .kpi.hero .kpi-label,
 .kpi.hero .kpi-sub {
-  color: var(--ink-muted);
+  color: var(--muted);
 }
 .kpi.hero .kpi-icon {
-  background: rgba(47, 191, 136, 0.16);
-  color: var(--emerald);
+  background: var(--good-soft);
+  color: var(--money);
 }
 .delta {
   display: inline-flex;
@@ -813,7 +817,7 @@ h3 {
   color: var(--good);
 }
 .kpi.hero .delta {
-  color: var(--ink-text);
+  color: var(--text);
 }
 
 /* ------------------------------------------------------------------ badges */
@@ -2328,6 +2332,9 @@ details.more > .body {
   .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-value {
     font-size: 17px;
   }
+  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-value.kpi-date {
+    font-size: 15px;
+  }
   .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-sub {
     font-size: 11.5px;
   }
@@ -3235,7 +3242,8 @@ canvas.explorable:active {
   gap: 0;
   margin-bottom: 12px;
 }
-.main .kpis > .kpi:not(.hero) {
+/* .card.kpi: outranks the section rule above, which takes the side padding off */
+.main .kpis > .card.kpi:not(.hero) {
   border-top: 1px solid var(--border);
   padding: 18px 22px;
 }
@@ -3295,7 +3303,7 @@ canvas.explorable:active {
   .main .kpis > .kpi.hero:last-child {
     margin: 0;
   }
-  .main .kpis > .kpi:not(.hero) {
+  .main .kpis > .card.kpi:not(.hero) {
     padding: 12px 10px 12px 12px;
   }
   .main .kpis > .kpi:not(.hero):first-child,

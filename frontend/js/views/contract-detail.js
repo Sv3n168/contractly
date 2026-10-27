@@ -157,6 +157,9 @@ async function overviewTab(el, c, reload) {
   const progress = termStart && c.next_term_end ? progressPct(termStart, c.next_term_end) : null;
   const runtime = monthsBetween(c.start_date, c.end_date && c.end_date < today() ? c.end_date : today());
 
+  // Shared costs: next to the own part always the whole contract's price.
+  const shared = Boolean(c.partner_amount) || (c.share_percent != null && c.share_percent !== 100);
+  const fullYearly = c.full_monthly_cost * 12;
   el.innerHTML = `
     <div class="kpis">
       <div class="card kpi hero">
@@ -166,9 +169,9 @@ async function overviewTab(el, c, reload) {
           c.current_price?.details?.kind === "pause"
             ? "pausiert – keine Kosten"
             : c.partner_amount
-            ? `${money(c.full_monthly_cost)} abzgl. ${money(c.partner_amount)} von Partner:in`
+            ? `Gesamt ${money(c.full_monthly_cost)} · Partner:in zahlt ${money(c.partner_amount)}`
             : c.share_percent != null && c.share_percent !== 100
-            ? `dein Anteil ${c.share_percent} % von ${money(c.full_monthly_cost)}`
+            ? `dein Anteil ${c.share_percent} % · Gesamt ${money(c.full_monthly_cost)}`
             : c.current_price && c.current_price.interval !== "monthly"
               ? `${money(c.current_price.amount)} ${intervalLabel(c.current_price.interval)}`
               : "aktueller Preis"
@@ -176,10 +179,13 @@ async function overviewTab(el, c, reload) {
       </div>
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("calendar")}</span>Pro Jahr</div>
         <div class="kpi-value num">${money(c.yearly_cost)}</div><div class="kpi-sub">${
-          c.extras_12m ? `+ ${money(c.extras_12m)} Zusatzkosten (12 M.)` : "hochgerechnet"
+          shared ? `Gesamt ${money(fullYearly)}${c.extras_12m ? ` · + ${money(c.extras_12m)} Zusatzkosten` : ""}`
+          : c.extras_12m ? `+ ${money(c.extras_12m)} Zusatzkosten (12 M.)` : "hochgerechnet"
         }</div></div>
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("layers")}</span>Bisher bezahlt</div>
-        <div class="kpi-value num">${money(c.total_paid, true)}</div><div class="kpi-sub">in ${durationText(Math.max(runtime, 0))} Laufzeit</div></div>
+        <div class="kpi-value num">${money(c.total_paid, true)}</div><div class="kpi-sub">${
+          shared ? `Gesamt ${money(c.full_total_paid, true)} · ` : ""
+        }in ${durationText(Math.max(runtime, 0))} Laufzeit</div></div>
       ${
         c.loan?.balance != null
           ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("trendDown")}</span>Restschuld</div>
@@ -190,7 +196,7 @@ async function overviewTab(el, c, reload) {
              <div class="kpi-value num ${c.switch_savings >= 0 ? "better" : "worse"}">${signedMoney(c.switch_savings)}</div>
              <div class="kpi-sub">${c.switch_savings >= 0 ? "gespart ggü. altem Vertrag" : "Mehrkosten ggü. altem Vertrag"}</div></div>`
           : `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("clock")}</span>Kündbar bis</div>
-             <div class="kpi-value num" style="font-size:22px">${c.cancellation_deadline ? fmtDate(c.cancellation_deadline) : c.end_date ? "endet " + fmtDate(c.end_date) : "–"}</div>
+             <div class="kpi-value num kpi-date">${c.cancellation_deadline ? fmtDate(c.cancellation_deadline) : c.end_date ? "endet " + fmtDate(c.end_date) : "–"}</div>
              <div class="kpi-sub">${c.cancellation_deadline ? relDays(daysUntil(c.cancellation_deadline)) : ""}</div></div>`
       }
     </div>

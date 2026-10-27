@@ -141,6 +141,8 @@ export function reminderItem(item, { actions = true, compact = false } = {}) {
       subscription_check: "sparkles",
       installment_check: "gauge",
       checkup: "refresh",
+      total_reached: "check",
+      total_exceeded: "alert",
     }[item.kind] || "bell";
   const href = item.contract_id ? `#/contracts/${item.contract_id}` : item.kind === "checkup" ? "#/checkup" : "#/reminders";
   return `

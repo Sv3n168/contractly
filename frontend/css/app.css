@@ -1440,6 +1440,15 @@ table.table {
 .callout.good {
   background: var(--good-soft);
 }
+.callout.bad {
+  background: var(--bad-soft);
+}
+.callout.bad .svg-icon {
+  color: var(--bad);
+}
+.term-bar.over > div {
+  background: var(--bad);
+}
 .callout.good .svg-icon {
   color: var(--good);
 }

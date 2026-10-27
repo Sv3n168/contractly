@@ -149,6 +149,7 @@ export const api = {
 
   pauseContract: (id, data) => request("POST", `/api/contracts/${id}/pause`, data),
   confirmCancellation: (id, data = {}) => request("POST", `/api/contracts/${id}/cancellation-confirmed`, data),
+  noConfirmation: (id) => request("POST", `/api/contracts/${id}/no-confirmation`),
   stillUsed: (id) => request("POST", `/api/contracts/${id}/still-used`),
 
   analyzeContractList: (file) => {

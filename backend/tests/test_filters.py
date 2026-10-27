@@ -73,4 +73,4 @@ def test_bookings_so_far(client):
     assert detail["payments"]["count"] == 24
     assert detail["payments"]["first"] == start.isoformat()
     assert detail["payments"]["next"] == add_months(start, 24).isoformat()
-    assert detail["total_paid"] == pytest.approx(24 * 454, rel=0.03)
+    assert detail["total_paid"] == 24 * 454  # what left the account, not the costs spread by days

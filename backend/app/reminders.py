@@ -141,6 +141,9 @@ def collect(db: Session, ref: date, horizon_days: int = 60, include_dismissed: b
     return result
 
 
+NO_CONFIRMATION = "no_confirmation"  # attribute: the provider won't confirm, don't ask for it
+
+
 def _item(c: Contract, kind: str, key_date: date, title: str, notify: date, detail: str) -> dict:
     return {
         "key": f"{kind}:{c.id}:{key_date.isoformat()}",
@@ -215,7 +218,7 @@ def _scenario_items(c: Contract, ref: date, horizon: date) -> list[dict]:
                     )
                 )
     # Cancellation sent but not confirmed yet
-    if c.cancelled_on and not c.cancellation_confirmed_on and running:
+    if c.cancelled_on and not c.cancellation_confirmed_on and running and not (c.attributes or {}).get(NO_CONFIRMATION):
         due = c.cancelled_on + timedelta(days=14)
         if due <= horizon:
             title = f"Kündigungsbestätigung fehlt: {c.name}"
@@ -234,6 +237,8 @@ def _scenario_items(c: Contract, ref: date, horizon: date) -> list[dict]:
             title = f"Nachzahlung droht: {c.name} (ca. {gap:.0f} €)"
             detail = f"Abschlag auf {amount} € erhöhen, dann bleibt die Jahresabrechnung ohne Nachzahlung."
             out.append(_item(c, "installment_check", e["billing_year_end"], title, ref, detail))
+    # Agreed total: say when it is reached (with the odd last amount) and warn when more was paid
+    out.extend(_total_items(c, ref, horizon, running))
     # Loans: end of the fixed-rate period, last payment, unused special repayment
     if loans.is_loan(c.category) and running:
         out.extend(_loan_items(c, ref, horizon))
@@ -249,6 +254,36 @@ def _scenario_items(c: Contract, ref: date, horizon: date) -> list[dict]:
             title = f"Abo-Check: {c.name} noch genutzt?"
             out.append(_item(c, "subscription_check", due, title, due, "Wenn nicht: kündigen spart Geld."))
     return out
+
+
+def _euro(v: float) -> str:
+    return f"{v:,.2f} €".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
+def _total_items(c: Contract, ref: date, horizon: date, running: bool) -> list[dict]:
+    b = calc.total_budget(c, ref)
+    if not b:
+        return []
+    if b["exceeded"]:
+        last = calc.payments_made(c, ref)["last"] or ref
+        title = f"Gesamtsumme überschritten: {c.name} (+{_euro(b['over'])})"
+        detail = (
+            f"{_euro(b['paid'])} gezahlt, vereinbart sind {_euro(b['total'])} – "
+            "Dauerauftrag beenden und zu viel Gezahltes zurückfordern."
+        )
+        return [_item(c, "total_exceeded", last, title, last, detail)]
+    due = b["last_date"]
+    if not (running and due and due - timedelta(days=30) <= horizon):
+        return []
+    if b["planned_amount"] - b["last_amount"] > 0.005:
+        detail = (
+            f"Nur noch {_euro(b['last_amount'])} statt {_euro(b['planned_amount'])} überweisen, dann sind die "
+            f"{_euro(b['total'])} genau erreicht – danach den Dauerauftrag beenden."
+        )
+    else:
+        detail = f"Damit sind die {_euro(b['total'])} erreicht – danach den Dauerauftrag beenden."
+    title = f"Letzte Zahlung: {c.name} ({_euro(b['last_amount'])})"
+    return [_item(c, "total_reached", due, title, due - timedelta(days=30), detail)]
 
 
 def _loan_items(c: Contract, ref: date, horizon: date) -> list[dict]:
@@ -347,6 +382,8 @@ def _neutral_title(item: dict) -> str:
         "installment_check": "Abschlag prüfen – Nachzahlung droht",
         "fixed_rate_end": "Zinsbindung endet",
         "loan_payoff": "Letzte Kreditrate",
+        "total_reached": "Gesamtsumme erreicht – letzte Zahlung",
+        "total_exceeded": "Gesamtsumme überschritten",
         "special_repayment": "Sondertilgung möglich",
     }
     if item["kind"] in neutral:

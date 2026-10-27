@@ -207,6 +207,8 @@ async function overviewTab(el, c, reload) {
       }
     </div>
 
+    ${budgetCard(c)}
+
     <div class="card" style="margin-bottom:20px">
       <div class="card-head" style="align-items:flex-start"><div><h2>Kostenverlauf</h2>
         <p>${chain.length > 1 ? `Durchgehend über alle Wechsel: ${chain.map((x) => esc(x.name)).join(" → ")}` : "Monatliche Kosten · gestrichelt = Vorschau"}${hist.extras.some((v) => v) ? " · Punkte = Monate mit Zusatzkosten" : ""}</p></div>
@@ -253,10 +255,16 @@ async function overviewTab(el, c, reload) {
               }</div></div>`
             : c.state === "cancelled"
               ? `<div class="callout warn">${icon("clock")}<div>Gekündigt${c.cancelled_on ? ` am ${fmtDate(c.cancelled_on)}` : ""} – läuft noch bis <b>${fmtDate(c.end_date)}</b> (${relDays(daysUntil(c.end_date))}).
-                  <br/>${
+                  ${
                     c.cancellation_confirmed_on
-                      ? `${icon("check", "inline")} Bestätigung erhalten am ${fmtDate(c.cancellation_confirmed_on)}`
-                      : `<b>Bestätigung des Anbieters steht noch aus.</b> <button class="btn btn-sm" id="confirm-btn" style="margin-top:6px">${icon("check")} Bestätigung erhalten</button>`
+                      ? `<br/>${icon("check", "inline")} Bestätigung erhalten am ${fmtDate(c.cancellation_confirmed_on)}`
+                      : c.attributes?.no_confirmation
+                        ? ""
+                        : `<br/><b>Bestätigung des Anbieters steht noch aus.</b>
+                           <span style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px">
+                             <button class="btn btn-sm" id="confirm-btn">${icon("check")} Bestätigung erhalten</button>
+                             <button class="btn btn-sm btn-ghost" id="no-confirm-btn">${icon("x")} Kommt keine – ausblenden</button>
+                           </span>`
                   }</div></div>`
               : c.cancellation_deadline
                 ? deadlineCallout(c)
@@ -292,6 +300,11 @@ async function overviewTab(el, c, reload) {
   $("#confirm-btn", el)?.addEventListener("click", async () => {
     await api.confirmCancellation(c.id);
     toast("Bestätigung vermerkt ✓");
+    reload();
+  });
+  $("#no-confirm-btn", el)?.addEventListener("click", async () => {
+    await api.noConfirmation(c.id);
+    toast("Hinweis ausgeblendet");
     reload();
   });
   $("#letter-btn", el)?.addEventListener("click", () => openLetter(c));
@@ -778,4 +791,45 @@ function remindersTab(el, c, reload) {
       reload("reminders");
     }
   });
+}
+
+
+/** Progress towards the agreed total: how much is left, the odd last amount, a warning when more was paid. */
+function budgetCard(c) {
+  const b = c.budget;
+  if (!b) return "";
+  const end = c.end_date ? ` (Vertragsende ${fmtDate(c.end_date)})` : "";
+  let plan;
+  if (b.exceeded) {
+    plan = `<div class="callout bad">${icon("alert")}<div><b>Gesamtsumme um ${money(b.over)} überschritten.</b>
+      Dauerauftrag beenden und zu viel Gezahltes zurückfordern.</div></div>`;
+  } else if (!b.left) {
+    plan = `<div class="callout good">${icon("check")}<div><b>Gesamtsumme erreicht.</b> Der Dauerauftrag kann beendet werden.</div></div>`;
+  } else if (b.last_date) {
+    const odd = b.planned_amount - b.last_amount > 0.005;
+    const regular = b.regular_left
+      ? `noch <b>${b.regular_left} × ${money(b.regular_amount)}</b> bis ${fmtDate(b.last_regular_date)}, `
+      : "";
+    plan = `<p style="margin:0">Offen: <b>${money(b.left)}</b> – ${regular}${odd ? "dann als letzte Zahlung" : "die letzte"}
+      <b>${money(b.last_amount)}</b> am <b>${fmtDate(b.last_date)}</b>.</p>
+      <div class="callout ${odd ? "warn" : ""}" style="margin-top:12px">${icon("info")}<div>${
+        odd
+          ? `Die letzte Zahlung ist kleiner: <b>${money(b.last_amount)} statt ${money(b.planned_amount)}</b> – sonst zahlst du ${money(b.planned_amount - b.last_amount)} zu viel. Dauerauftrag also bis ${b.regular_left ? fmtDate(b.last_regular_date) : "dahin"} laufen lassen, die ${money(b.last_amount)} einmal überweisen.`
+          : `Der Dauerauftrag kann nach dem ${fmtDate(b.last_date)} enden.`
+      } Contractly erinnert dich vorher.</div></div>${
+        b.projected_over
+          ? `<div class="callout bad" style="margin-top:12px">${icon("alert")}<div>Bis zum Vertragsende${end} würden <b>${money(b.projected_over)} zu viel</b> gezahlt.</div></div>`
+          : ""
+      }`;
+  } else {
+    plan = `<p style="margin:0">Offen: <b>${money(b.left)}</b>${
+      b.short ? ` – bis zum Vertragsende${end} fehlen bei den eingetragenen Preisen noch ${money(b.short)}.` : "."
+    }</p>`;
+  }
+  return `<div class="card budget-card" style="margin-bottom:20px">
+    <div class="card-head"><div><h2>Gesamtsumme</h2>
+      <p>${money(b.paid)} von ${money(b.total)} bezahlt · ${String(b.percent).replace(".", ",")} %</p></div></div>
+    <div class="term-bar ${b.exceeded ? "over" : ""}"><div style="width:${b.percent}%"></div></div>
+    ${plan}
+  </div>`;
 }

@@ -202,6 +202,60 @@ def payments_made(contract: Contract, today: date) -> dict:
     }
 
 
+def total_budget(contract: Contract, today: date) -> dict | None:
+    """Progress towards the agreed total (``max_total``), on whole amounts by due date.
+
+    Says how much is paid and open, how many regular payments are left, how much the last one has
+    to be so the total comes out exactly, and whether more than the total was paid (or would be
+    by the contract's end date)."""
+    total = getattr(contract, "max_total", None)
+    if not total:
+        return None
+    once = [p for p in contract.prices if p.interval == "once" and p.amount > 0]
+    paid = sum(a for _, a in payment_dates(contract, today, full=True))
+    paid += sum(p.amount for p in once if p.valid_from <= today)
+    left = round(total - paid, 2)
+    info: dict = {
+        "total": round(total, 2),
+        "paid": round(paid, 2),
+        "left": max(left, 0.0),
+        "over": max(-left, 0.0),
+        "exceeded": left < -0.005,
+        "percent": round(min(paid / total, 1) * 100, 1),
+        "regular_left": 0,
+        "regular_amount": None,
+        "last_regular_date": None,
+        "last_date": None,
+        "last_amount": None,
+        "planned_amount": None,
+        "projected_over": 0.0,
+        "short": 0.0,
+    }
+    if left <= 0.005:
+        return info
+    sum_ahead, regular = 0.0, []
+    future_once = sorted((p.valid_from, p.amount) for p in once if p.valid_from > today)
+    ahead = sorted(
+        [*(x for x in payment_dates(contract, add_months(today, 12 * 60), full=True) if x[0] > today), *future_once]
+    )
+    for due, amount in ahead:
+        if sum_ahead + amount >= left - 0.005:
+            rest = round(left - sum_ahead, 2)
+            info.update(last_date=due, last_amount=rest, planned_amount=amount)  # instead of amount
+            if contract.end_date and contract.end_date >= due:
+                after = sum(a for d, a in ahead if d > due) + (amount - rest)
+                info["projected_over"] = round(after, 2)
+            break
+        sum_ahead += amount
+        regular.append((due, amount))
+    else:
+        info["short"] = round(left - sum_ahead, 2)  # ends before the total is reached
+    info["regular_left"] = len(regular)
+    if regular:
+        info.update(last_regular_date=regular[-1][0], regular_amount=regular[-1][1])
+    return info
+
+
 def payments_by_month(
     contract: Contract,
     first: date,

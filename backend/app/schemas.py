@@ -74,6 +74,7 @@ class ContractBase(BaseModel):
     share_percent: int | None = Field(default=None, ge=0, le=100)
     partner_amount: float | None = Field(default=None, ge=0, le=1_000_000)
     account: str | None = Field(default=None, max_length=60)
+    max_total: float | None = Field(default=None, ge=0, le=100_000_000)
     cancellation_confirmed_on: date | None = None
     tax_relevant: bool | None = None
     withdrawal_until: date | None = None
@@ -152,6 +153,7 @@ class ContractSummary(ORM):
     share_percent: int | None = None
     partner_amount: float | None = None
     account: str | None = None
+    max_total: float | None = None
     full_monthly_cost: float = 0
     tax_relevant: bool = False
     cancellation_confirmed_on: date | None = None
@@ -182,6 +184,8 @@ class ContractOut(ContractSummary):
     full_total_paid: float = 0
     # bookings so far: count, regular_count, first, last, next (due dates)
     payments: dict[str, Any] | None = None
+    # progress towards max_total (see calc.total_budget)
+    budget: dict[str, Any] | None = None
     extras_12m: float = 0
     extras_months_12m: int = 0
     switch_savings: float | None = None

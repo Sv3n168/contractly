@@ -120,8 +120,11 @@ export function contractRow(c) {
   const price = c.current_price;
   // a contract that starts later shows what it will cost, not 0,00 €
   const planned = c.state === "planned" && price;
-  const monthly = planned ? price.monthly_equivalent : c.monthly_cost;
-  const sub = planned
+  const oneOff = !price && c.one_off_total;
+  const monthly = planned ? price.monthly_equivalent : oneOff ? c.one_off_total : c.monthly_cost;
+  const sub = oneOff
+    ? "einmalig"
+    : planned
     ? `ab ${fmtDate(c.start_date)}`
     : price && price.interval !== "monthly"
       ? `${money(price.amount)} ${intervalLabel(price.interval)}`

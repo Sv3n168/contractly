@@ -168,7 +168,7 @@ async function overviewTab(el, c, reload) {
   const ended = c.state === "ended";
   el.innerHTML = `
     ${ended ? endedBanner(c, next) : ""}
-    ${ended ? endedKpis(c, next, runtime) : c.state === "planned" ? plannedKpis(c) : `
+    ${ended ? endedKpis(c, next, runtime) : c.state === "planned" && c.current_price ? plannedKpis(c) : !c.current_price && c.one_off_total ? oneOffKpis(c) : `
     <div class="kpis">
       <div class="card kpi hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Pro Monat</div>
@@ -970,5 +970,23 @@ function plannedKpis(c) {
               <div class="kpi-sub">${relDays(daysUntil(c.cancellation_deadline))}</div></div>`
           : ""
       }
+    </div>`;
+}
+
+/** Paid once, no recurring price (a device, a course paid up front …): the amount, not 0,00 € a month. */
+function oneOffKpis(c) {
+  const once = c.prices.filter((p) => p.interval === "once" && p.amount > 0 && p.details?.kind !== "extra");
+  const first = once.map((p) => p.valid_from).sort()[0];
+  return `<div class="kpis kpis-3">
+      <div class="card kpi hero">
+        <div class="kpi-label">Einmalig</div>
+        <div class="kpi-value num">${money(c.one_off_total)}</div>
+        <div class="kpi-sub">${first ? `${first > today() ? "fällig" : "bezahlt"} am ${fmtDate(first)}` : ""}</div>
+      </div>
+      <div class="card kpi"><div class="kpi-label">Laufende Kosten</div>
+        <div class="kpi-value num">keine</div><div class="kpi-sub">kein regelmäßiger Preis</div></div>
+      <div class="card kpi"><div class="kpi-label">Bisher bezahlt</div>
+        <div class="kpi-value num">${money(c.total_paid, true)}</div>
+        <div class="kpi-sub">${c.payments?.count ? `${c.payments.count} ${c.payments.count === 1 ? "Buchung" : "Buchungen"}` : ""}</div></div>
     </div>`;
 }

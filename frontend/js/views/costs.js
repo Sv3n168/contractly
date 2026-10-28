@@ -4,7 +4,7 @@ import { api } from "../api.js";
 import { chartHint, legendHtml, lines, showLast, stackedBars } from "../charts.js";
 import { GROUPS, catColor, contractIcon, catLabel, cssVar, groupOf, slotColor, state } from "../store.js";
 import { accountSwitch, otherAccounts } from "./components.js";
-import { $, esc, fmtDate, fmtMonth, icon, money, today } from "../ui.js";
+import { $, esc, fmtDate, fmtMonth, icon, modal, money, today } from "../ui.js";
 
 // Filters stay while moving between the tabs: payment intervals and areas (empty = all), view mode.
 const prefs = {
@@ -71,22 +71,9 @@ export async function renderCosts(view) {
     <div class="page-head"><div><h1>Kosten & Prognose</h1><p>Was haben deine Verträge gekostet – und was kommt auf dich zu?</p></div>
       ${accountSwitch(accounts, state.account)}</div>
 
-    <div class="filter-bar">
-      <div class="filter-row"><span class="filter-label">Zahlweise</span>
-        <div class="chips" id="f-int">${usedIntervals
-          .map(([k, l]) => `<button type="button" class="chip ${prefs.intervals.has(k) ? "active" : ""}" data-int="${k}">${l}</button>`)
-          .join("")}</div></div>
-      <div class="filter-row"><span class="filter-label">Bereiche</span>
-        <div class="chips" id="f-grp">${usedGroups
-          .map((g) => `<button type="button" class="chip ${prefs.groups.has(g.key) ? "active" : ""}" data-grp="${g.key}">
-            <span class="dot" style="background:var(--series-${g.slot})"></span>${esc(g.label)}</button>`)
-          .join("")}</div></div>
-      <div class="filter-row"><span class="filter-label">Ansicht</span>
-        <div class="segmented" id="f-mode">
-          <button type="button" data-mode="spread" class="${prefs.mode === "spread" ? "active" : ""}" title="Eine Jahreszahlung wird auf 12 Monate verteilt"><span class="label-long">Monatlich umgelegt</span><span class="label-short">Umgelegt</span></button>
-          <button type="button" data-mode="paid" class="${prefs.mode === "paid" ? "active" : ""}" title="Jede Zahlung im Monat ihrer Fälligkeit"><span class="label-long">Wann bezahlt</span><span class="label-short">Fällig</span></button>
-        </div>
-        <button type="button" class="btn btn-ghost btn-sm" id="f-reset" title="Filter zurücksetzen" aria-label="Filter zurücksetzen">${icon("x")}<span class="label-long"> Zurücksetzen</span></button></div>
+    <div class="list-toolbar costs-toolbar">
+      <div class="chips active-filters" id="active"></div>
+      <button class="btn" id="filter-btn">${icon("layers")}<span class="label">Filter</span><span class="count" id="filter-count"></span></button>
     </div>
     <div id="selection"></div>
 
@@ -94,7 +81,6 @@ export async function renderCosts(view) {
       <div class="card-head">
         <div><h2>Kostenverlauf</h2><p id="hist-sub"></p></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <div class="segmented" id="group"><button data-g="category">Bereiche</button><button data-g="contract">Verträge</button></div>
           <div class="segmented" id="range">${[12, 24, 60, 0].map((r) => `<button data-r="${r}">${r ? (r < 24 ? r + " M" : r / 12 + " J") : "Alles"}</button>`).join("")}</div>
         </div>
       </div>
@@ -105,7 +91,9 @@ export async function renderCosts(view) {
 
     <div class="card" style="margin-bottom:20px">
       <div class="card-head"><div><h2>${icon("trendUp")} Hochrechnung</h2><p>Basierend auf aktuellen Preisen, bekannten Vertragsenden und einer angenommenen Preissteigerung.</p></div></div>
-      <div class="form-grid" style="margin-bottom:18px">
+      <details class="assumptions">
+        <summary>${icon("settings")} <span id="assume-text"></span>${icon("chevDown", "chev")}</summary>
+      <div class="form-grid" style="margin:12px 0 6px">
         <label class="field"><span>Zeitraum: <b id="m-out">${prefs.months}</b> Monate</span>
           <input type="range" class="range" id="months" min="6" max="120" step="6" value="${prefs.months}"/></label>
         <label class="field"><span>Preissteigerung: <b id="i-out">${prefs.increase}</b> % pro Jahr</span>
@@ -113,6 +101,7 @@ export async function renderCosts(view) {
         <label class="check span-2" style="align-self:end"><input type="checkbox" id="extras" ${prefs.extras ? "checked" : ""}/>
           Ø Zusatzkosten der letzten 12 Monate einrechnen <span class="muted small" id="x-out"></span></label>
       </div>
+      </details>
       <div class="kpis" id="proj-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
       <div class="chart-box"><canvas id="proj"></canvas></div>
       <div id="proj-legend"></div>
@@ -141,7 +130,6 @@ export async function renderCosts(view) {
   /** What the selection costs: per year, per month and the next due dates – e.g. the monthly reserve for yearly bills. */
   const drawSelection = () => {
     const filtered = prefs.intervals.size || prefs.groups.size;
-    $("#f-reset", view).hidden = !filtered && prefs.mode === "spread";
     const box = $("#selection", view);
     if (!filtered) {
       box.innerHTML = "";
@@ -280,34 +268,84 @@ export async function renderCosts(view) {
     btn.classList.toggle("active", set.has(key));
     redraw();
   };
-  $("#f-int", view).addEventListener("click", (e) => {
-    const b = e.target.closest("[data-int]");
-    if (b) toggle(prefs.intervals, b.dataset.int, b);
+  // active filters as removable chips; the defaults show nothing
+  const drawActive = () => {
+    const chips = [
+      ...[...prefs.intervals].map((k) => [`int:${k}`, INTERVAL_CHIPS.find(([x]) => x === k)?.[1] ?? k]),
+      ...[...prefs.groups].map((k) => [`grp:${k}`, esc(GROUPS.find((g) => g.key === k)?.label ?? k)]),
+      ...(prefs.mode === "paid" ? [["mode", "Wann bezahlt"]] : []),
+    ];
+    $("#active", view).innerHTML = chips.length
+      ? chips.map(([k, t]) => `<button class="chip active" data-clear="${k}" title="Filter entfernen">${t} ${icon("x")}</button>`).join("")
+      : `<span class="muted small">Alle Verträge · monatlich umgelegt</span>`;
+    $("#filter-count", view).textContent = chips.length || "";
+  };
+  $("#active", view).addEventListener("click", (e) => {
+    const k = e.target.closest("[data-clear]")?.dataset.clear;
+    if (!k) return;
+    if (k === "mode") prefs.mode = "spread";
+    else if (k.startsWith("int:")) prefs.intervals.delete(k.slice(4));
+    else prefs.groups.delete(k.slice(4));
+    update();
   });
-  $("#f-grp", view).addEventListener("click", (e) => {
-    const b = e.target.closest("[data-grp]");
-    if (b) toggle(prefs.groups, b.dataset.grp, b);
-  });
-  $("#f-mode", view).addEventListener("click", (e) => {
-    const b = e.target.closest("[data-mode]");
-    if (!b || b.dataset.mode === prefs.mode) return;
-    prefs.mode = b.dataset.mode;
-    view.querySelectorAll("#f-mode button").forEach((x) => x.classList.toggle("active", x === b));
+  const update = () => {
+    drawActive();
     redraw();
+  };
+  const chip = (attr, active, label) => `<button type="button" class="chip ${active ? "active" : ""}" ${attr}>${label}</button>`;
+  $("#filter-btn", view).addEventListener("click", () => {
+    const m = modal({
+      title: "Filter & Ansicht",
+      body: `<div class="filter-sheet">
+          <div class="fs-group"><div class="fs-label">Zahlweise</div><div class="chips" id="f-int">
+            ${usedIntervals.map(([k, l]) => chip(`data-int="${k}"`, prefs.intervals.has(k), l)).join("")}</div></div>
+          <div class="fs-group"><div class="fs-label">Bereiche</div><div class="chips" id="f-grp">
+            ${usedGroups
+              .map((g) => chip(`data-grp="${g.key}"`, prefs.groups.has(g.key), `<span class="dot" style="background:var(--series-${g.slot})"></span>${esc(g.label)}`))
+              .join("")}</div></div>
+          <div class="fs-group"><div class="fs-label">Ansicht</div><div class="chips" id="f-mode">
+            ${chip(`data-mode="spread"`, prefs.mode === "spread", "Monatlich umgelegt")}
+            ${chip(`data-mode="paid"`, prefs.mode === "paid", "Wann bezahlt")}</div>
+            <p class="small muted" style="margin:6px 0 0">Umgelegt: eine Jahreszahlung zählt mit 1/12 in jedem Monat. Wann bezahlt: im Monat der Fälligkeit.</p></div>
+          <div class="fs-group"><div class="fs-label">Kostenverlauf gliedern nach</div><div class="chips" id="group">
+            ${chip(`data-g="category"`, prefs.group === "category", "Bereichen")}
+            ${chip(`data-g="contract"`, prefs.group === "contract", "Verträgen")}</div></div>
+        </div>`,
+      foot: `<button class="btn btn-ghost" id="f-reset" style="margin-right:auto">Zurücksetzen</button><button class="btn btn-primary" data-close>Fertig</button>`,
+    });
+    m.addEventListener("click", (e) => {
+      const b = e.target.closest("[data-int],[data-grp],[data-mode],[data-g]");
+      if (b?.dataset.int) {
+        prefs.intervals.has(b.dataset.int) ? prefs.intervals.delete(b.dataset.int) : prefs.intervals.add(b.dataset.int);
+        b.classList.toggle("active", prefs.intervals.has(b.dataset.int));
+        update();
+      } else if (b?.dataset.grp) {
+        prefs.groups.has(b.dataset.grp) ? prefs.groups.delete(b.dataset.grp) : prefs.groups.add(b.dataset.grp);
+        b.classList.toggle("active", prefs.groups.has(b.dataset.grp));
+        update();
+      } else if (b?.dataset.mode && b.dataset.mode !== prefs.mode) {
+        prefs.mode = b.dataset.mode;
+        m.querySelectorAll("#f-mode .chip").forEach((x) => x.classList.toggle("active", x === b));
+        update();
+      } else if (b?.dataset.g && b.dataset.g !== prefs.group) {
+        prefs.group = b.dataset.g;
+        m.querySelectorAll("#group .chip").forEach((x) => x.classList.toggle("active", x === b));
+        drawHistory();
+      }
+      if (e.target.closest("#f-reset")) {
+        prefs.intervals.clear();
+        prefs.groups.clear();
+        prefs.mode = "spread";
+        m.close();
+        update();
+      }
+    });
   });
-  $("#f-reset", view).addEventListener("click", () => {
-    prefs.intervals.clear();
-    prefs.groups.clear();
-    prefs.mode = "spread";
-    renderCosts(view);
-  });
-  view.querySelector("#group").addEventListener("click", (e) => {
-    const b = e.target.closest("[data-g]");
-    if (b) {
-      prefs.group = b.dataset.g;
-      drawHistory();
-    }
-  });
+  const assumeText = () => {
+    $("#assume-text", view).textContent = `Annahmen: ${prefs.months} Monate · ${prefs.increase.toLocaleString("de-DE")} % Preissteigerung · ${
+      prefs.extras ? "mit" : "ohne"
+    } Zusatzkosten`;
+  };
   view.querySelector("#range").addEventListener("click", (e) => {
     const b = e.target.closest("[data-r]");
     if (b) {
@@ -324,17 +362,22 @@ export async function renderCosts(view) {
   $("#months", view).addEventListener("input", (e) => {
     prefs.months = Number(e.target.value);
     $("#m-out", view).textContent = prefs.months;
+    assumeText();
     debounced();
   });
   $("#increase", view).addEventListener("input", (e) => {
     prefs.increase = Number(e.target.value);
     $("#i-out", view).textContent = prefs.increase.toLocaleString("de-DE");
+    assumeText();
     debounced();
   });
   $("#extras", view).addEventListener("change", (e) => {
     prefs.extras = e.target.checked;
+    assumeText();
     drawProjection();
   });
+  drawActive();
+  assumeText();
   drawSelection();
   await Promise.all([drawHistory(), drawProjection()]);
 }

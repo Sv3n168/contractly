@@ -3732,3 +3732,44 @@ a.switch-banner:hover {
 .filter-sheet .chips {
   flex-wrap: wrap;
 }
+
+.costs-toolbar {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.costs-toolbar .active-filters {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.assumptions {
+  margin-bottom: 14px;
+}
+.assumptions > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+}
+.assumptions > summary::-webkit-details-marker {
+  display: none;
+}
+.assumptions > summary .svg-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+.assumptions[open] > summary .chev {
+  transform: rotate(180deg);
+}
+.chips .chip .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}

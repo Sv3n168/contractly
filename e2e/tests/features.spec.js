@@ -199,6 +199,7 @@ test("costs: filter by payment interval, monthly reserve, when paid", async ({ p
     data: { name: "Haftpflicht Jahr", category: "liability", start_date: `${y}-03-10`, initial_price: { valid_from: `${y}-03-10`, amount: 120, interval: "yearly" } },
   });
   await page.goto("/#/costs");
+  await page.click("#filter-btn");
   await page.click("#f-int [data-int='yearly']");
   await expect(page.locator("#selection .kpi.hero")).toContainText("Monatliche Rücklage");
   await expect(page.locator("#selection .list")).toContainText("Haftpflicht Jahr");
@@ -208,7 +209,10 @@ test("costs: filter by payment interval, monthly reserve, when paid", async ({ p
     .poll(() => page.evaluate(() => Chart.getChart(document.getElementById("hist"))?.data.datasets.length || 0))
     .toBeGreaterThan(0);
   await page.click("#f-mode [data-mode='paid']");
+  await page.click(".modal [data-close]");
   await expect(page.locator("#hist-sub")).toContainText("Fälligkeit");
+  await expect(page.locator("#filter-count")).toHaveText("2");
+  await page.click("#filter-btn");
   await page.click("#f-reset");
   await expect(page.locator("#selection")).toBeEmpty();
   check();

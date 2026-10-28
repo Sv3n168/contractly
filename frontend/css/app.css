@@ -47,6 +47,14 @@
   --ink-text: #f4f1ea;
   --ink-muted: rgba(244, 241, 234, 0.62);
   --ink-line: rgba(244, 241, 234, 0.1);
+  /* the app's frame (sidebar): a quiet paper tone, not black */
+  --chrome: #f3f1ec;
+  --chrome-text: var(--text);
+  --chrome-muted: var(--muted);
+  --chrome-line: var(--border);
+  --chrome-hover: rgba(11, 15, 20, 0.04);
+  --chrome-active: var(--surface);
+  --chrome-active-shadow: 0 1px 2px rgba(11, 15, 20, 0.06), 0 0 0 1px var(--border);
   --emerald: #2fbf88;
   --font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   /* Motion: iOS-like curves – a spring for things that move, a soft ease-out for fades */
@@ -101,6 +109,10 @@
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
     --ink: #000000;
     --ink-2: #0c1420;
+    --chrome: #0d1116;
+    --chrome-hover: rgba(255, 255, 255, 0.04);
+    --chrome-active: var(--surface-2);
+    --chrome-active-shadow: none;
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
@@ -141,6 +153,10 @@
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
   --ink: #000000;
   --ink-2: #0c1420;
+  --chrome: #0d1116;
+  --chrome-hover: rgba(255, 255, 255, 0.04);
+  --chrome-active: var(--surface-2);
+  --chrome-active-shadow: none;
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
@@ -262,10 +278,9 @@ h3 {
   flex-direction: column;
   gap: 4px;
   padding: 20px 14px;
-  color: var(--ink-text);
-  background: url("guilloche.svg") right -120px bottom -40px / 560px auto no-repeat,
-    linear-gradient(180deg, var(--ink) 0%, var(--ink) 55%, var(--ink-2) 100%);
-  border-right: 1px solid var(--ink-line);
+  color: var(--chrome-text);
+  background: var(--chrome);
+  border-right: 1px solid var(--chrome-line);
   overflow-y: auto;
 }
 .brand {
@@ -281,14 +296,14 @@ h3 {
 }
 .sidebar .brand,
 .auth-side .brand {
-  color: var(--ink-text);
+  color: var(--chrome-text);
 }
 .brand-mark {
   width: 34px;
   height: 34px;
   border-radius: 10px;
   background: url("/icon.svg") center / cover;
-  box-shadow: 0 0 0 1px var(--ink-line), 0 6px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px var(--chrome-line);
 }
 .brand-mark .svg-icon {
   display: none;
@@ -299,7 +314,7 @@ h3 {
   font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
   opacity: 0.75;
 }
 .nav-link {
@@ -308,18 +323,19 @@ h3 {
   gap: 12px;
   padding: 9px 12px;
   border-radius: var(--radius-sm);
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
   font-weight: 550;
   transition: background 0.15s, color 0.15s;
   position: relative;
 }
 .nav-link:hover {
-  background: rgba(244, 241, 234, 0.06);
-  color: var(--ink-text);
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
 }
 .nav-link.active {
-  background: rgba(244, 241, 234, 0.09);
-  color: var(--ink-text);
+  background: var(--chrome-active);
+  color: var(--chrome-text);
+  box-shadow: var(--chrome-active-shadow);
 }
 .nav-link.active::before {
   /* green marker: where you are */
@@ -351,34 +367,36 @@ h3 {
 .sidebar .btn-new {
   margin: 0 2px 10px;
   justify-content: center;
-  background: var(--ink-text);
-  border-color: var(--ink-text);
-  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text);
+  box-shadow: var(--shadow-sm);
 }
 .sidebar .btn-new:hover {
-  background: #fff;
+  background: var(--surface);
+  border-color: var(--border-strong, var(--border));
 }
 .sidebar .user-chip,
 .sidebar .user-chip b {
-  color: var(--ink-text);
+  color: var(--chrome-text);
 }
 .sidebar .user-chip small {
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
 }
 .sidebar .user-chip:hover {
-  background: rgba(244, 241, 234, 0.06);
+  background: var(--chrome-hover);
 }
 .sidebar .btn-ghost {
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
 }
 .sidebar .btn-ghost:hover {
-  background: rgba(244, 241, 234, 0.08);
-  color: var(--ink-text);
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
 }
 .sidebar-footer {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid var(--ink-line);
+  border-top: 1px solid var(--chrome-line);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -390,10 +408,10 @@ h3 {
   width: 100%;
   margin-bottom: 8px;
   padding: 8px 12px;
-  border: 1px solid var(--ink-line);
+  border: 1px solid var(--chrome-line);
   border-radius: var(--radius-sm);
-  background: rgba(244, 241, 234, 0.05);
-  color: var(--ink-muted);
+  background: var(--chrome-hover);
+  color: var(--chrome-muted);
   cursor: pointer;
   text-align: left;
 }
@@ -401,10 +419,10 @@ h3 {
   margin-left: auto;
   font-size: 11px;
   padding: 1px 6px;
-  border: 1px solid var(--ink-line);
+  border: 1px solid var(--chrome-line);
   border-radius: 5px;
   background: transparent;
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
 }
 
 .main {
@@ -2293,9 +2311,9 @@ details.more > .body {
     border-radius: 16px;
     display: grid;
     place-items: center;
-    color: var(--ink-text);
-    background: linear-gradient(135deg, var(--ink-2), var(--ink));
-    box-shadow: 0 6px 18px rgba(11, 15, 20, 0.35), inset 0 -2px 0 var(--emerald);
+    color: #fff;
+    background: var(--primary);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 30%, transparent);
   }
   .bottom-nav .nav-badge {
     position: absolute;
@@ -3514,4 +3532,46 @@ a.switch-banner:hover {
   text-decoration: underline;
   text-decoration-color: var(--border);
   text-underline-offset: 2px;
+}
+
+.callout-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------------------ facts: read like a list
+ * Label left, value right, a hairline between – instead of a grid of grey boxes. */
+
+.main .facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.main .fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 0;
+  background: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+.main .fact:last-child {
+  border-bottom: 0;
+}
+.main .fact .k {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.main .fact .v {
+  margin: 0;
+  text-align: right;
+  font-weight: 550;
+}
+.main .fact .v small {
+  display: block;
+  font-weight: 400;
 }

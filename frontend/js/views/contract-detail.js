@@ -55,7 +55,6 @@ export async function renderContractDetail(view, id, query = {}) {
         <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))} ${stateBadge(c)}</div>
       </div>
       <div class="page-actions">
-        ${c.state !== "ended" && !loan ? `<a class="btn btn-primary" href="#/contracts/${id}?tab=compare">${icon("scale")} Vergleichen</a>` : ""}
         <a class="btn" href="#/contracts/${id}/edit">${icon("edit")}<span class="label">Bearbeiten</span></a>
         <div class="menu">
           <button class="btn btn-icon" data-menu aria-label="Mehr Aktionen">${icon("more")}</button>
@@ -219,7 +218,7 @@ async function overviewTab(el, c, reload) {
     <div class="card" style="margin-bottom:20px">
       <div class="card-head" style="align-items:flex-start"><div><h2>Kostenverlauf</h2>
         <p>${chain.length > 1 ? "Durchgehend über alle Wechsel" : "Monatliche Kosten"} · gestrichelt = Vorschau${hist.extras.some((v) => v) || hist.credits.some((v) => v) ? " · Punkte = Zusatzkosten oder Bonus" : ""}</p></div>
-        ${c.state !== "ended" ? `<button class="btn btn-sm" id="extra-btn">${icon("plus")} Zusatzkosten</button>` : ""}</div>
+</div>
       <div class="chart-box"><canvas id="hist"></canvas></div>
       ${
         hist.series.length > 1
@@ -237,8 +236,7 @@ async function overviewTab(el, c, reload) {
     <div class="grid grid-2">
       <div class="stack">
         <div class="card">
-          <div class="card-head"><div><h2>Leistungen & Eckdaten</h2></div>
-            <a class="btn btn-sm btn-ghost" href="#/contracts/${c.id}/edit">${icon("edit")} Ändern</a></div>
+          <div class="card-head"><div><h2>Leistungen & Eckdaten</h2></div></div>
           ${
             facts.length
               ? `<div class="facts">${facts.map(([k, v]) => `<div class="fact"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join("")}</div>`
@@ -297,13 +295,6 @@ async function overviewTab(el, c, reload) {
           <div class="fact"><div class="k">Erinnerung</div><div class="v">${c.reminder_days != null ? `${c.reminder_days} Tage vorher` : "aus"}</div></div>
         </div>`
         }
-        ${
-          c.state === "active"
-            ? `<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-                <button class="btn" id="cancel-btn">${icon("ban")} Kündigen</button>
-                <button class="btn btn-ghost" id="letter-btn">${icon("mail")} Kündigungsschreiben</button></div>`
-            : ""
-        }
       </div>
     </div>`;
 
@@ -335,9 +326,18 @@ function deadlineCallout(c) {
   }
   const d = daysUntil(c.cancellation_deadline);
   const cls = d <= 14 ? "bad" : d <= 45 ? "warn" : "good";
+  // the actions show up only when they matter: a deadline coming up
   return `<div class="callout ${cls}">${icon(cls === "good" ? "check" : "alert")}<div>
     Nächste Kündigungsmöglichkeit: bis <b>${fmtDate(c.cancellation_deadline)}</b> (${relDays(d)}) zum ${fmtDate(c.next_term_end)}.
-    ${cls === "good" ? "Entspannt – genug Zeit zum Vergleichen." : "Jetzt vergleichen lohnt sich!"}</div></div>`;
+    ${cls === "good" ? "Entspannt – genug Zeit zum Vergleichen." : "Jetzt vergleichen lohnt sich."}${
+      cls === "good"
+        ? ""
+        : `<div class="callout-actions">
+            ${c.category === "loan" ? "" : `<a class="btn btn-sm" href="#/contracts/${c.id}?tab=compare">${icon("scale")} Angebote vergleichen</a>`}
+            <button class="btn btn-sm btn-ghost" id="cancel-btn">${icon("ban")} Kündigen</button>
+            <button class="btn btn-sm btn-ghost" id="letter-btn">${icon("mail")} Kündigungsschreiben</button>
+          </div>`
+    }</div></div>`;
 }
 
 const MONTH_INITIALS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];

@@ -584,6 +584,9 @@ class Vault:
         if dek is None:
             raise VaultError("locked")
         ttl = settings.session_days_remember * 86400 if remember else settings.session_hours * 3600
+        idle = self.idle_minutes(user_id)
+        if idle:
+            ttl = min(ttl, idle * 60)  # automatic logout wins over "Angemeldet bleiben"
         token = secrets.token_urlsafe(32)
         nonce = os.urandom(12)
         wrapped = nonce + AESGCM(self._token_key(token)).encrypt(nonce, dek, user_id.encode())
@@ -621,6 +624,24 @@ class Vault:
             except InvalidTag:
                 return None
         return user_id
+
+    def idle_minutes(self, user_id: str) -> int:
+        try:
+            user = self.user(user_id)
+        except VaultError:
+            return 0
+        return int((user.get("settings") or {}).get("idle_minutes") or 0)
+
+    def limit_sessions(self, user_id: str, minutes: int) -> None:
+        """A newly set automatic logout also applies to the sessions already open."""
+        if not minutes:
+            return
+        ttl = minutes * 60
+        with closing(self._sdb()) as db:
+            db.execute(
+                "UPDATE sessions SET ttl=MIN(ttl, ?), expires=MIN(expires, ?) WHERE user_id=?",
+                (ttl, time.time() + ttl, user_id),
+            )
 
     def end_session(self, token: str | None) -> None:
         """Logout: end the session; the last session of a user also removes their key."""

@@ -97,7 +97,7 @@ export async function renderDashboard(view) {
         <div class="list" id="dash-reminders">
           ${
             upcoming.items.length
-              ? upcoming.items.slice(0, 3).map((i) => reminderItem(i, { compact: true })).join("")
+              ? upcoming.items.slice(0, 3).map((i) => reminderItem(i)).join("")
               : `<div class="callout good">${icon("check")}<div>Alles im Griff – in den nächsten 60 Tagen steht nichts an.</div></div>`
           }
         </div>

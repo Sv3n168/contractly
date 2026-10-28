@@ -147,9 +147,20 @@ test("pause a subscription", async ({ page }) => {
   check();
 });
 
-test("reminders and calendar link", async ({ page }) => {
+test("reminders: one check mark per row, the row opens every option", async ({ page }) => {
   const check = watchErrors(page);
   await page.goto("/#/reminders");
+  const row = page.locator("#later .reminder-item").first();
+  await expect(row.locator(".quick-done")).toHaveCount(1);
+  await row.locator("[data-open]").click();
+  await expect(page.locator(".reminder-sheet .sheet-actions .btn").first()).toBeVisible();
+  await page.locator(".reminder-sheet [data-close]").click();
+  check();
+});
+
+test("calendar link lives in the settings", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/settings");
   await expect(page.locator("#cal")).toHaveValue(/\/api\/calendar\/.+\.ics$/);
   const url = await page.inputValue("#cal");
   const res = await page.request.get(url);
@@ -189,6 +200,7 @@ test("own fields: rename the customer number, add a field", async ({ page }) => 
   await page.fill("[name=price_amount]", "39");
   await page.click("summary:has-text('Nummern, Kostenanteil')");
   const own = page.locator("#own-fields");
+  await page.fill("[name=managed_by]", "Makler Schmidt");
   await own.locator("[data-key=customer_number] [data-rename]").click();
   await own.locator("[data-key=customer_number] .lbl-input").fill("Mitgliedsnummer");
   await page.keyboard.press("Enter");
@@ -201,5 +213,6 @@ test("own fields: rename the customer number, add a field", async ({ page }) => 
   await expect(page.getByRole("heading", { name: "Kletterhalle" })).toBeVisible();
   await expect(page.locator(".fact", { hasText: "Mitgliedsnummer" })).toContainText("M-4711");
   await expect(page.locator(".fact", { hasText: "Chipkarte" })).toContainText("Nr. 0815");
+  await expect(page.locator(".detail-head .sub")).toContainText("Verwaltet von Makler Schmidt");
   check();
 });

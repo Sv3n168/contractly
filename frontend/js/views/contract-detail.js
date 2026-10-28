@@ -22,7 +22,7 @@ import {
   toast,
   today,
 } from "../ui.js";
-import { attrValue, reminderItem, stateBadge } from "./components.js";
+import { attrValue, bindReminderActions, reminderItem, stateBadge } from "./components.js";
 import { renderCompare } from "./compare.js";
 import { setupDrop } from "./contract-form.js";
 import { contractPayload, suggestionPicker } from "./ocr.js";
@@ -52,7 +52,9 @@ export async function renderContractDetail(view, id, query = {}) {
       <div class="cat-icon lg" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
       <div class="title">
         <h1>${esc(c.name)}</h1>
-        <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))} ${stateBadge(c)}</div>
+        <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))}${
+          c.attributes?.managed_by ? ` · ${esc(c.attributes?.field_labels?.managed_by || "Verwaltet von")} ${esc(c.attributes.managed_by)}` : ""
+        } ${stateBadge(c)}</div>
       </div>
       <div class="page-actions">
         <a class="btn" href="#/contracts/${id}/edit">${icon("edit")}<span class="label">Bearbeiten</span></a>
@@ -243,6 +245,7 @@ async function overviewTab(el, c, reload) {
               : `<p class="muted" style="margin:0">Noch keine Eckdaten hinterlegt. <a href="#/contracts/${c.id}/edit">Jetzt ergänzen</a> – oder ein Dokument hochladen und erkennen lassen.</p>`
           }
           <div class="facts" style="margin-top:10px">
+            ${c.attributes?.managed_by ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.managed_by || "Verwaltet von")}</div><div class="v">${esc(c.attributes.managed_by)}</div></div>` : ""}
             ${c.customer_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.customer_number || "Kundennummer")}</div><div class="v">${esc(c.customer_number)}</div></div>` : ""}
             ${c.contract_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.contract_number || "Vertragsnummer")}</div><div class="v">${esc(c.contract_number)}</div></div>` : ""}
             ${(c.attributes?.custom_fields || [])
@@ -525,7 +528,7 @@ export function priceModal(c, existing, done) {
     body: `<form class="form-grid" id="pf">
       <label class="field"><span>Gültig ab</span><input type="date" name="valid_from" value="${esc(p.valid_from || today())}" required/></label>
       <label class="field"><span>${isOnce ? "Betrag (negativ = Gutschrift)" : "Neuer Preis"}</span><div class="input-group">
-        <input type="number" step="0.01" name="amount" value="${esc(p.amount ?? "")}" placeholder="${cur && !isOnce ? cur.amount : ""}" required inputmode="decimal"/><span class="addon">€</span></div></label>
+        <input type="number" step="0.01" name="amount" value="${esc(p.amount ?? "")}" required inputmode="decimal"/><span class="addon">€</span></div></label>
       ${
         isOnce
           ? `<input type="hidden" name="interval" value="once"/>`
@@ -542,11 +545,11 @@ export function priceModal(c, existing, done) {
       }
       ${
         c.category === "loan" && !isOnce
-          ? `<label class="field"><span>Sollzins ab hier</span><div class="input-group"><input type="number" step="0.01" name="interest_rate" value="${esc(p.details?.interest_rate ?? "")}" placeholder="${esc(c.attributes?.interest_rate ?? "")}"/><span class="addon">%</span></div></label>
+          ? `<label class="field"><span>Sollzins ab hier</span><div class="input-group"><input type="number" step="0.01" name="interest_rate" value="${esc(p.details?.interest_rate ?? "")}"/><span class="addon">%</span></div></label>
              <div class="field span-all"><small>Für eine Anschlussfinanzierung: neue Rate und neuen Zins ab dem Ende der Zinsbindung eintragen.</small></div>`
           : ""
       }
-      <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(p.note ?? "")}" placeholder="${isOnce ? "z. B. Neukundenbonus, Anschlussgebühr" : "z. B. Preiserhöhung, Aktionspreis endet"}"/></label>
+      <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(p.note ?? "")}"/></label>
     </form>`,
     foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
@@ -803,14 +806,10 @@ function remindersTab(el, c, reload) {
       </div>
     </div>`;
   $("#add-rem", el).addEventListener("click", () => reminderForm({ contract_id: c.id }, () => reload("reminders")));
-  $("#rem-list", el).addEventListener("click", async (e) => {
-    const done = e.target.closest("[data-done]");
-    if (done) {
-      await api.completeReminder(done.dataset.done);
-      toast("Erledigt ✓");
-      refreshBadge();
-      reload("reminders");
-    }
+  bindReminderActions($("#rem-list", el), api, (msg) => {
+    toast(msg);
+    refreshBadge();
+    reload("reminders");
   });
 }
 

@@ -2375,17 +2375,6 @@ details.more > .body {
     min-width: 38px;
     justify-content: center;
   }
-  /* reminders: the text keeps the row next to the date, buttons move below it */
-  .reminder-item {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .reminder-item > .grow {
-    flex: 1 1 calc(100% - 70px);
-  }
-  .reminder-item > .grow + .btn {
-    margin-left: auto;
-  }
   .kpi-value {
     margin-top: 4px;
     font-size: 20px;
@@ -3636,4 +3625,63 @@ a.switch-banner:hover {
   .own-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+/* ------------------------------------------------------------------ reminders: read first */
+
+.stack.reading {
+  max-width: 780px;
+}
+.reminder-item {
+  align-items: center;
+}
+.reminder-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* full titles: wrap instead of "…" */
+.reminder-open .title {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.reminder-open:hover .title {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.quick-done {
+  flex: none;
+  color: var(--muted);
+}
+.quick-done:hover {
+  color: var(--good);
+  border-color: var(--good);
+}
+.reminder-sheet .sheet-when {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.reminder-sheet .sheet-detail {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sheet-actions .btn {
+  justify-content: center;
 }

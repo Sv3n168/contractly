@@ -41,7 +41,7 @@ export async function renderInbox(view) {
           <div class="card-head"><div><h2>${icon("mail")} E-Mail-Text einfügen</h2><p>Inhalt der Mail kopieren und hier einfügen</p></div></div>
           <div class="stack" style="gap:12px">
             <label class="field"><span>Betreff (optional)</span><input name="subject" autocomplete="off"/></label>
-            <label class="field"><span>Text</span><textarea name="text" rows="6" required placeholder="z. B. „Ab dem 01.01. ändert sich Ihr monatlicher Grundpreis von 44,95 € auf 49,95 € …“"></textarea></label>
+            <label class="field"><span>Text</span><textarea name="text" rows="6" required></textarea></label>
             <button class="btn btn-primary btn-block" type="submit">${icon("sparkles")} Auswerten</button>
           </div>
         </form>

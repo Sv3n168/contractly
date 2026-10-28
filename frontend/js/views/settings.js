@@ -7,12 +7,14 @@ import { bindRecoveryKey, recoveryKeyHtml } from "./auth.js";
 const isAdmin = () => state.user?.role === "admin";
 
 export async function renderSettings(view) {
-  const [profile, me, backups, users] = await Promise.all([
+  const [profile, me, backups, users, cal] = await Promise.all([
     api.profile(),
     api.me(),
     isAdmin() ? api.backups() : Promise.resolve(null),
     isAdmin() ? api.users() : Promise.resolve(null),
+    api.calendarToken(),
   ]);
+  const calUrl = `${location.origin}/api/calendar/${cal.token}.ics`;
   state.profile = profile;
   state.user = me;
   const cfg = me.settings || {};
@@ -52,7 +54,7 @@ export async function renderSettings(view) {
         <form class="card" id="profile">
           <div class="card-head"><div><h2>${icon("user")} Dein Profil</h2><p>Für die Begrüßung und als Absender im Kündigungsschreiben.</p></div></div>
           <div class="form-grid">
-            <label class="field span-2"><span>Name</span><input name="name" value="${esc(profile.name ?? "")}" placeholder="Max Mustermann"/></label>
+            <label class="field span-2"><span>Name</span><input name="name" value="${esc(profile.name ?? "")}"/></label>
             <label class="field"><span>Straße & Nr.</span><input name="street" value="${esc(profile.street ?? "")}"/></label>
             <label class="field"><span>PLZ & Ort</span><input name="zip_city" value="${esc(profile.zip_city ?? "")}"/></label>
             <label class="field"><span>E-Mail</span><input type="email" name="email" value="${esc(profile.email ?? "")}"/></label>
@@ -65,9 +67,9 @@ export async function renderSettings(view) {
           <div class="card-head"><div><h2>${icon("bell")} Benachrichtigungen</h2><p>Erinnerungen an Fristen – kommen auch, wenn du abgemeldet bist.</p></div></div>
           <div class="form-grid">
             <label class="field span-2"><span>E-Mail-Adresse</span><input type="email" name="notify_email" value="${esc(cfg.notify_email ?? "")}" placeholder="${
-              state.meta.smtp ? "du@example.org" : "E-Mail-Versand ist auf dem Server nicht eingerichtet"
+              state.meta.smtp ? "" : "E-Mail-Versand ist auf dem Server nicht eingerichtet"
             }"/></label>
-            <label class="field span-2"><span>ntfy-Adresse (Push aufs Handy)</span><input name="ntfy_url" value="${esc(cfg.ntfy_url ?? "")}" placeholder="https://ntfy.sh/dein-geheimes-thema"/>
+            <label class="field span-2"><span>ntfy-Adresse (Push aufs Handy)</span><input name="ntfy_url" value="${esc(cfg.ntfy_url ?? "")}"/>
               <small>In der ntfy-App ein Thema abonnieren und dessen Adresse hier eintragen.</small></label>
             <label class="check span-all"><input type="checkbox" name="reveal_names" ${cfg.reveal_names ? "checked" : ""}/>
               <span>Vertragsnamen in Erinnerungen & Kalender zeigen<br/><small class="muted">Aus: neutral wie „Kündigungsfrist Mobilfunk-Vertrag“. Diese Angaben bleiben für den Versand auch nach dem Abmelden lesbar.</small></span></label>
@@ -77,6 +79,16 @@ export async function renderSettings(view) {
             <button class="btn btn-primary" type="submit">${icon("check")} Speichern</button>
           </div>
         </form>
+
+        <div class="card">
+          <div class="card-head"><div><h2>${icon("calendar")} Kalender-Abo</h2>
+            <p>Fristen & Erinnerungen im Handy- oder Outlook-Kalender. Der Link ist geheim und persönlich.</p></div></div>
+          <div class="input-group"><input class="input" readonly value="${esc(calUrl)}" id="cal"/><button class="btn" id="copy-cal" title="Link kopieren" style="border-radius:0 var(--radius-sm) var(--radius-sm) 0">${icon("copy")}</button></div>
+          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+            <a class="btn" href="${calUrl.replace(/^https?/, "webcal")}">${icon("link")} Im Kalender öffnen</a>
+            <button class="btn btn-ghost" id="new-cal" title="Alten Link ungültig machen">${icon("refresh")} Neuer Link</button>
+          </div>
+        </div>
 
         <div class="card">
           <div class="card-head"><div><h2>${icon("home")} Home Assistant</h2><p>Monatskosten, nächste Frist & offene Erinnerungen als Sensor – nur lesend.</p></div></div>
@@ -137,6 +149,17 @@ export async function renderSettings(view) {
       toast(err.message, "error");
     } finally {
       busy(e.currentTarget, false);
+    }
+  });
+  $("#copy-cal", view).addEventListener("click", async () => {
+    await navigator.clipboard.writeText(calUrl);
+    toast("Link kopiert");
+  });
+  $("#new-cal", view).addEventListener("click", async () => {
+    if (await confirmDialog("Der bisherige Kalender-Link funktioniert dann nicht mehr. Neuen Link erzeugen?", { okLabel: "Neuer Link", danger: false })) {
+      await api.newCalendarToken();
+      toast("Neuer Kalender-Link erstellt");
+      router();
     }
   });
   $("#pw", view).addEventListener("click", changePasswordModal);
@@ -348,7 +371,7 @@ function usersCard(users, me) {
         .join("")}
     </div>
     <form id="invite" class="form-grid" style="margin-top:14px">
-      <label class="field"><span>Neuer Benutzer</span><input name="username" placeholder="z. B. Anna" required/></label>
+      <label class="field"><span>Neuer Benutzer</span><input name="username" required/></label>
       <label class="field"><span>Rolle</span><select name="role"><option value="member">Mitglied</option><option value="admin">Administrator</option></select></label>
       <div class="field span-all"><button class="btn btn-primary" type="submit">${icon("plus")} Einladen</button></div>
     </form>

@@ -181,8 +181,8 @@ function quickForm(c, energy, o = null, id = "offer-form") {
   return `
     <form id="${id}">
       <div class="form-grid">
-        <label class="field"><span>Anbieter</span><input name="provider" value="${v("provider")}" placeholder="z. B. Freenet" /></label>
-        <label class="field"><span>Tarif</span><input name="name" value="${v("name")}" placeholder="z. B. Allnet 50 GB" /></label>
+        <label class="field"><span>Anbieter</span><input name="provider" value="${v("provider")}" /></label>
+        <label class="field"><span>Tarif</span><input name="name" value="${v("name")}" /></label>
         ${
           energy
             ? `<label class="field"><span>Grundpreis</span><div class="input-group"><input type="number" step="any" name="base_price_month" value="${v("base_price_month")}" inputmode="decimal"/><span class="addon">€/Monat</span></div></label>
@@ -199,7 +199,7 @@ function quickForm(c, energy, o = null, id = "offer-form") {
         <div class="bonus-rows">${bonuses.map((b) => bonusRow(energy, b)).join("")}</div>
         <div class="promo-row ${hasPromo ? "" : "hidden"}">
           <span class="field-label">Aktionspreis</span>
-          <div class="input-group"><input class="input" type="number" step="0.01" min="0" name="promo_price" value="${v("promo_price")}" placeholder="z. B. 9,99" inputmode="decimal"/><span class="addon">€/Monat</span></div>
+          <div class="input-group"><input class="input" type="number" step="0.01" min="0" name="promo_price" value="${v("promo_price")}" inputmode="decimal"/><span class="addon">€/Monat</span></div>
           <div class="input-group"><span class="addon addon-l">für die ersten</span><input class="input" type="number" min="1" max="60" name="promo_months" value="${o?.promo_months ?? 6}"/><span class="addon">Mon.</span></div>
           <button type="button" class="btn btn-ghost btn-icon btn-danger" data-rm-promo aria-label="Aktionspreis entfernen">${icon("x")}</button>
         </div>

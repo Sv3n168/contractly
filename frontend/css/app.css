@@ -15,18 +15,19 @@
 
 :root {
   color-scheme: light;
-  --bg: #fbfaf7;
+  /* cool, quiet grey-white with one clear blue */
+  --bg: #f7f8fa;
   --surface: #ffffff;
-  --surface-2: #f2f1ec;
-  --surface-3: #e8e6df;
-  --border: #e6e3db;
-  --border-strong: #d5d1c6;
-  --text: #0b0f14;
-  --text-2: #3e4653;
-  --muted: #727885;
-  --primary: #163a6b;
-  --primary-hover: #0f2b52;
-  --primary-soft: #e8eef7;
+  --surface-2: #f1f3f6;
+  --surface-3: #e6e9ee;
+  --border: #e4e7ec;
+  --border-strong: #cfd4dc;
+  --text: #101828;
+  --text-2: #344054;
+  --muted: #667085;
+  --primary: #2348b8;
+  --primary-hover: #1b3a96;
+  --primary-soft: #eaf0fd;
   --primary-ink: #ffffff;
   --good: #0b7f57;
   --good-soft: #e3f3eb;
@@ -35,9 +36,9 @@
   --warn-soft: #fbf1df;
   --bad: #c23b3b;
   --bad-soft: #fbeaea;
-  --info-soft: #e8eef7;
-  --grid: #ebe9e3;
-  --axis: #cbc7bc;
+  --info-soft: #eaf0fd;
+  --grid: #eceff3;
+  --axis: #cfd4dc;
   --shadow-sm: 0 1px 2px rgba(11, 15, 20, 0.05);
   --shadow: 0 1px 2px rgba(11, 15, 20, 0.04), 0 4px 18px rgba(11, 15, 20, 0.06);
   --shadow-lg: 0 12px 40px rgba(11, 15, 20, 0.2);
@@ -48,7 +49,7 @@
   --ink-muted: rgba(244, 241, 234, 0.62);
   --ink-line: rgba(244, 241, 234, 0.1);
   /* the app's frame (sidebar): a quiet paper tone, not black */
-  --chrome: #f3f1ec;
+  --chrome: #ffffff;
   --chrome-text: var(--text);
   --chrome-muted: var(--muted);
   --chrome-line: var(--border);
@@ -781,20 +782,20 @@ h3 {
   height: 16px;
 }
 .kpi-value {
-  margin-top: 10px;
+  margin-top: 6px;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 21px;
   font-weight: 650;
   letter-spacing: -0.025em;
   line-height: 1.1;
   font-variant-numeric: lining-nums tabular-nums;
 }
 .kpi-value.kpi-date {
-  font-size: 19px;
+  font-size: 17px;
 }
 .kpi-sub {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .kpi.hero {
@@ -1853,7 +1854,7 @@ details.more > .body {
 
 .chart-box {
   position: relative;
-  height: 300px;
+  height: 240px;
 }
 .chart-box.sm {
   height: 220px;
@@ -2476,7 +2477,7 @@ details.more > .body {
     bottom: calc(84px + env(safe-area-inset-bottom));
   }
   .chart-box {
-    height: 240px;
+    height: 200px;
   }
   .chart-box.lg {
     height: 280px;
@@ -3288,7 +3289,7 @@ canvas.explorable:active {
   border-top: 1px solid var(--border);
   border-radius: 0;
   box-shadow: none;
-  padding: 22px 0 8px;
+  padding: 18px 0 6px;
 }
 .main .card-head {
   margin-bottom: 10px;
@@ -3324,7 +3325,7 @@ canvas.explorable:active {
 /* .card.kpi: outranks the section rule above, which takes the side padding off */
 .main .kpis > .card.kpi:not(.hero) {
   border-top: 1px solid var(--border);
-  padding: 18px 22px;
+  padding: 12px 18px;
 }
 .main .kpis > .kpi:not(.hero):first-child {
   padding-left: 0;
@@ -3338,10 +3339,10 @@ canvas.explorable:active {
 /* every figure of a row starts at the same height: the tinted card gets the same padding as its
    neighbours (its 1px border stands in for their hairline), so labels, numbers and sub lines align */
 .main .kpis > .card.kpi.hero {
-  padding: 17px 22px;
+  padding: 11px 18px;
 }
 .main #tab > .kpis:first-child:has(> .hero) > .kpi:not(.hero) {
-  padding-top: 18px;
+  padding-top: 12px;
 }
 .main .kpis > .kpi.hero:last-child {
   margin: 0 0 0 16px;

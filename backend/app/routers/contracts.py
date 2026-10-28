@@ -185,6 +185,13 @@ def contract_history(
     for x in chain:
         for m, v in calc.extras_by_month(x, first, calc.month_end(last)).items():
             extras[m] = round(extras.get(m, 0.0) + v, 2)
+    # one-off credits (switching bonus): shown as a marker instead of a dip of the price line
+    credits: dict[str, float] = {}
+    for x in chain:
+        for p in x.prices:
+            if p.interval == "once" and p.amount < 0 and first <= p.valid_from <= calc.month_end(last):
+                m = calc.month_key(p.valid_from)
+                credits[m] = round(credits.get(m, 0.0) - p.amount * calc.share(x), 2)
     events = []
     for x in chain:
         for p in x.prices:
@@ -206,6 +213,7 @@ def contract_history(
         "series": series,
         "totals": totals,
         "extras": [extras.get(m, 0.0) for m in months],
+        "credits": [credits.get(m, 0.0) for m in months],
         "events": events,
         "chain": [contract_summary(x, ref) for x in chain],
     }

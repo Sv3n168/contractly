@@ -133,7 +133,7 @@ export function stackedBars(canvas, months, series, { highlightFrom = null, wind
  * chain total, so a provider switch continues the curve instead of restarting it; the
  * segment color shows which contract was active.
  */
-export function chainLine(canvas, months, series, colors, { currentMonth, extras = [] } = {}) {
+export function chainLine(canvas, months, series, colors, { currentMonth, extras = [], credits = [] } = {}) {
   const opts = base();
   const todayIdx = months.indexOf(currentMonth);
   const activeAt = (i) => {
@@ -143,12 +143,15 @@ export function chainLine(canvas, months, series, colors, { currentMonth, extras
     });
     return idx;
   };
-  const totals = months.map((_, i) => series.reduce((sum, s) => sum + (s.values[i] || 0), 0));
+  // A one-off credit (switching bonus) is a marker, not a drop of the price line.
+  const totals = months.map((_, i) => series.reduce((sum, s) => sum + (s.values[i] || 0), 0) + (credits[i] || 0));
+  const marked = (i) => extras[i] || credits[i];
   opts.plugins.tooltip.callbacks.title = (items) => fmtMonth(months[items[0].dataIndex]);
   opts.plugins.tooltip.callbacks.label = (ctx) => {
     const i = ctx.dataIndex;
     const parts = series.filter((s) => s.values[i]).map((s) => ` ${s.name}: ${money(s.values[i])}`);
     if (extras[i]) parts.push(` davon Zusatzkosten: ${money(extras[i])}`);
+    if (credits[i]) parts.push(` Bonus: − ${money(credits[i])}`);
     return parts.length ? parts : " –";
   };
   opts.plugins.tooltip.filter = () => true;
@@ -166,8 +169,8 @@ export function chainLine(canvas, months, series, colors, { currentMonth, extras
           stepped: "before",
           borderWidth: 2,
           // Months with additional charges get a visible marker.
-          pointRadius: (ctx) => (extras[ctx.dataIndex] ? 4 : 0),
-          pointBackgroundColor: (ctx) => colors[activeAt(ctx.dataIndex)],
+          pointRadius: (ctx) => (marked(ctx.dataIndex) ? 4 : 0),
+          pointBackgroundColor: (ctx) => (credits[ctx.dataIndex] ? cssVar("--good") : colors[activeAt(ctx.dataIndex)]),
           pointBorderColor: cssVar("--surface"),
           pointBorderWidth: 2,
           pointHoverRadius: 5,

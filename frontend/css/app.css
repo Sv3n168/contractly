@@ -191,8 +191,8 @@ h4 {
 }
 h1 {
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 750;
+  font-size: 26px;
+  font-weight: 700;
   letter-spacing: -0.035em;
 }
 h2 {
@@ -763,16 +763,16 @@ h3 {
   height: 16px;
 }
 .kpi-value {
-  margin-top: 12px;
+  margin-top: 10px;
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 750;
-  letter-spacing: -0.04em;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
   line-height: 1.1;
   font-variant-numeric: lining-nums tabular-nums;
 }
 .kpi-value.kpi-date {
-  font-size: 22px;
+  font-size: 19px;
 }
 .kpi-sub {
   margin-top: 6px;
@@ -933,7 +933,7 @@ h3 {
 }
 
 .dash-hero .kpi-value {
-  font-size: 40px;
+  font-size: 32px;
   margin: 14px 0 10px;
 }
 .dash-hero .kpi-sub {
@@ -1020,8 +1020,8 @@ h3 {
   gap: 6px;
 }
 .cc-price strong {
-  font-size: 24px;
-  font-weight: 750;
+  font-size: 19px;
+  font-weight: 650;
   letter-spacing: -0.02em;
 }
 .cc-meta {
@@ -1392,7 +1392,7 @@ table.table {
 }
 .fact .v {
   margin-top: 2px;
-  font-weight: 650;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
@@ -1486,8 +1486,8 @@ table.table {
   left: 16px;
 }
 .offer-card .big {
-  font-size: 26px;
-  font-weight: 750;
+  font-size: 21px;
+  font-weight: 650;
   letter-spacing: -0.02em;
 }
 .offer-card dl {
@@ -2323,35 +2323,11 @@ details.more > .body {
   .kpi-label .kpi-icon {
     display: none;
   }
-  /* four tiles with the black card: it gets the full width, the rest share one row */
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) {
-    padding: 10px 12px;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-label {
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    font-size: 11.5px;
-    line-height: 1.25;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-value {
-    font-size: 17px;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-value.kpi-date {
-    font-size: 15px;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-sub {
-    font-size: 11.5px;
-  }
   .kpis > .kpi.hero {
     grid-column: 1 / -1;
   }
   .kpis > .kpi.hero .kpi-value {
-    font-size: 26px;
+    font-size: 22px;
   }
   .card.contract-list {
     padding: 4px 0;
@@ -2842,7 +2818,7 @@ body:not(.is-admin) .admin-only {
   gap: 2px;
 }
 .checkup-stats b {
-  font-size: 28px;
+  font-size: 22px;
 }
 .checkup-stats span {
   font-size: 13px;
@@ -2966,7 +2942,7 @@ body:not(.is-admin) .admin-only {
   flex-wrap: wrap;
 }
 .loan-balance .big {
-  font-size: 26px;
+  font-size: 21px;
   font-weight: 700;
 }
 .loan-balance .grow {
@@ -3341,6 +3317,14 @@ canvas.explorable:active {
 .main .kpis > .kpi.hero {
   margin: 0 16px 0 0;
 }
+/* every figure of a row starts at the same height: the tinted card gets the same padding as its
+   neighbours (its 1px border stands in for their hairline), so labels, numbers and sub lines align */
+.main .kpis > .card.kpi.hero {
+  padding: 17px 22px;
+}
+.main #tab > .kpis:first-child:has(> .hero) > .kpi:not(.hero) {
+  padding-top: 18px;
+}
 .main .kpis > .kpi.hero:last-child {
   margin: 0 0 0 16px;
 }
@@ -3395,6 +3379,50 @@ canvas.explorable:active {
   .main .kpis:has(> .hero) > .kpi:not(.hero):first-child {
     padding-left: 0;
   }
+  .main .kpis > .card.kpi.hero {
+    padding: 14px 16px;
+  }
+  /* next to the headline card the other figures become a plain list: label left, number right –
+     nothing squeezed into three narrow columns, nothing cut off */
+  .main .kpis:has(> .hero) {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+  .main .kpis:has(> .hero) > .kpi.hero {
+    margin-bottom: 6px;
+  }
+  .main .kpis:has(> .hero) > .card.kpi:not(.hero) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "label value" "sub value";
+    column-gap: 16px;
+    align-items: center;
+    padding: 11px 0;
+    border-left: 0;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-label {
+    grid-area: label;
+    font-size: 14px;
+    color: var(--text);
+    white-space: normal;
+    display: block;
+    -webkit-line-clamp: unset;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-value,
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-value.kpi-date {
+    grid-area: value;
+    margin: 0;
+    font-size: 17px;
+    text-align: right;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-sub {
+    grid-area: sub;
+    margin-top: 1px;
+    font-size: 12.5px;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-sub:empty {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -3423,10 +3451,67 @@ canvas.explorable:active {
   flex-wrap: wrap;
 }
 .income-now .big {
-  font-size: 24px;
-  font-weight: 750;
+  font-size: 20px;
+  font-weight: 650;
   letter-spacing: -0.03em;
 }
 .income-card.ended {
   opacity: 0.7;
+}
+
+/* ------------------------------------------------------------------ contract chain (switches) */
+
+.chain-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.chain-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text);
+  padding: 4px 0;
+}
+.chain-item .dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  transform: translateY(1px);
+}
+.chain-item:not(.current) b {
+  font-weight: 550;
+}
+.chain-item:not(.current):hover b {
+  text-decoration: underline;
+}
+.chain-arrow {
+  color: var(--muted);
+  display: inline-flex;
+}
+.chain-arrow .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.switch-banner {
+  margin-bottom: 18px;
+  align-items: center;
+  color: var(--text);
+}
+a.switch-banner:hover {
+  filter: brightness(0.98);
+}
+.switch-banner .switch-go {
+  margin-left: auto;
+  flex: none;
+}
+.kpi-sub a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 2px;
 }

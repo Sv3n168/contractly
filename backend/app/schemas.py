@@ -154,6 +154,7 @@ class ContractSummary(ORM):
     partner_amount: float | None = None
     account: str | None = None
     max_total: float | None = None
+    one_off_total: float = 0
     full_monthly_cost: float = 0
     tax_relevant: bool = False
     cancellation_confirmed_on: date | None = None

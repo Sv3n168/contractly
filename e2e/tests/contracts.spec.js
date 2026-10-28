@@ -286,3 +286,58 @@ test("a contract that starts later shows its coming price, not 0,00 €", async 
   await expect(page.locator(".contract-row", { hasText: "Neue Kfz" })).toContainText("75,00");
   check();
 });
+
+test("the form shows when the contract renews and the last day to cancel", async ({ page }) => {
+  const check = watchErrors(page);
+  const y = new Date().getFullYear();
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Kfz" }).click();
+  await page.fill("[name=provider]", "Renew Test");
+  await page.fill("[name=price_amount]", "400");
+  await page.fill("[name=start_date]", `${y - 2}-01-01`);
+  await page.click("summary:has-text('Laufzeit, Kündigung')");
+  // car insurance: 12 months, renews by 12 months, notice 1 month
+  const preview = page.locator("#term-preview");
+  await expect(preview).toContainText(`Verlängert sich am 01.01.${y + 1}`);
+  await expect(preview).toContainText(`bis 30.11.${y}`);
+  // a renewal date from the paper sets the minimum term
+  await page.fill("[name=start_date]", `${y}-01-01`);
+  await page.fill("#renews-on", `${y + 2}-01-01`);
+  await page.locator("#renews-on").dispatchEvent("change");
+  await expect(page.locator("[name=min_term_months]")).toHaveValue("24");
+  await expect(preview).toContainText(`Verlängert sich am 01.01.${y + 2}`);
+  check();
+});
+
+test("a contract paid once shows its amount, not 0,00 € a month", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Bildung" }).click();
+  await page.fill("[name=provider]", "Sprachschule");
+  await page.fill("[name=price_amount]", "490");
+  await page.selectOption("[name=price_interval]", "once");
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Sprachschule" })).toBeVisible();
+  await expect(page.locator(".kpi.hero")).toContainText("Einmalig");
+  await expect(page.locator(".kpi.hero")).toContainText("490,00");
+  await page.goto("/#/contracts");
+  await expect(page.locator(".contract-row", { hasText: "Sprachschule" })).toContainText("einmalig");
+  check();
+});
+
+test("electricity base price can be entered per year", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/4/edit");
+  await page.fill("[name=attr_base_price_month]", "180");
+  await page.selectOption("[name=attr_base_price_month__period]", "year");
+  await page.click("#save");
+  await expect(page.locator(".fact", { hasText: "Grundpreis" })).toContainText("180 €/Jahr (15 €/Monat)");
+  const c = await (await page.request.get("/api/contracts/4")).json();
+  expect(c.attributes.base_price_month).toBe(15);
+  expect(c.attributes.base_price_period).toBe("year");
+  // editing again shows it per year
+  await page.goto("/#/contracts/4/edit");
+  await expect(page.locator("[name=attr_base_price_month]")).toHaveValue("180");
+  await expect(page.locator("[name=attr_base_price_month__period]")).toHaveValue("year");
+  check();
+});

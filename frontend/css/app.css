@@ -4022,3 +4022,16 @@ a.switch-banner:hover {
     padding-left: 0;
   }
 }
+
+/* "€/Monat | €/Jahr" as the addon of a price input */
+.input-group .addon-select {
+  width: auto;
+  flex: none;
+  padding: 0 28px 0 10px;
+  border-left: 0;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background-color: var(--surface-2);
+  color: var(--text-2);
+  font-size: 14px;
+  cursor: pointer;
+}

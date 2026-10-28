@@ -96,6 +96,10 @@ def _summary_fields(c: Contract, ref: date) -> dict:
         "partner_amount": c.partner_amount,
         "account": c.account,
         "max_total": c.max_total,
+        # paid once (no recurring price): what it cost – shown instead of 0,00 € a month
+        "one_off_total": round(
+            sum(p.amount for p in c.prices if p.interval == "once" and p.amount > 0 and not calc.is_extra(p)), 2
+        ),
         "full_monthly_cost": round(_full_monthly(c, ref), 2),
         "tax_relevant": tax_relevant(c.category, c.tax_relevant),
         "cancellation_confirmed_on": c.cancellation_confirmed_on,

@@ -22,7 +22,7 @@ import {
   toast,
   today,
 } from "../ui.js";
-import { attrValue, bindReminderActions, reminderItem, stateBadge } from "./components.js";
+import { attrValue, basePriceText, bindReminderActions, periodPriceInput, readPeriodPrice, reminderItem, stateBadge } from "./components.js";
 import { renderCompare } from "./compare.js";
 import { setupDrop } from "./contract-form.js";
 import { contractPayload, suggestionPicker } from "./ocr.js";
@@ -150,7 +150,7 @@ async function overviewTab(el, c, reload) {
   const colors = hist.series.map((s, i) => slotColor(((catSlot(c.category) - 1 + i) % 8) + 1));
   const cat = category(c.category);
   const facts = (cat.fields || [])
-    .map((f) => [f.label, attrValue(f, c.attributes?.[f.key])])
+    .map((f) => [f.label, f.key === "base_price_month" ? basePriceText(c, c.attributes?.[f.key]) : attrValue(f, c.attributes?.[f.key])])
     .filter(([, v]) => v !== null);
   if (c.attributes?.iban) facts.push(["IBAN (Abbuchung)", c.attributes.iban]);
 
@@ -168,7 +168,7 @@ async function overviewTab(el, c, reload) {
   const ended = c.state === "ended";
   el.innerHTML = `
     ${ended ? endedBanner(c, next) : ""}
-    ${ended ? endedKpis(c, next, runtime) : c.state === "planned" ? plannedKpis(c) : `
+    ${ended ? endedKpis(c, next, runtime) : c.state === "planned" && c.current_price ? plannedKpis(c) : !c.current_price && c.one_off_total ? oneOffKpis(c) : `
     <div class="kpis">
       <div class="card kpi hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Pro Monat</div>
@@ -570,7 +570,7 @@ export function priceModal(c, existing, done) {
       }
       ${
         energy && !isOnce
-          ? `<label class="field"><span>Grundpreis</span><div class="input-group"><input type="number" step="any" name="base_price_month" value="${esc(p.details?.base_price_month ?? c.attributes?.base_price_month ?? "")}"/><span class="addon">€/Monat</span></div></label>
+          ? `<label class="field"><span>Grundpreis</span>${periodPriceInput("base_price_month", p.details?.base_price_month ?? c.attributes?.base_price_month ?? "", c.attributes?.base_price_period)}</label>
              <label class="field"><span>Arbeitspreis</span><div class="input-group"><input type="number" step="any" name="unit_price_ct" value="${esc(p.details?.unit_price_ct ?? c.attributes?.unit_price_ct ?? "")}"/><span class="addon">ct/kWh</span></div></label>
              <div class="field span-all"><small>Tipp: Preis = neuer Abschlag. Grund- & Arbeitspreis werden zusätzlich als aktueller Tarif gespeichert.</small></div>`
           : ""
@@ -596,6 +596,12 @@ export function priceModal(c, existing, done) {
   $("[data-save]", m).addEventListener("click", async (e) => {
     const d = formData($("#pf", m));
     if (d.amount == null) return toast("Bitte Betrag angeben", "error");
+    let basePeriod = null;
+    if ("base_price_month__period" in d) {
+      const r = readPeriodPrice(d, "base_price_month");
+      d.base_price_month = r.monthly;
+      basePeriod = r.period;
+    }
     if (isOnce) d.amount = credit ? -Math.abs(d.amount) : Math.abs(d.amount);
     const details = {};
     if (d.base_price_month != null) details.base_price_month = d.base_price_month;
@@ -608,7 +614,7 @@ export function priceModal(c, existing, done) {
       else await api.addPrice(c.id, payload);
       if (energy && Object.keys(details).length && !p.id) {
         const body = contractPayload(c);
-        Object.assign(body.attributes, details, { installment: d.amount });
+        Object.assign(body.attributes, details, { installment: d.amount }, basePeriod ? { base_price_period: basePeriod } : {});
         await api.updateContract(c.id, body);
       }
       m.close();
@@ -970,5 +976,23 @@ function plannedKpis(c) {
               <div class="kpi-sub">${relDays(daysUntil(c.cancellation_deadline))}</div></div>`
           : ""
       }
+    </div>`;
+}
+
+/** Paid once, no recurring price (a device, a course paid up front …): the amount, not 0,00 € a month. */
+function oneOffKpis(c) {
+  const once = c.prices.filter((p) => p.interval === "once" && p.amount > 0 && p.details?.kind !== "extra");
+  const first = once.map((p) => p.valid_from).sort()[0];
+  return `<div class="kpis kpis-3">
+      <div class="card kpi hero">
+        <div class="kpi-label">Einmalig</div>
+        <div class="kpi-value num">${money(c.one_off_total)}</div>
+        <div class="kpi-sub">${first ? `${first > today() ? "fällig" : "bezahlt"} am ${fmtDate(first)}` : ""}</div>
+      </div>
+      <div class="card kpi"><div class="kpi-label">Laufende Kosten</div>
+        <div class="kpi-value num">keine</div><div class="kpi-sub">kein regelmäßiger Preis</div></div>
+      <div class="card kpi"><div class="kpi-label">Bisher bezahlt</div>
+        <div class="kpi-value num">${money(c.total_paid, true)}</div>
+        <div class="kpi-sub">${c.payments?.count ? `${c.payments.count} ${c.payments.count === 1 ? "Buchung" : "Buchungen"}` : ""}</div></div>
     </div>`;
 }

@@ -4,7 +4,7 @@
 import { api } from "../api.js";
 import { catColorVar, category, catIcon, isEnergy, state } from "../store.js";
 import { $, $$, busy, esc, formData, icon, today, toast } from "../ui.js";
-import { bindIconPicker, iconPicker } from "./components.js";
+import { bindIconPicker, iconPicker, periodPriceInput, readPeriodPrice } from "./components.js";
 import { applySuggestionsToForm } from "./ocr.js";
 
 const form_q = (root, sel) => root.querySelector(sel);
@@ -19,6 +19,8 @@ export function attributeInputs(cat, values = {}, prefix = "attr_", fields = nul
       if (f.type === "select")
         return `<label class="field"><span>${esc(f.label)}</span><select name="${name}"><option value="">–</option>
           ${f.options.map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
+      if (f.key === "base_price_month")
+        return `<label class="field"><span>${esc(f.label)}</span>${periodPriceInput(name, v, values?.base_price_period)}</label>`;
       const type = f.type === "number" ? "number" : f.type === "date" ? "date" : "text";
       const input = `<input type="${type}" name="${name}" ${type === "number" ? 'step="any" inputmode="decimal"' : ""}
         value="${esc(v ?? "")}" placeholder="${esc(f.placeholder || "")}" />`;
@@ -31,6 +33,12 @@ export function attributeInputs(cat, values = {}, prefix = "attr_", fields = nul
 
 export function collectAttributes(data, prefix = "attr_") {
   const attrs = {};
+  data = { ...data };
+  if (`${prefix}base_price_month__period` in data) {
+    const { monthly, period } = readPeriodPrice(data, `${prefix}base_price_month`);
+    data[`${prefix}base_price_month`] = monthly;
+    if (monthly != null) attrs.base_price_period = period;
+  }
   for (const [k, v] of Object.entries(data)) {
     if (!k.startsWith(prefix)) continue;
     if (v === null || v === "" || v === false) continue;
@@ -147,7 +155,6 @@ export async function renderContractForm(view, id, query = {}) {
                     <span class="addon">€</span></div></label>
                   <label class="field"><span>Zahlweise</span><select name="price_interval">
                     ${Object.entries(state.meta.intervals)
-                      .filter(([k]) => k !== "once")
                       .map(([k, v]) => `<option value="${k}" ${k === priceInterval ? "selected" : ""}>${v.label}</option>`)
                       .join("")}</select></label>`
             }
@@ -205,6 +212,10 @@ export async function renderContractForm(view, id, query = {}) {
             <label class="field"><span>Erinnern vor Frist</span><div class="input-group">
               <input name="reminder_days" type="number" min="0" value="${esc(editing ? src.reminder_days ?? "" : 30)}" placeholder="aus" /><span class="addon">Tage</span></div>
               <small>Leer lassen = keine Erinnerung</small></label>
+            <label class="field"><span>Verlängert sich am <span class="muted">(optional)</span></span>
+              <input type="date" id="renews-on"/>
+              <small>Steht auf dem Vertrag? Eintragen – die Mindestlaufzeit wird daraus berechnet.</small></label>
+            <div class="span-all term-preview" id="term-preview" aria-live="polite"></div>
             ${
               editing
                 ? `<label class="field"><span>Vertragsende</span><input name="end_date" type="date" value="${esc(src.end_date ?? "")}" />
@@ -279,6 +290,7 @@ export async function renderContractForm(view, id, query = {}) {
     bindAlreadyCancelled(form);
     bindShareMode(form);
     bindOwnFields(form);
+    bindTermPreview(form);
     $("#total-toggle", form)?.addEventListener("click", (e) => {
       e.currentTarget.hidden = true;
       $("#total-box", form).hidden = false;
@@ -610,4 +622,110 @@ function collectOwnFields(form) {
     .map((f) => ({ label: f.label || "Eigenes Feld", value: f.value }));
   const managed = $("[name=managed_by]", box)?.value.trim();
   return { field_labels, custom_fields, managed_by: managed || undefined };
+}
+
+// ------------------------------------------------------------------ renewal & deadline preview
+// Same rules as the server (calc.term_info): the term ends after the minimum term, then after
+// every renewal; the cancellation must arrive by the term end minus the notice period.
+
+const isoAddMonths = (iso, n) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1 + n, 1));
+  const last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
+  t.setUTCDate(Math.min(d, last));
+  return t.toISOString().slice(0, 10);
+};
+const isoAddDays = (iso, n) => {
+  const t = new Date(`${iso}T00:00:00Z`);
+  t.setUTCDate(t.getUTCDate() + n);
+  return t.toISOString().slice(0, 10);
+};
+const deDate = (iso) => iso.split("-").reverse().join(".");
+
+function noticeDeadline(termEnd, value, unit) {
+  if (!value) return termEnd;
+  if (unit === "days") return isoAddDays(termEnd, -value);
+  if (unit === "weeks") return isoAddDays(termEnd, -7 * value);
+  return isoAddDays(isoAddMonths(isoAddDays(termEnd, 1), -value), -1);
+}
+
+/** Next term end and cancellation deadline from today on (null when not computable). */
+export function nextTerm({ start, minTerm, renewal, noticeValue, noticeUnit }, ref = today()) {
+  if (!start) return null;
+  renewal = renewal || 1;
+  for (let k = 0; k < 2000; k++) {
+    const months = minTerm ? minTerm + k * renewal : renewal * (k + 1);
+    const termEnd = isoAddDays(isoAddMonths(start, months), -1);
+    const deadline = noticeDeadline(termEnd, noticeValue, noticeUnit);
+    if (deadline >= ref) {
+      const minEnd = isoAddDays(isoAddMonths(start, minTerm || 0), -1);
+      const flexible = renewal <= 1 && (!minTerm || termEnd > minEnd);
+      return { termEnd, renewsOn: isoAddDays(termEnd, 1), deadline, flexible };
+    }
+  }
+  return null;
+}
+
+function bindTermPreview(form) {
+  const box = $("#term-preview", form);
+  const renewsOn = $("#renews-on", form);
+  if (!box) return;
+  const num = (name) => {
+    const v = form.elements[name]?.value;
+    return v === "" || v == null ? 0 : Number(v);
+  };
+  const values = () => ({
+    start: form.elements.start_date?.value,
+    minTerm: num("min_term_months"),
+    renewal: num("renewal_months") || 1,
+    noticeValue: num("notice_value"),
+    noticeUnit: form.elements.notice_unit?.value || "months",
+  });
+  const draw = () => {
+    if (form.elements.end_date?.value) {
+      box.innerHTML = `<div class="callout">${icon("clock")}<div>Vertrag endet am <b>${deDate(form.elements.end_date.value)}</b> – keine Verlängerung mehr.</div></div>`;
+      return;
+    }
+    const t = nextTerm(values());
+    if (!t) {
+      box.innerHTML = "";
+      return;
+    }
+    if (document.activeElement !== renewsOn) renewsOn.value = t.renewsOn;
+    const remind = form.elements.reminder_days?.value;
+    const reminderOn = remind !== "" && remind != null ? isoAddDays(t.deadline, -Number(remind)) : null;
+    const renewal = values().renewal;
+    box.innerHTML = t.flexible
+      ? `<div class="callout good">${icon("check")}<div><b>Monatlich kündbar.</b> Nächstes mögliches Ende: ${deDate(t.termEnd)} – dafür kündigen bis <b>${deDate(t.deadline)}</b>.</div></div>`
+      : `<div class="callout warn">${icon("alert")}<div>Verlängert sich am <b>${deDate(t.renewsOn)}</b> um ${renewal} ${renewal === 1 ? "Monat" : "Monate"} –
+          wer das nicht will, muss <b>bis ${deDate(t.deadline)}</b> kündigen.${reminderOn ? ` Contractly erinnert dich am ${deDate(reminderOn)}.` : ""}</div></div>`;
+  };
+  // A renewal date from the contract paper sets the minimum term (keeping the renewal rhythm).
+  renewsOn.addEventListener("change", () => {
+    const v = values();
+    const target = renewsOn.value;
+    if (!target || !v.start || target <= v.start) return draw();
+    let months = 0;
+    while (isoAddMonths(v.start, months) < target && months < 1200) months++;
+    if (isoAddMonths(v.start, months) !== target) {
+      box.innerHTML = `<div class="callout bad">${icon("alert")}<div>Das Datum passt nicht zum Vertragsbeginn (${deDate(v.start)}) – bitte den Beginn prüfen: Verträge verlängern sich meist zum gleichen Tag im Monat.</div></div>`;
+      return;
+    }
+    // keep the minimum term when it already leads to this date; otherwise the shortest term in
+    // the renewal rhythm (e.g. 12 months for a yearly contract) – or exactly up to the date
+    const r = v.renewal;
+    if (nextTerm(v)?.renewsOn !== target) {
+      const field = form.elements.min_term_months;
+      field.value = r > 1 ? ((months - 1) % r) + 1 : months;
+      if (nextTerm(values())?.renewsOn !== target) field.value = months;
+    }
+    draw();
+  });
+  form.addEventListener("input", (e) => {
+    if (e.target !== renewsOn) draw();
+  });
+  form.addEventListener("change", (e) => {
+    if (e.target !== renewsOn) draw();
+  });
+  draw();
 }

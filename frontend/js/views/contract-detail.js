@@ -22,7 +22,7 @@ import {
   toast,
   today,
 } from "../ui.js";
-import { attrValue, basePriceText, bindReminderActions, periodPriceInput, readPeriodPrice, reminderItem, stateBadge } from "./components.js";
+import { PERIOD_FIELDS, attrValue, basePriceText, bindReminderActions, periodPriceInput, readPeriodPrice, reminderItem, stateBadge } from "./components.js";
 import { renderCompare } from "./compare.js";
 import { setupDrop } from "./contract-form.js";
 import { contractPayload, suggestionPicker } from "./ocr.js";
@@ -150,7 +150,7 @@ async function overviewTab(el, c, reload) {
   const colors = hist.series.map((s, i) => slotColor(((catSlot(c.category) - 1 + i) % 8) + 1));
   const cat = category(c.category);
   const facts = (cat.fields || [])
-    .map((f) => [f.label, f.key === "base_price_month" ? basePriceText(c, c.attributes?.[f.key]) : attrValue(f, c.attributes?.[f.key])])
+    .map((f) => [f.label, f.key in PERIOD_FIELDS ? basePriceText(c, c.attributes?.[f.key], f.key) : attrValue(f, c.attributes?.[f.key])])
     .filter(([, v]) => v !== null);
   if (c.attributes?.iban) facts.push(["IBAN (Abbuchung)", c.attributes.iban]);
 
@@ -614,7 +614,14 @@ export function priceModal(c, existing, done) {
       else await api.addPrice(c.id, payload);
       if (energy && Object.keys(details).length && !p.id) {
         const body = contractPayload(c);
-        Object.assign(body.attributes, details, { installment: d.amount }, basePeriod ? { base_price_period: basePeriod } : {});
+        // the Abschlag is kept per month; a yearly price is shown per year again
+        const months = state.meta.intervals[d.interval]?.months || 1;
+        Object.assign(
+          body.attributes,
+          details,
+          { installment: Math.round((d.amount / months) * 100) / 100, installment_period: d.interval === "yearly" ? "year" : "month" },
+          basePeriod ? { base_price_period: basePeriod } : {},
+        );
         await api.updateContract(c.id, body);
       }
       m.close();

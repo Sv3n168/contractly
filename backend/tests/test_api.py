@@ -358,3 +358,23 @@ def test_undo_reminder_actions(client):
     assert back["done_at"] is None and back["due_date"] == "2026-01-10"
     client.post("/api/reminders/dismiss", params={"key": "deadline:1:2026-11-30"})
     assert client.post("/api/reminders/undismiss", params={"key": "deadline:1:2026-11-30"}).json() == {"ok": True}
+
+
+def test_education_category(client):
+    from app.importer import guess_category
+
+    meta = client.get("/api/meta").json()
+    edu = next(c for c in meta["categories"] if c["key"] == "education")
+    assert edu["label"] == "Bildung" and edu["icon"] == "🎓"
+    assert guess_category("Studiengebühren Master Fernstudium") == "education"
+    r = client.post(
+        "/api/contracts",
+        json={
+            "name": "Master",
+            "category": "education",
+            "start_date": "2025-09-01",
+            "initial_price": {"valid_from": "2025-09-01", "amount": 1105, "interval": "monthly"},
+            "attributes": {"institution": "IU", "program": "M.Sc. Informatik"},
+        },
+    )
+    assert r.status_code == 201, r.text

@@ -13,6 +13,7 @@ const PRESETS = {
   gas: ["Nachzahlung Jahresabrechnung", "Mahngebühr"],
   streaming: ["Leihfilm / Kauf", "Zusatzmitglied"],
   fitness: ["Getränke / Shop", "Kurs", "Personal Training"],
+  education: ["Prüfungsgebühr", "Lernmaterial", "Semesterbeitrag", "Exkursion"],
 };
 const DEFAULT_PRESETS = ["Zusatzleistung", "Mahngebühr", "Nachzahlung"];
 

@@ -127,6 +127,22 @@ CATEGORY_HINTS = [
     ("insurance", ("versicherung", "ergo", "axa", "generali", "debeka", "barmenia", "provinzial")),
     ("streaming", ("netflix", "spotify", "disney", "dazn", "sky ", "amazon prime", "apple.com", "youtube", "audible")),
     ("fitness", ("fitness", "fitx", "mcfit", "urban sports", "sportnavi", "wellpass", "verein", "gym")),
+    (
+        "education",
+        (
+            "hochschule",
+            "universität",
+            "studium",
+            "studiengebühr",
+            "semesterbeitrag",
+            "fernstudium",
+            "akademie",
+            "weiterbildung",
+            "volkshochschule",
+            "nachhilfe",
+            "sprachkurs",
+        ),
+    ),
 ]
 
 

@@ -12,12 +12,13 @@ const CATEGORY_SLOT = {
   loan: 1,
   other: 1,
   electricity: 2,
+  gas: 2, // Strom & Gas share one area, so "Bildung" gets a colour of its own
+  education: 4,
   car_insurance: 3,
   liability: 3,
   household: 3,
   legal_protection: 3,
   insurance: 3,
-  gas: 4,
   mobile: 5,
   fitness: 6,
   internet: 7,
@@ -26,9 +27,9 @@ const CATEGORY_SLOT = {
 // In slot order: neighbouring slots were validated for colour-blind separation.
 export const GROUPS = [
   { key: "other", label: "Kredite & Sonstiges", slot: 1 },
-  { key: "electricity", label: "Strom", slot: 2 },
+  { key: "electricity", label: "Strom & Gas", slot: 2 },
   { key: "insurance", label: "Versicherungen", slot: 3 },
-  { key: "gas", label: "Gas", slot: 4 },
+  { key: "education", label: "Bildung", slot: 4 },
   { key: "mobile", label: "Mobilfunk", slot: 5 },
   { key: "fitness", label: "Fitness & Vereine", slot: 6 },
   { key: "internet", label: "Festnetz & Internet", slot: 7 },

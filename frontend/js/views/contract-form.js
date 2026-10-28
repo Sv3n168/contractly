@@ -442,6 +442,7 @@ const CATEGORY_HINTS = [
   ["household", /hausrat/i],
   ["fitness", /fitness|studio|mitgliedschaft|urban sports|sportnavi|wellpass/i],
   ["streaming", /netflix|spotify|disney|streaming|prime video|dazn|sky/i],
+  ["education", /hochschule|universit|studium|studiengeb|semesterbeitrag|fernstudium|akademie|weiterbildung|volkshochschule|nachhilfe|sprachkurs/i],
 ];
 function guessCategory(text) {
   const hit = CATEGORY_HINTS.find(([, re]) => re.test(text || ""));

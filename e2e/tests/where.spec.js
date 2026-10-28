@@ -20,3 +20,18 @@ test("Auswertung answers first where the money goes", async ({ page }, testInfo)
   await page.screenshot({ path: testInfo.outputPath(`where-${testInfo.project.name}.png`), fullPage: false });
   check();
 });
+
+test("Bildung is a category and its own area", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Bildung" }).click();
+  await page.fill("[name=provider]", "Fernhochschule");
+  await page.fill("[name=name]", "Studium");
+  await page.fill("[name=price_amount]", "300");
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Studium" })).toBeVisible();
+  await page.goto("/#/costs");
+  await expect(page.locator("#where .where-area", { hasText: "Bildung" })).toContainText("300,00");
+  await expect(page.locator("#where .where-area", { hasText: "Strom & Gas" })).toBeVisible();
+  check();
+});

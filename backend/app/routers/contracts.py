@@ -1,6 +1,7 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import calc
@@ -23,6 +24,10 @@ from ..schemas import (
 from ..services import contract_detail, contract_summary, load_contracts, price_out, today
 
 router = APIRouter(prefix="/api/contracts", tags=["contracts"])
+
+
+class CheckedIn(BaseModel):
+    last_checked_on: date | None = None
 
 
 def get_contract(db: Session, contract_id: int) -> Contract:
@@ -336,11 +341,22 @@ def no_confirmation(contract_id: int, db: Session = Depends(get_db)):
     return contract_detail(c)
 
 
-@router.post("/{contract_id}/still-used", response_model=ContractOut)
-def still_used(contract_id: int, db: Session = Depends(get_db)):
-    """Answer to the subscription check: keep it, ask again in a year."""
+@router.delete("/{contract_id}/cancellation-confirmed", response_model=ContractOut)
+def unconfirm_cancellation(contract_id: int, db: Session = Depends(get_db)):
+    """Undo "confirmation received"."""
     c = get_contract(db, contract_id)
-    c.last_checked_on = today()
+    c.cancellation_confirmed_on = None
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)
+
+
+@router.post("/{contract_id}/still-used", response_model=ContractOut)
+def still_used(contract_id: int, data: CheckedIn | None = None, db: Session = Depends(get_db)):
+    """Answer to the subscription check: keep it, ask again in a year. With a body it sets the
+    date of the last check directly (undo: back to the previous one)."""
+    c = get_contract(db, contract_id)
+    c.last_checked_on = data.last_checked_on if data else today()
     db.commit()
     db.refresh(c)
     return contract_detail(c)

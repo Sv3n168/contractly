@@ -139,7 +139,8 @@ export function formData(form) {
 
 // ------------------------------------------------------------------ toast
 
-export function toast(message, type = "ok", duration = null) {
+/** Short message at the bottom; with `action` ({ label, run }) it offers e.g. "Rückgängig" a little longer. */
+export function toast(message, type = "ok", duration = null, action = null) {
   let root = $(".toasts");
   if (!root) {
     root = document.createElement("div");
@@ -148,12 +149,22 @@ export function toast(message, type = "ok", duration = null) {
   }
   const el = document.createElement("div");
   el.className = `toast ${type === "error" ? "error" : ""}`;
-  el.innerHTML = `${icon(type === "error" ? "alert" : "check")}<span>${esc(message)}</span>`;
+  el.innerHTML = `${icon(type === "error" ? "alert" : "check")}<span>${esc(message)}</span>${
+    action ? `<button type="button" class="toast-action">${esc(action.label)}</button>` : ""
+  }`;
   root.append(el);
-  setTimeout(() => {
+  const leave = () => {
     el.classList.add("leaving");
     setTimeout(() => el.remove(), 320);
-  }, duration ?? (type === "error" ? 5000 : 2600));
+  };
+  if (action) {
+    $(".toast-action", el).addEventListener("click", async (e) => {
+      e.currentTarget.disabled = true;
+      await action.run();
+      leave();
+    });
+  }
+  setTimeout(leave, duration ?? (type === "error" ? 5000 : action ? 6000 : 2600));
 }
 
 const reducedMotion = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;

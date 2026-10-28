@@ -126,6 +126,8 @@ export const api = {
   createReminder: (data) => request("POST", "/api/reminders", data),
   updateReminder: (id, data) => request("PUT", `/api/reminders/${id}`, data),
   completeReminder: (id) => request("POST", `/api/reminders/${id}/done`),
+  reopenReminder: (id, due_date) => request("POST", `/api/reminders/${id}/reopen`, { due_date }),
+  undismissReminder: (key) => request("POST", `/api/reminders/undismiss${qs({ key })}`),
   deleteReminder: (id) => request("DELETE", `/api/reminders/${id}`),
   dismissReminder: (key) => request("POST", `/api/reminders/dismiss${qs({ key })}`),
   testNotification: () => request("POST", "/api/reminders/test"),
@@ -150,7 +152,8 @@ export const api = {
   pauseContract: (id, data) => request("POST", `/api/contracts/${id}/pause`, data),
   confirmCancellation: (id, data = {}) => request("POST", `/api/contracts/${id}/cancellation-confirmed`, data),
   noConfirmation: (id) => request("POST", `/api/contracts/${id}/no-confirmation`),
-  stillUsed: (id) => request("POST", `/api/contracts/${id}/still-used`),
+  stillUsed: (id, body) => request("POST", `/api/contracts/${id}/still-used`, body),
+  unconfirmCancellation: (id) => request("DELETE", `/api/contracts/${id}/cancellation-confirmed`),
 
   analyzeContractList: (file) => {
     const fd = new FormData();

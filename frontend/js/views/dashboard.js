@@ -64,9 +64,6 @@ export async function renderDashboard(view) {
         <h1>${greeting()}${firstName ? ", " + esc(firstName) : ""} 👋</h1>
         <p>Dein Vertragsüberblick für ${monthName}.</p>
       </div>
-      <div class="page-actions">
-        <a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a>
-      </div>
     </div>
 
     <div class="dash-top">
@@ -119,8 +116,5 @@ export async function renderDashboard(view) {
     visible.map((g) => ({ label: g.label, color: slotColor(g.slot), values: g.values })),
     { highlightFrom: series.months.find((m) => m > currentMonth) },
   );
-  bindReminderActions(view.querySelector("#dash-reminders"), api, (msg) => {
-    toast(msg);
-    router();
-  });
+  bindReminderActions(view.querySelector("#dash-reminders"), api, () => router());
 }

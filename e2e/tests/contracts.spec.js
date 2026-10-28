@@ -55,7 +55,7 @@ test("agreed total: last payment is smaller, so the total comes out exactly", as
   await page.fill("[name=name]", "Master");
   await page.fill("[name=price_amount]", "1105");
   await page.fill("[name=start_date]", start);
-  await page.click("summary:has-text('Laufzeit, Kündigung')");
+  await page.click("#total-toggle");
   await page.fill("[name=max_total]", "19900");
   await page.click("#save");
   await expect(page.getByRole("heading", { name: "Master" })).toBeVisible();
@@ -73,7 +73,7 @@ test("partner pays a fixed amount; a contract without own name is called like it
   await page.locator(".cat-tile", { hasText: "Strom" }).click();
   await page.fill("[name=provider]", "Stadtwerke Musterstadt");
   await page.fill("[name=price_amount]", "95");
-  await page.click("summary:has-text('Kostenanteil')");
+  await page.click("summary:has-text('Anteil, Konto')");
   await page.click("#share-mode [data-mode=amount]");
   await page.fill("[name=partner_amount]", "20");
   await page.click("#save");
@@ -108,13 +108,33 @@ test("own emoji for a contract", async ({ page }) => {
 test("record extra charges by invoice amount", async ({ page }) => {
   const check = watchErrors(page);
   await page.goto("/#/contracts/1?tab=prices");
-  await page.click("[data-add=extra]");
+  await page.click("[data-add=choose]");
+  await page.click(".modal [data-k=extra]");
   await page.click(".modal [data-m=total]");
   await page.fill(".modal [name=amount]", "60");
   await expect(page.locator("#preview")).toContainText("Zusatzkosten");
   await page.click(".modal [data-t='Roaming']");
   await page.click(".modal [data-save]");
   await expect(page.locator(".table", { hasText: "Roaming" })).toBeVisible();
+  check();
+});
+
+test("a bonus is entered as a positive amount and stored as a credit; rows open their dialog", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/1?tab=prices");
+  await page.click("[data-add=choose]");
+  await page.click(".modal [data-k=credit]");
+  await page.fill(".modal [name=amount]", "50");
+  await page.fill(".modal [name=note]", "Treuebonus");
+  await page.click(".modal [data-save]");
+  const row = page.locator("tr.row-link", { hasText: "Treuebonus" });
+  await expect(row).toContainText("Gutschrift");
+  await expect(row).toContainText("50,00");
+  await row.click();
+  await expect(page.locator(".modal .segmented [data-s=credit]")).toHaveClass(/active/);
+  await page.click(".modal [data-del]");
+  await page.click(".modal [data-ok]");
+  await expect(page.locator("tr.row-link", { hasText: "Treuebonus" })).toHaveCount(0);
   check();
 });
 
@@ -176,7 +196,7 @@ test("contract paid from the joint account doesn't count as own cost", async ({ 
   await page.locator(".cat-tile", { hasText: "Streaming" }).click();
   await page.fill("[name=name]", "Familien-Streaming");
   await page.fill("[name=price_amount]", "18");
-  await page.click("summary:has-text('Kostenanteil')");
+  await page.click("summary:has-text('Anteil, Konto')");
   await page.fill("[name=account]", "Gemeinschaftskonto");
   await page.click("#save");
   await expect(page.getByRole("heading", { name: "Familien-Streaming" })).toBeVisible();
@@ -198,7 +218,7 @@ test("own fields: rename the customer number, add a field", async ({ page }) => 
   await page.locator(".cat-tile", { hasText: "Fitness" }).click();
   await page.fill("[name=name]", "Kletterhalle");
   await page.fill("[name=price_amount]", "39");
-  await page.click("summary:has-text('Nummern, Kostenanteil')");
+  await page.click("summary:has-text('Anteil, Konto')");
   const own = page.locator("#own-fields");
   await page.fill("[name=managed_by]", "Makler Schmidt");
   await own.locator("[data-key=customer_number] [data-rename]").click();
@@ -228,5 +248,17 @@ test("contract list: search plus one filter button, active filters removable", a
   await page.click("#active [data-clear=category]");
   await expect(page.locator(".contract-row").nth(1)).toBeVisible();
   await expect(page.locator("#filter-count")).toHaveText("");
+  check();
+});
+
+test("a mis-tap on the check mark can be undone", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/reminders");
+  const first = page.locator("#later .reminder-item:has([data-dismiss])").first();
+  const title = await first.locator(".title").innerText();
+  await first.locator(".quick-done").click();
+  await expect(page.locator("#later .reminder-item .title", { hasText: title })).toHaveCount(0);
+  await page.click(".toast-action");
+  await expect(page.locator("#later .reminder-item .title", { hasText: title })).toHaveCount(1);
   check();
 });

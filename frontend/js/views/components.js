@@ -1,7 +1,7 @@
 // Reusable view fragments.
 
 import { STATE_LABEL, catColorVar, contractIcon, catLabel, category, intervalLabel } from "../store.js";
-import { daysUntil, esc, fmtDate, icon, modal, money, num, relDays } from "../ui.js";
+import { daysUntil, esc, fmtDate, icon, modal, money, num, relDays, toast } from "../ui.js";
 
 export function attrValue(field, value) {
   if (value === null || value === undefined || value === "") return null;
@@ -203,28 +203,50 @@ function reminderSheet(item, api, onChange) {
   });
   m.addEventListener("click", async (e) => {
     if (e.target.closest("a[href]")) return m.close();
-    if (await runAction(e.target, api, onChange)) m.close();
+    if (await runAction(e.target, api, onChange, item)) m.close();
   });
 }
 
-async function runAction(target, api, onChange) {
+async function runAction(target, api, onChange, sheetItem = null) {
   const done = target.closest("[data-done]");
   const dismiss = target.closest("[data-dismiss]");
   const used = target.closest("[data-still-used]");
   const confirmed = target.closest("[data-confirmed]");
+  const row = target.closest("[data-item]");
+  const item = sheetItem ?? (row ? JSON.parse(row.dataset.item) : null);
+  let msg;
+  let undo;
   if (used) {
-    await api.stillUsed(used.dataset.stillUsed);
-    onChange("Prima – wir fragen in einem Jahr wieder");
+    const id = used.dataset.stillUsed;
+    const before = (await api.contract(id)).last_checked_on;
+    await api.stillUsed(id);
+    msg = "Prima – wir fragen in einem Jahr wieder";
+    undo = () => api.stillUsed(id, { last_checked_on: before });
   } else if (confirmed) {
-    await api.confirmCancellation(confirmed.dataset.confirmed);
-    onChange("Bestätigung vermerkt ✓");
+    const id = confirmed.dataset.confirmed;
+    await api.confirmCancellation(id);
+    msg = "Bestätigung vermerkt";
+    undo = () => api.unconfirmCancellation(id);
   } else if (done) {
-    await api.completeReminder(done.dataset.done);
-    onChange("Erledigt ✓");
+    const id = done.dataset.done;
+    await api.completeReminder(id);
+    msg = "Erledigt";
+    if (item?.date) undo = () => api.reopenReminder(id, item.date);
   } else if (dismiss) {
-    await api.dismissReminder(dismiss.dataset.dismiss);
-    onChange("Ausgeblendet");
+    const key = dismiss.dataset.dismiss;
+    await api.dismissReminder(key);
+    msg = "Ausgeblendet";
+    undo = () => api.undismissReminder(key);
   } else return false;
+  // a mis-tap is never final: the message offers to undo it
+  toast(msg, "ok", null, undo && {
+    label: "Rückgängig",
+    run: async () => {
+      await undo();
+      onChange();
+    },
+  });
+  onChange();
   return true;
 }
 

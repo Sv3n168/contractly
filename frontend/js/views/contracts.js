@@ -48,7 +48,6 @@ export async function renderContracts(view) {
       <div><h1>Verträge</h1><p>${running.length} laufend · ${money(monthly)} im Monat · ${money(monthly * 12, true)} im Jahr${
         elsewhere ? ` · zzgl. ${money(elsewhere)} über andere Konten` : ""
       }</p></div>
-      <div class="page-actions"><a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a></div>
     </div>
     <div class="list-toolbar">
       <input class="input" id="q" type="search" placeholder="Suchen …" aria-label="Verträge durchsuchen (Name, Anbieter, Eckdaten)" value="${esc(prefs.q)}" />

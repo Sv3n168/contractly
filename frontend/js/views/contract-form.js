@@ -52,7 +52,7 @@ export async function renderContractForm(view, id, query = {}) {
        <p>${
          predecessor
            ? `Ersetzt <b>${esc(predecessor.name)}</b> – der Kostenverlauf läuft nahtlos weiter.`
-           : "Nur drei Angaben sind Pflicht. Den Rest kannst du jederzeit ergänzen."
+           : "Pflicht sind nur Kategorie, Preis und Beginn (mit <b class=\"req\">*</b>). Den Rest kannst du jederzeit ergänzen."
        }</p>`;
 
   const drawCategoryStep = () => {
@@ -142,7 +142,7 @@ export async function renderContractForm(view, id, query = {}) {
             ${
               editing
                 ? ""
-                : `<label class="field input-big"><span>Preis</span><div class="input-group">
+                : `<label class="field input-big"><span>Preis <b class="req" title="Pflichtfeld">*</b></span><div class="input-group">
                     <input name="price_amount" type="number" step="0.01" inputmode="decimal" required />
                     <span class="addon">€</span></div></label>
                   <label class="field"><span>Zahlweise</span><select name="price_interval">
@@ -151,8 +151,14 @@ export async function renderContractForm(view, id, query = {}) {
                       .map(([k, v]) => `<option value="${k}" ${k === priceInterval ? "selected" : ""}>${v.label}</option>`)
                       .join("")}</select></label>`
             }
-            <label class="field"><span>Vertragsbeginn</span>
+            <label class="field"><span>Vertragsbeginn <b class="req" title="Pflichtfeld">*</b></span>
               <input name="start_date" type="date" value="${esc(src.start_date || query.start || today())}" required /></label>
+          </div>
+          <div class="total-field">
+            <button type="button" class="btn btn-sm btn-ghost" id="total-toggle" ${src.max_total ? "hidden" : ""}>${icon("plus")} Gesamtsumme festlegen <span class="muted">– z. B. Ratenzahlung, Studiengebühren</span></button>
+            <label class="field" id="total-box" ${src.max_total ? "" : "hidden"}><span>Gesamtsumme</span><div class="input-group">
+              <input name="max_total" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(src.max_total ?? "")}"/><span class="addon">€</span></div>
+              <small>Contractly sagt dir, wann sie erreicht ist, wie hoch die letzte Zahlung sein muss – und warnt, wenn mehr bezahlt wurde.</small></label>
           </div>
           <div id="dup-hint"></div>
           ${
@@ -183,7 +189,7 @@ export async function renderContractForm(view, id, query = {}) {
         }
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small" style="font-weight:500">– vorbelegt</span>${icon("chevDown", "chev")}</summary>
+          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small" style="font-weight:500">– Mindestlaufzeit, Frist, Erinnerung · vorbelegt</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <label class="field"><span>Mindestlaufzeit</span><div class="input-group">
               <input name="min_term_months" type="number" min="0" value="${esc(src.min_term_months ?? d.min_term_months ?? "")}" /><span class="addon">Monate</span></div></label>
@@ -199,9 +205,6 @@ export async function renderContractForm(view, id, query = {}) {
             <label class="field"><span>Erinnern vor Frist</span><div class="input-group">
               <input name="reminder_days" type="number" min="0" value="${esc(editing ? src.reminder_days ?? "" : 30)}" placeholder="aus" /><span class="addon">Tage</span></div>
               <small>Leer lassen = keine Erinnerung</small></label>
-            <label class="field"><span>Gesamtsumme <span class="muted">(optional)</span></span><div class="input-group">
-              <input name="max_total" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(src.max_total ?? "")}"/><span class="addon">€</span></div>
-              <small>Fester Gesamtbetrag, z. B. Studiengebühren: Contractly sagt dir, wann er erreicht ist, wie hoch die letzte Zahlung sein muss – und warnt, wenn mehr bezahlt wurde.</small></label>
             ${
               editing
                 ? `<label class="field"><span>Vertragsende</span><input name="end_date" type="date" value="${esc(src.end_date ?? "")}" />
@@ -212,7 +215,7 @@ export async function renderContractForm(view, id, query = {}) {
         </details>
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("file")} Nummern, Kostenanteil & Notizen${icon("chevDown", "chev")}</summary>
+          <summary>${icon("file")} Anteil, Konto & Nummern <span class="muted small" style="font-weight:500">– Partneranteil, Bezahlt über, Verwaltet von, Kunden- & Vertragsnummer, Notizen</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <div class="field share-field">
               <span>Mein Anteil</span>
@@ -276,6 +279,11 @@ export async function renderContractForm(view, id, query = {}) {
     bindAlreadyCancelled(form);
     bindShareMode(form);
     bindOwnFields(form);
+    $("#total-toggle", form)?.addEventListener("click", (e) => {
+      e.currentTarget.hidden = true;
+      $("#total-box", form).hidden = false;
+      $("[name=max_total]", form).focus();
+    });
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
       toast("Erkannte Daten übernommen – bitte kurz prüfen");

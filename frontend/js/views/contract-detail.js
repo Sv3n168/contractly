@@ -66,14 +66,14 @@ export async function renderContractDetail(view, id, query = {}) {
             ${c.state === "active" ? `<button data-act="pause">${icon("clock")} Pausieren (ruhend stellen)</button>` : ""}
             ${
               c.state === "active"
-                ? `<button data-act="cancel">${icon("ban")} Als gekündigt markieren</button>`
+                ? `<button data-act="cancel">${icon("ban")} Kündigen …</button>`
                 : c.state === "cancelled"
                   ? `${c.cancellation_confirmed_on ? "" : `<button data-act="confirmed">${icon("check")} Kündigungsbestätigung erhalten</button>`}
                      <button data-act="reactivate">${icon("refresh")} Kündigung zurücknehmen</button>`
                   : ""
             }
-            <button data-act="letter">${icon("mail")} Kündigungsschreiben</button>
-            <button data-act="successor">${icon("swap")} Durch neuen Vertrag ersetzen</button>
+            ${c.state === "cancelled" ? `<button data-act="letter">${icon("mail")} Kündigungsschreiben</button>` : ""}
+            <button data-act="successor">${icon("swap")} Anbieter oder Tarif wechseln</button>
             <button data-act="reminder">${icon("bell")} Erinnerung hinzufügen</button>
             <hr/>
             <button data-act="delete" class="danger">${icon("trash")} Löschen</button>
@@ -341,8 +341,7 @@ function deadlineCallout(c) {
         ? ""
         : `<div class="callout-actions">
             ${c.category === "loan" ? "" : `<a class="btn btn-sm" href="#/contracts/${c.id}?tab=compare">${icon("scale")} Angebote vergleichen</a>`}
-            <button class="btn btn-sm btn-ghost" id="cancel-btn">${icon("ban")} Kündigen</button>
-            <button class="btn btn-sm btn-ghost" id="letter-btn">${icon("mail")} Kündigungsschreiben</button>
+            <button class="btn btn-sm btn-ghost" id="cancel-btn">${icon("ban")} Kündigen …</button>
           </div>`
     }</div></div>`;
 }
@@ -435,9 +434,8 @@ function progressPct(a, b) {
 function pricesTab(el, c, reload) {
   const recurring = c.prices.filter((p) => p.interval !== "once").sort((a, b) => b.valid_from.localeCompare(a.valid_from));
   const once = c.prices.filter((p) => p.interval === "once").sort((a, b) => b.valid_from.localeCompare(a.valid_from));
-  const actions = (p) => `<td class="r" style="white-space:nowrap">
-      <button class="btn btn-ghost btn-sm" data-edit="${p.id}" aria-label="Bearbeiten">${icon("edit")}</button>
-      <button class="btn btn-ghost btn-sm btn-danger" data-del="${p.id}" aria-label="Löschen">${icon("trash")}</button></td>`;
+  // a row opens its dialog (edit, delete) – no pencil and trash can in every line
+  const actions = () => `<td class="r row-go">${icon("chevRight")}</td>`;
   el.innerHTML = `
     <div class="card" style="margin-bottom:20px">
       <div class="card-head"><div><h2>Preishistorie</h2><p>Der reguläre Preis – jede Änderung gilt ab ihrem Datum bis zur nächsten.</p></div>
@@ -450,7 +448,7 @@ function pricesTab(el, c, reload) {
                 .map((p, i) => {
                   const prev = recurring[i + 1];
                   const diff = prev ? p.monthly_equivalent - prev.monthly_equivalent : null;
-                  return `<tr>
+                  return `<tr class="row-link" data-edit="${p.id}" tabindex="0">
                     <td class="num">${fmtDate(p.valid_from)}</td>
                     <td class="r num"><b>${money(p.amount)}</b></td>
                     <td class="hide-sm">${intervalLabel(p.interval)}</td>
@@ -466,10 +464,7 @@ function pricesTab(el, c, reload) {
     <div class="card">
       <div class="card-head"><div><h2>Zusatzkosten & Einmalzahlungen</h2>
         <p>Teurere Monate (z. B. Auslandstelefonate), Gebühren, Boni und Gutschriften – ändern den regulären Preis nicht.</p></div>
-        <div class="page-actions">
-          <button class="btn btn-sm" data-add="once">${icon("plus")} Einmalzahlung / Bonus</button>
-          <button class="btn btn-sm btn-primary" data-add="extra">${icon("plus")} Zusatzkosten</button>
-        </div></div>
+        <button class="btn btn-sm btn-primary" data-add="choose">${icon("plus")} Erfassen</button></div>
       ${
         c.extras_12m
           ? `<div class="callout" style="margin-bottom:14px">${icon("info")}<div>Letzte 12 Monate: <b>${money(c.extras_12m)}</b> Zusatzkosten in
@@ -486,7 +481,7 @@ function pricesTab(el, c, reload) {
                   const kind = extra
                     ? `<span class="badge warn">Zusatzkosten</span>`
                     : `<span class="badge ${p.amount < 0 ? "good" : ""}">${p.amount < 0 ? "Gutschrift" : "einmalig"}</span>`;
-                  return `<tr>
+                  return `<tr class="row-link" data-edit="${p.id}" tabindex="0">
                     <td class="num">${extra ? esc(monthLabel(ym)) : fmtDate(p.valid_from)}</td>
                     <td class="hide-sm">${kind}</td>
                     <td class="muted">${esc(p.note || "")}</td>
@@ -495,26 +490,47 @@ function pricesTab(el, c, reload) {
                     ${actions(p)}</tr>`;
                 })
                 .join("")}</tbody></table></div>`
-          : `<p class="muted" style="margin:0">Keine Zusatzkosten erfasst. War eine Rechnung mal höher als sonst? Einfach oben eintragen.</p>`
+          : `<p class="muted" style="margin:0">Noch nichts erfasst. War eine Rechnung mal höher als sonst, gab es eine Gebühr oder einen Bonus? Oben auf „Erfassen“.</p>`
       }
     </div>`;
-  el.addEventListener("click", async (e) => {
+  const done = () => reload("prices");
+  const open = (row) => {
+    const p = c.prices.find((x) => x.id === Number(row.dataset.edit));
+    if (isExtra(p)) extraModal(c, p, done);
+    else priceModal(c, p, done);
+  };
+  el.addEventListener("click", (e) => {
     const add = e.target.closest("[data-add]");
-    const edit = e.target.closest("[data-edit]");
-    const del = e.target.closest("[data-del]");
-    const done = () => reload("prices");
-    if (add?.dataset.add === "extra") extraModal(c, null, done);
-    else if (add) priceModal(c, add.dataset.add === "once" ? { interval: "once" } : null, done);
-    if (edit) {
-      const p = c.prices.find((x) => x.id === Number(edit.dataset.edit));
-      if (isExtra(p)) extraModal(c, p, done);
-      else priceModal(c, p, done);
+    const row = e.target.closest("[data-edit]");
+    if (add?.dataset.add === "choose") onceChooser(c, done);
+    else if (add) priceModal(c, null, done);
+    if (row) open(row);
+  });
+  el.addEventListener("keydown", (e) => {
+    const row = e.target.closest("[data-edit]");
+    if (row && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      open(row);
     }
-    if (del && (await confirmDialog("Diesen Eintrag löschen?"))) {
-      await api.deletePrice(c.id, del.dataset.del);
-      toast("Gelöscht");
-      done();
-    }
+  });
+}
+
+/** What happened? A higher bill, a one-off cost or a credit – each with its own simple dialog. */
+function onceChooser(c, done) {
+  const m = modal({
+    title: "Was möchtest du erfassen?",
+    body: `<div class="choice-list">
+        <button class="choice" data-k="extra">${icon("trendUp")}<span><b>Eine Rechnung war höher</b><small>z. B. Auslandstelefonate, Nachzahlung – nur in diesem Monat</small></span></button>
+        <button class="choice" data-k="cost">${icon("euro")}<span><b>Einmalige Kosten</b><small>z. B. Anschlussgebühr, Gerät, Aufnahmegebühr</small></span></button>
+        <button class="choice" data-k="credit">${icon("piggy")}<span><b>Gutschrift oder Bonus</b><small>z. B. Wechselbonus, Erstattung</small></span></button>
+      </div>`,
+  });
+  m.addEventListener("click", (e) => {
+    const k = e.target.closest("[data-k]")?.dataset.k;
+    if (!k) return;
+    m.close();
+    if (k === "extra") extraModal(c, null, done);
+    else priceModal(c, { interval: "once", amount: null, credit: k === "credit" }, done);
   });
 }
 
@@ -523,12 +539,20 @@ export function priceModal(c, existing, done) {
   const cur = c.current_price;
   const p = existing || {};
   const isOnce = p.interval === "once";
+  let credit = isOnce && (p.credit || p.amount < 0);
   const m = modal({
-    title: p.id ? "Preis bearbeiten" : isOnce ? "Einmalzahlung / Bonus" : "Preisänderung erfassen",
+    title: isOnce ? (p.id ? "Einmalbetrag bearbeiten" : credit ? "Gutschrift oder Bonus" : "Einmalige Kosten") : p.id ? "Preis bearbeiten" : "Preisänderung erfassen",
     body: `<form class="form-grid" id="pf">
-      <label class="field"><span>Gültig ab</span><input type="date" name="valid_from" value="${esc(p.valid_from || today())}" required/></label>
-      <label class="field"><span>${isOnce ? "Betrag (negativ = Gutschrift)" : "Neuer Preis"}</span><div class="input-group">
-        <input type="number" step="0.01" name="amount" value="${esc(p.amount ?? "")}" required inputmode="decimal"/><span class="addon">€</span></div></label>
+      ${
+        isOnce
+          ? `<div class="field span-all"><div class="segmented" id="sign">
+              <button type="button" data-s="cost" class="${credit ? "" : "active"}">Kosten</button>
+              <button type="button" data-s="credit" class="${credit ? "active" : ""}">Gutschrift / Bonus</button></div></div>`
+          : ""
+      }
+      <label class="field"><span>${isOnce ? "Datum" : "Gültig ab"}</span><input type="date" name="valid_from" value="${esc(p.valid_from || today())}" required/></label>
+      <label class="field"><span>${isOnce ? "Betrag" : "Neuer Preis"}</span><div class="input-group">
+        <input type="number" step="0.01" ${isOnce ? 'min="0"' : ""} name="amount" value="${esc(p.amount == null ? "" : isOnce ? Math.abs(p.amount) : p.amount)}" required inputmode="decimal"/><span class="addon">€</span></div></label>
       ${
         isOnce
           ? `<input type="hidden" name="interval" value="once"/>`
@@ -551,11 +575,20 @@ export function priceModal(c, existing, done) {
       }
       <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(p.note ?? "")}"/></label>
     </form>`,
-    foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
+    foot: `${p.id ? `<button class="btn btn-ghost btn-danger" data-del style="margin-right:auto">${icon("trash")} Löschen</button>` : ""}
+      <button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
+  $("#sign", m)?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-s]");
+    if (!b) return;
+    credit = b.dataset.s === "credit";
+    m.querySelectorAll("#sign button").forEach((x) => x.classList.toggle("active", x === b));
+  });
+  bindDelete(m, c, p, done);
   $("[data-save]", m).addEventListener("click", async (e) => {
     const d = formData($("#pf", m));
     if (d.amount == null) return toast("Bitte Betrag angeben", "error");
+    if (isOnce) d.amount = credit ? -Math.abs(d.amount) : Math.abs(d.amount);
     const details = {};
     if (d.base_price_month != null) details.base_price_month = d.base_price_month;
     if (d.unit_price_ct != null) details.unit_price_ct = d.unit_price_ct;
@@ -576,6 +609,18 @@ export function priceModal(c, existing, done) {
     } catch (err) {
       busy(e.currentTarget, false);
       toast(err.message, "error");
+    }
+  });
+}
+
+/** "Löschen" inside an edit dialog (instead of a trash can in every row). */
+export function bindDelete(m, c, p, done) {
+  $("[data-del]", m)?.addEventListener("click", async () => {
+    m.close();
+    if (await confirmDialog("Diesen Eintrag löschen?")) {
+      await api.deletePrice(c.id, p.id);
+      toast("Gelöscht");
+      done();
     }
   });
 }
@@ -664,7 +709,7 @@ function documentsTab(el, c, reload) {
                     <a class="grow" href="/api/documents/${d.id}" target="_blank" rel="noopener" style="color:inherit">
                       <div class="title">${esc(d.original_name)}</div>
                       <div class="sub">${fileSize(d.size)} · ${fmtDate(d.uploaded_at)}${d.description ? " · " + esc(d.description) : ""}</div></a>
-                    ${ocrOk ? `<button class="btn btn-sm" data-ocr="${d.id}" title="Daten erkennen">${icon("scan")}<span class="label">Erkennen</span></button>` : ""}
+                    ${ocrOk ? `<button class="btn btn-sm" data-ocr="${d.id}" title="Inhalt erkennen">${icon("scan")}<span class="label">Erkennen</span></button>` : ""}
                     <a class="btn btn-sm btn-ghost" href="/api/documents/${d.id}?download=true" aria-label="Herunterladen">${icon("download")}</a>
                     <button class="btn btn-sm btn-ghost btn-danger" data-del="${d.id}" aria-label="Löschen">${icon("trash")}</button></div>`,
                 )
@@ -675,8 +720,8 @@ function documentsTab(el, c, reload) {
       <div class="card">
         <label class="dropzone" id="drop">${icon("upload")}<b>Dokument hochladen</b>
           <span class="muted small">PDF oder Bild, max. Größe laut Server</span><input type="file" hidden/></label>
-        <label class="check small" style="margin-top:12px"><input type="checkbox" id="auto-ocr" ${ocrOk ? "checked" : "disabled"}/> Nach dem Upload Daten erkennen (OCR)</label>
-        ${ocrOk ? "" : `<p class="small muted">OCR ist auf diesem Server nicht verfügbar.</p>`}
+        <label class="check small" style="margin-top:12px"><input type="checkbox" id="auto-ocr" ${ocrOk ? "checked" : "disabled"}/> Inhalt erkennen und Änderungen vorschlagen</label>
+        ${ocrOk ? "" : `<p class="small muted">Texterkennung ist auf diesem Server nicht eingerichtet.</p>`}
       </div>
     </div>`;
   setupDrop(el, async (file) => {
@@ -806,8 +851,7 @@ function remindersTab(el, c, reload) {
       </div>
     </div>`;
   $("#add-rem", el).addEventListener("click", () => reminderForm({ contract_id: c.id }, () => reload("reminders")));
-  bindReminderActions($("#rem-list", el), api, (msg) => {
-    toast(msg);
+  bindReminderActions($("#rem-list", el), api, () => {
     refreshBadge();
     reload("reminders");
   });

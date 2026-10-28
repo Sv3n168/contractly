@@ -68,13 +68,14 @@ export async function renderCosts(view) {
   const usedGroups = GROUPS.filter((g) => running.some((c) => groupOf(c.category) === g.key));
   const usedIntervals = INTERVAL_CHIPS.filter(([k]) => running.some((c) => c.current_price?.interval === k));
   view.innerHTML = `
-    <div class="page-head"><div><h1>Kosten & Prognose</h1><p>Was haben deine Verträge gekostet – und was kommt auf dich zu?</p></div>
+    <div class="page-head"><div><h1>Kosten & Prognose</h1><p>Wohin dein Geld geht, wie es sich entwickelt hat – und was auf dich zukommt.</p></div>
       ${accountSwitch(accounts, state.account)}</div>
 
     <div class="list-toolbar costs-toolbar">
       <div class="chips active-filters" id="active"></div>
       <button class="btn" id="filter-btn">${icon("layers")}<span class="label">Filter</span><span class="count" id="filter-count"></span></button>
     </div>
+    <div class="card where-card" id="where" style="margin-bottom:20px"></div>
     <div id="selection"></div>
 
     <div class="card" style="margin-bottom:20px">
@@ -126,6 +127,70 @@ export async function renderCosts(view) {
     onAccount(c) &&
     (!prefs.intervals.size || prefs.intervals.has(c.current_price?.interval)) &&
     (!prefs.groups.size || prefs.groups.has(groupOf(c.category)));
+
+  // ------------------------------------------------------------- where the money goes
+  // The first answer of the page: the monthly total split into areas, largest first, each one
+  // opening its contracts. Same colours as the history chart below.
+  const summaryP = api.summary({ account: state.account }).catch(() => null);
+  const openAreas = new Set();
+  const drawWhere = async () => {
+    const box = $("#where", view);
+    const picked = running.filter(matches);
+    const total = picked.reduce((s, c) => s + c.monthly_cost, 0);
+    if (!picked.length || total <= 0) {
+      box.innerHTML = `<div class="card-head"><div><h2>Wohin dein Geld geht</h2></div></div><p class="muted" style="margin:0">Keine laufenden Kosten für diese Auswahl.</p>`;
+      return;
+    }
+    const areas = GROUPS.map((g) => {
+      const items = picked.filter((c) => groupOf(c.category) === g.key).sort((a, b) => b.monthly_cost - a.monthly_cost);
+      return { ...g, items, sum: items.reduce((s, c) => s + c.monthly_cost, 0) };
+    })
+      .filter((a) => a.sum > 0)
+      .sort((a, b) => b.sum - a.sum);
+    const max = areas[0].sum;
+    const pct = (v) => `${Math.round((v / total) * 100)} %`;
+    const s = await summaryP;
+    const filtered = prefs.intervals.size || prefs.groups.size;
+    const net = !filtered && s?.income_monthly_net ? s.income_monthly_net : null;
+    box.innerHTML = `
+      <div class="card-head"><div><h2>Wohin dein Geld geht</h2>
+        <p>${prefs.mode === "paid" ? "Durchschnitt pro Monat" : "Pro Monat"}, Jahres- und Halbjahreszahlungen umgerechnet · antippen für die Verträge</p></div></div>
+      <div class="where-total">
+        <span class="num where-sum">${money(total)}</span><span class="muted"> im Monat · ${money(total * 12, true)} im Jahr</span>
+        ${net ? `<div class="where-net">${Math.round((total / net) * 100)} % von ${money(net)} Netto · <b>${money(net - total)}</b> bleiben</div>` : ""}
+      </div>
+      <div class="where-strip" aria-hidden="true">${areas
+        .map((a) => `<span style="flex:${a.sum};background:var(--series-${a.slot})" title="${esc(a.label)}: ${money(a.sum)}"></span>`)
+        .join("")}</div>
+      <div class="where-list">${areas
+        .map(
+          (a) => `<div class="where-area ${openAreas.has(a.key) ? "open" : ""}" data-area="${a.key}">
+            <button type="button" class="where-row" aria-expanded="${openAreas.has(a.key)}">
+              <span class="where-label"><span class="dot" style="background:var(--series-${a.slot})"></span>${esc(a.label)}
+                <span class="muted small">${a.items.length} ${a.items.length === 1 ? "Vertrag" : "Verträge"}</span></span>
+              <span class="where-bar"><span style="width:${(a.sum / max) * 100}%;background:var(--series-${a.slot})"></span></span>
+              <span class="where-amount num"><b>${money(a.sum)}</b><span class="muted">${pct(a.sum)}</span></span>
+              ${icon("chevDown", "chev")}
+            </button>
+            <div class="where-items">${a.items
+              .map(
+                (c) => `<a class="where-item" href="#/contracts/${c.id}">
+                  <span>${esc(contractIcon(c))} ${esc(c.name)}</span>
+                  <span class="num">${money(c.monthly_cost)} <span class="muted">· ${pct(c.monthly_cost)}</span></span></a>`,
+              )
+              .join("")}</div>
+          </div>`,
+        )
+        .join("")}</div>`;
+  };
+  $("#where", view).addEventListener("click", (e) => {
+    const area = e.target.closest(".where-row")?.closest("[data-area]");
+    if (!area) return;
+    const k = area.dataset.area;
+    openAreas.has(k) ? openAreas.delete(k) : openAreas.add(k);
+    area.classList.toggle("open", openAreas.has(k));
+    area.querySelector(".where-row").setAttribute("aria-expanded", openAreas.has(k));
+  });
 
   /** What the selection costs: per year, per month and the next due dates – e.g. the monthly reserve for yearly bills. */
   const drawSelection = () => {
@@ -258,6 +323,7 @@ export async function renderCosts(view) {
     redraw();
   });
   const redraw = () => {
+    drawWhere();
     drawSelection();
     drawHistory();
     drawProjection();
@@ -378,6 +444,7 @@ export async function renderCosts(view) {
   });
   drawActive();
   assumeText();
+  drawWhere();
   drawSelection();
   await Promise.all([drawHistory(), drawProjection()]);
 }

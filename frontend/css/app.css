@@ -15,8 +15,8 @@
 
 :root {
   color-scheme: light;
-  /* cool, quiet grey-white with one clear blue */
-  --bg: #f7f8fa;
+  /* cool grey page, white panels, one clear blue */
+  --bg: #f0f2f5;
   --surface: #ffffff;
   --surface-2: #f1f3f6;
   --surface-3: #e6e9ee;
@@ -1103,9 +1103,7 @@ h3 {
 }
 .cr-title b,
 .cr-title span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .cr-title span {
   font-size: 13px;
@@ -1185,9 +1183,8 @@ a.list-item:hover {
 }
 .list-item .title {
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* full titles: wrap instead of "…" */
+  overflow-wrap: anywhere;
 }
 .list-item .sub {
   font-size: 13px;
@@ -1773,9 +1770,13 @@ details.more > .body {
 .tl-label .t {
   font-weight: 600;
   font-size: 14px;
-  white-space: nowrap;
+  line-height: 1.3;
+  /* long names take a second line instead of "…" */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .tl-label .s {
   font-size: 12px;
@@ -2471,11 +2472,42 @@ details.more > .body {
   .chart-box.lg {
     height: 280px;
   }
+  /* phones: the name above, the bar below over the full width – no sideways scrolling */
+  .tl-inner {
+    min-width: 0;
+  }
   .tl-axis {
-    margin-left: 130px;
+    margin-left: 0;
+  }
+  .tl-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 0 4px;
   }
   .tl-label {
-    width: 130px;
+    width: auto;
+    position: relative;
+    z-index: 1;
+    background: var(--surface);
+    padding: 0 0 4px;
+  }
+  .tl-label .cat-icon {
+    display: none;
+  }
+  .tl-label .t {
+    -webkit-line-clamp: unset;
+  }
+  .tl-label > span {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  .tl-track {
+    height: 30px;
+  }
+  .tl-bar {
+    top: 3px;
   }
   .letter {
     padding: 24px 20px;
@@ -3273,68 +3305,68 @@ canvas.explorable:active {
  */
 
 .main .card:not(.kpi.hero):not(.contract-card) {
-  background: transparent;
-  border: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-  box-shadow: none;
-  padding: 18px 0 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  padding: 16px 20px;
 }
 .main .card-head {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .main .card-head h2 {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 .main .card-head h2 .svg-icon {
   width: 15px;
   height: 15px;
+  color: var(--muted);
 }
 .main .card-head p {
   font-size: 13px;
 }
 .main .grid,
 .main .dash-top {
-  column-gap: 48px;
-  row-gap: 12px;
+  gap: 16px;
 }
 .main .stack {
-  gap: 12px;
+  gap: 16px;
 }
 
-/* key figures: one row with thin dividers, no boxes */
+/* key figures: one white strip with thin dividers between the figures */
 .main .kpis {
   gap: 0;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
-/* .card.kpi: outranks the section rule above, which takes the side padding off */
+/* .card.kpi: outranks the section rule above */
 .main .kpis > .card.kpi:not(.hero) {
-  border-top: 1px solid var(--border);
-  padding: 12px 18px;
-}
-.main .kpis > .kpi:not(.hero):first-child {
-  padding-left: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 10px 18px;
 }
 .main .kpis > .kpi:not(.hero) + .kpi:not(.hero) {
   border-left: 1px solid var(--border);
 }
 .main .kpis > .kpi.hero {
-  margin: 0 16px 0 0;
+  margin: 0 8px 0 0;
 }
-/* every figure of a row starts at the same height: the tinted card gets the same padding as its
-   neighbours (its 1px border stands in for their hairline), so labels, numbers and sub lines align */
+/* every figure of a row starts at the same height: the tinted card's 1px border plus its
+   padding equals its neighbours' padding, so labels, numbers and sub lines align */
 .main .kpis > .card.kpi.hero {
-  padding: 11px 18px;
-}
-.main #tab > .kpis:first-child:has(> .hero) > .kpi:not(.hero) {
-  padding-top: 12px;
+  padding: 9px 16px;
 }
 .main .kpis > .kpi.hero:last-child {
-  margin: 0 0 0 16px;
+  margin: 0 0 0 8px;
 }
 .main .kpi-label .kpi-icon {
   display: none;
@@ -3343,6 +3375,7 @@ canvas.explorable:active {
 /* lists run edge to edge inside a section */
 .main .card.contract-list {
   padding-top: 4px;
+  padding-bottom: 4px;
 }
 .main .contract-row,
 .main .cl-group {
@@ -3350,15 +3383,7 @@ canvas.explorable:active {
   padding-right: 0;
 }
 .main .settings-link {
-  padding: 16px 0;
-}
-/* the tab bar already draws the line above a tab's first section */
-.main #tab > .card:first-child,
-.main #tab > .grid:first-child > .card,
-.main #tab > .grid:first-child > .stack > .card:first-child,
-.main #tab > .kpis:first-child > .kpi:not(.hero) {
-  border-top: 0;
-  padding-top: 4px;
+  padding: 16px 20px;
 }
 .main .table th:first-child,
 .main .table td:first-child {
@@ -3371,7 +3396,8 @@ canvas.explorable:active {
 
 @media (max-width: 720px) {
   .main .card:not(.kpi.hero):not(.contract-card) {
-    padding: 18px 0 6px;
+    padding: 14px 16px;
+    border-radius: 12px;
   }
   .main .kpis {
     row-gap: 12px;
@@ -3381,11 +3407,7 @@ canvas.explorable:active {
     margin: 0;
   }
   .main .kpis > .card.kpi:not(.hero) {
-    padding: 12px 10px 12px 12px;
-  }
-  .main .kpis > .kpi:not(.hero):first-child,
-  .main .kpis:has(> .hero) > .kpi:not(.hero):first-child {
-    padding-left: 0;
+    padding: 10px 12px;
   }
   .main .kpis > .card.kpi.hero {
     padding: 14px 16px;
@@ -3405,7 +3427,7 @@ canvas.explorable:active {
     grid-template-areas: "label value" "sub value";
     column-gap: 16px;
     align-items: center;
-    padding: 11px 0;
+    padding: 11px 10px;
     border-left: 0;
   }
   .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-label {
@@ -3772,4 +3794,14 @@ a.switch-banner:hover {
   height: 8px;
   border-radius: 50%;
   margin-right: 6px;
+}
+
+.kpis.kpis-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 720px) {
+  /* a page head with a switch (2 Jahre · 5 Jahre …): the text keeps the full width, the switch goes below */
+  .page-head:has(> .segmented) > div:first-child {
+    flex: 1 1 100%;
+  }
 }

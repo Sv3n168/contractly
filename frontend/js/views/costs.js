@@ -102,7 +102,7 @@ export async function renderCosts(view) {
           Ø Zusatzkosten der letzten 12 Monate einrechnen <span class="muted small" id="x-out"></span></label>
       </div>
       </details>
-      <div class="kpis" id="proj-kpis" style="grid-template-columns:repeat(3,minmax(0,1fr))"></div>
+      <div class="kpis kpis-3" id="proj-kpis"></div>
       <div class="chart-box"><canvas id="proj"></canvas></div>
       <div id="proj-legend"></div>
     </div>

@@ -243,8 +243,12 @@ async function overviewTab(el, c, reload) {
               : `<p class="muted" style="margin:0">Noch keine Eckdaten hinterlegt. <a href="#/contracts/${c.id}/edit">Jetzt ergänzen</a> – oder ein Dokument hochladen und erkennen lassen.</p>`
           }
           <div class="facts" style="margin-top:10px">
-            ${c.customer_number ? `<div class="fact"><div class="k">Kundennummer</div><div class="v">${esc(c.customer_number)}</div></div>` : ""}
-            ${c.contract_number ? `<div class="fact"><div class="k">Vertragsnummer</div><div class="v">${esc(c.contract_number)}</div></div>` : ""}
+            ${c.customer_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.customer_number || "Kundennummer")}</div><div class="v">${esc(c.customer_number)}</div></div>` : ""}
+            ${c.contract_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.contract_number || "Vertragsnummer")}</div><div class="v">${esc(c.contract_number)}</div></div>` : ""}
+            ${(c.attributes?.custom_fields || [])
+              .filter((f) => f.value)
+              .map((f) => `<div class="fact"><div class="k">${esc(f.label)}</div><div class="v">${esc(f.value)}</div></div>`)
+              .join("")}
           </div>
         </div>
         ${ended ? "" : energyCard(c)}

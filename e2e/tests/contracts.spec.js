@@ -180,3 +180,26 @@ test("contract paid from the joint account doesn't count as own cost", async ({ 
   await expect(page.locator(".contract-row", { hasText: "Familien-Streaming" })).toContainText("Gemeinschaftskonto");
   check();
 });
+
+test("own fields: rename the customer number, add a field", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Fitness" }).click();
+  await page.fill("[name=name]", "Kletterhalle");
+  await page.fill("[name=price_amount]", "39");
+  await page.click("summary:has-text('Nummern, Kostenanteil')");
+  const own = page.locator("#own-fields");
+  await own.locator("[data-key=customer_number] [data-rename]").click();
+  await own.locator("[data-key=customer_number] .lbl-input").fill("Mitgliedsnummer");
+  await page.keyboard.press("Enter");
+  await page.fill("[name=customer_number]", "M-4711");
+  await page.click("#own-add");
+  await page.keyboard.type("Chipkarte");
+  await page.keyboard.press("Enter");
+  await page.keyboard.type("Nr. 0815");
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Kletterhalle" })).toBeVisible();
+  await expect(page.locator(".fact", { hasText: "Mitgliedsnummer" })).toContainText("M-4711");
+  await expect(page.locator(".fact", { hasText: "Chipkarte" })).toContainText("Nr. 0815");
+  check();
+});

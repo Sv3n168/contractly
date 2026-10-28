@@ -233,8 +233,7 @@ export async function renderContractForm(view, id, query = {}) {
             <label class="check" style="align-self:center"><input type="checkbox" name="tax_relevant" ${
               (src.tax_relevant ?? category(cat).tax_default) ? "checked" : ""
             }/> Steuerlich relevant</label>
-            <label class="field"><span>Kundennummer</span><input name="customer_number" value="${esc(src.customer_number ?? pred.customer_number ?? "")}" /></label>
-            <label class="field"><span>Vertragsnummer</span><input name="contract_number" value="${esc(src.contract_number ?? "")}" /></label>
+            ${ownFieldsHtml(src, pred)}
             <label class="field span-2"><span>Anschrift des Anbieters <span class="muted">(für Kündigungsschreiben)</span></span>
               <textarea name="provider_address" rows="3" placeholder="Firma&#10;Straße Nr.&#10;PLZ Ort">${esc(src.provider_address ?? "")}</textarea></label>
             <label class="field span-all"><span>Notizen</span><textarea name="notes" rows="3">${esc(src.notes ?? "")}</textarea></label>
@@ -276,6 +275,7 @@ export async function renderContractForm(view, id, query = {}) {
     bindIconPicker(form);
     bindAlreadyCancelled(form);
     bindShareMode(form);
+    bindOwnFields(form);
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
       toast("Erkannte Daten übernommen – bitte kurz prüfen");
@@ -300,7 +300,7 @@ export async function renderContractForm(view, id, query = {}) {
         notice_unit: data.notice_unit || "months",
         reminder_days: data.reminder_days,
         notes: data.notes,
-        attributes: { ...(editing?.attributes || {}), ...collectAttributes(data) },
+        attributes: { ...(editing?.attributes || {}), ...collectAttributes(data), ...collectOwnFields(form) },
         share_percent: data.share_percent == null || data.share_percent === 100 ? null : data.share_percent,
         partner_amount: data.partner_amount || null,
         account: data.account || null,
@@ -500,3 +500,99 @@ function bindShareMode(form) {
   });
 }
 
+// ------------------------------------------------------------------ own fields
+// Customer and contract number can be renamed (✎), and any number of own fields added (+):
+// "Mitgliedsnummer", "Zählernummer", "Ansprechpartner" … Kept in attributes.field_labels and
+// attributes.custom_fields.
+
+const NUMBER_FIELDS = [
+  ["customer_number", "Kundennummer"],
+  ["contract_number", "Vertragsnummer"],
+];
+
+function ownFieldRow({ key = "", label, value = "", custom = false, editLabel = false }) {
+  return `<div class="own-field ${custom ? "custom" : ""}" ${key ? `data-key="${key}"` : ""}>
+      <div class="own-label">
+        <span class="lbl" ${editLabel ? "hidden" : ""}>${esc(label)}</span>
+        <input class="lbl-input" maxlength="40" placeholder="Bezeichnung, z. B. Mitgliedsnummer" value="${esc(label)}" ${editLabel ? "" : "hidden"} aria-label="Bezeichnung"/>
+        <button type="button" class="icon-btn" data-rename title="Bezeichnung ändern" aria-label="Bezeichnung ändern">${icon("edit")}</button>
+        ${custom ? `<button type="button" class="icon-btn" data-remove title="Feld entfernen" aria-label="Feld entfernen">${icon("trash")}</button>` : ""}
+      </div>
+      <input ${key ? `name="${key}"` : `class="cf-value"`} maxlength="200" value="${esc(value)}" aria-label="${esc(label || "Wert")}"/>
+    </div>`;
+}
+
+function ownFieldsHtml(src, pred) {
+  const labels = src.attributes?.field_labels || {};
+  const values = { customer_number: src.customer_number ?? pred.customer_number ?? "", contract_number: src.contract_number ?? "" };
+  return `<div class="field span-all own-fields" id="own-fields">
+      <span>Nummern & eigene Felder</span>
+      <div class="own-grid">
+        ${NUMBER_FIELDS.map(([key, def]) => ownFieldRow({ key, label: labels[key] || def, value: values[key] })).join("")}
+        ${(src.attributes?.custom_fields || []).map((f) => ownFieldRow({ label: f.label, value: f.value, custom: true })).join("")}
+      </div>
+      <button type="button" class="btn btn-sm btn-ghost own-add" id="own-add">${icon("plus")} Feld hinzufügen</button>
+    </div>`;
+}
+
+function bindOwnFields(form) {
+  const box = $("#own-fields", form);
+  if (!box) return;
+  const grid = $(".own-grid", box);
+  const finishRename = (row) => {
+    const input = $(".lbl-input", row);
+    if (input.hidden) return;
+    const text = input.value.trim();
+    if (!text && !row.classList.contains("custom")) input.value = $(".lbl", row).textContent;
+    $(".lbl", row).textContent = input.value.trim() || "Eigenes Feld";
+    input.hidden = true;
+    $(".lbl", row).hidden = false;
+  };
+  box.addEventListener("click", (e) => {
+    const row = e.target.closest(".own-field");
+    if (e.target.closest("[data-rename]")) {
+      const input = $(".lbl-input", row);
+      if (input.hidden) {
+        input.hidden = false;
+        $(".lbl", row).hidden = true;
+        input.focus();
+        input.select();
+      } else finishRename(row);
+    }
+    if (e.target.closest("[data-remove]")) row.remove();
+  });
+  box.addEventListener("keydown", (e) => {
+    if (e.target.matches(".lbl-input") && e.key === "Enter") {
+      e.preventDefault();
+      finishRename(e.target.closest(".own-field"));
+      e.target.closest(".own-field").querySelector("input:not(.lbl-input)").focus();
+    }
+  });
+  box.addEventListener("focusout", (e) => {
+    if (e.target.matches(".lbl-input") && !e.target.closest(".own-field").contains(e.relatedTarget)) finishRename(e.target.closest(".own-field"));
+  });
+  $("#own-add", box).addEventListener("click", () => {
+    grid.insertAdjacentHTML("beforeend", ownFieldRow({ label: "", custom: true, editLabel: true }));
+    $(".own-field:last-child .lbl-input", grid).focus();
+  });
+}
+
+function collectOwnFields(form) {
+  const box = $("#own-fields", form);
+  if (!box) return {};
+  const labelOf = (row) => {
+    const input = $(".lbl-input", row);
+    return (input.hidden ? $(".lbl", row).textContent : input.value).trim();
+  };
+  const field_labels = {};
+  for (const [key, def] of NUMBER_FIELDS) {
+    const row = $(`.own-field[data-key="${key}"]`, box);
+    const label = row && labelOf(row);
+    if (label && label !== def) field_labels[key] = label;
+  }
+  const custom_fields = $$(".own-field.custom", box)
+    .map((row) => ({ label: labelOf(row), value: $(".cf-value", row).value.trim() }))
+    .filter((f) => f.label || f.value)
+    .map((f) => ({ label: f.label || "Eigenes Feld", value: f.value }));
+  return { field_labels, custom_fields };
+}

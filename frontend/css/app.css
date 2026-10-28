@@ -3685,3 +3685,50 @@ a.switch-banner:hover {
 .sheet-actions .btn {
   justify-content: center;
 }
+
+/* ------------------------------------------------------------------ contract list toolbar */
+
+.list-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.list-toolbar .input {
+  flex: 1;
+  min-width: 0;
+}
+.list-toolbar .btn .count:not(:empty) {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  display: inline-grid;
+  place-items: center;
+}
+.active-filters:not(:empty) {
+  margin-bottom: 12px;
+}
+.active-filters .chip .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+.filter-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.fs-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.filter-sheet .chips {
+  flex-wrap: wrap;
+}

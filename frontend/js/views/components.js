@@ -45,6 +45,16 @@ export function deadlineHint(c) {
   return "";
 }
 
+/** In the list only what needs attention: a contract ending, a deadline coming up. */
+function rowHint(c) {
+  if (c.state === "cancelled" && c.end_date) return `<span>${icon("clock")} endet ${fmtDate(c.end_date)}</span>`;
+  if (c.cancellation_deadline && !c.monthly_cancellable) {
+    const d = daysUntil(c.cancellation_deadline);
+    if (d <= 45) return `<span class="badge ${d <= 14 ? "bad" : "warn"}">${icon("alert")} Kündigen bis ${fmtDate(c.cancellation_deadline)}</span>`;
+  }
+  return "";
+}
+
 /** Under the name: the provider – or the category when the contract is just named after the provider. */
 function subtitle(c) {
   return c.provider && c.provider.trim() !== c.name.trim() ? c.provider : catLabel(c.category);
@@ -116,8 +126,8 @@ export function contractRow(c) {
   <a class="contract-row ${c.state === "ended" ? "ended" : ""}" href="#/contracts/${c.id}">
     <div class="cat-icon sm" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
     <div class="cr-title"><b>${esc(c.name)}</b><span>${esc(subtitle(c))}</span></div>
-    <div class="cr-meta">${flags}${attrChips(c, 2)}</div>
-    <div class="cr-deadline">${deadlineHint(c)}</div>
+    <div class="cr-meta">${flags}</div>
+    <div class="cr-deadline">${rowHint(c)}</div>
     <div class="cr-price"><b class="num">${money(c.monthly_cost)}</b><span class="num">${sub}</span></div>
   </a>`;
 }

@@ -216,3 +216,17 @@ test("own fields: rename the customer number, add a field", async ({ page }) => 
   await expect(page.locator(".detail-head .sub")).toContainText("Verwaltet von Makler Schmidt");
   check();
 });
+
+test("contract list: search plus one filter button, active filters removable", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts");
+  await page.click("#filter-btn");
+  await page.click("[data-set=category] [data-v=mobile]");
+  await page.click(".modal [data-close]");
+  await expect(page.locator(".contract-row")).toHaveCount(1);
+  await expect(page.locator("#filter-count")).toHaveText("1");
+  await page.click("#active [data-clear=category]");
+  await expect(page.locator(".contract-row").nth(1)).toBeVisible();
+  await expect(page.locator("#filter-count")).toHaveText("");
+  check();
+});

@@ -3,7 +3,7 @@
 import { api } from "../api.js";
 import { category, isEnergy } from "../store.js";
 import { $, busy, confirmDialog, esc, fmtDate, formData, icon, modal, money, toast, today } from "../ui.js";
-import { attrValue } from "./components.js";
+import { attrValue, periodPriceInput, readPeriodPrice } from "./components.js";
 import { attributeInputs, collectAttributes } from "./contract-form.js";
 
 const VERDICT = {
@@ -128,6 +128,12 @@ export async function renderCompare(el, c, reload) {
 
 function readOfferForm(form) {
   const d = formData(form);
+  let basePeriod = null;
+  if ("base_price_month__period" in d) {
+    const r = readPeriodPrice(d, "base_price_month");
+    d.base_price_month = r.monthly;
+    basePeriod = r.period;
+  }
   if (d.monthly_price == null && d.base_price_month == null && d.unit_price_ct == null) {
     toast("Bitte einen Preis angeben", "error");
     return null;
@@ -152,7 +158,7 @@ function readOfferForm(form) {
     promo_price: promoOn ? d.promo_price : null,
     promo_months: promoOn && d.promo_price != null ? d.promo_months || null : null,
     min_term_months: d.min_term_months,
-    attributes: collectAttributes(d, "oattr_"),
+    attributes: { ...collectAttributes(d, "oattr_"), ...(basePeriod && d.base_price_month != null ? { base_price_period: basePeriod } : {}) },
     notes: d.notes,
   };
 }
@@ -185,7 +191,7 @@ function quickForm(c, energy, o = null, id = "offer-form") {
         <label class="field"><span>Tarif</span><input name="name" value="${v("name")}" /></label>
         ${
           energy
-            ? `<label class="field"><span>Grundpreis</span><div class="input-group"><input type="number" step="any" name="base_price_month" value="${v("base_price_month")}" inputmode="decimal"/><span class="addon">€/Monat</span></div></label>
+            ? `<label class="field"><span>Grundpreis</span>${periodPriceInput("base_price_month", o?.base_price_month ?? "", o?.attributes?.base_price_period ?? c.attributes?.base_price_period)}</label>
                <label class="field"><span>Arbeitspreis</span><div class="input-group"><input type="number" step="any" name="unit_price_ct" value="${v("unit_price_ct")}" inputmode="decimal"/><span class="addon">ct/kWh</span></div></label>`
             : `<label class="field"><span>Preis pro Monat</span><div class="input-group"><input type="number" step="0.01" name="monthly_price" value="${v("monthly_price")}" inputmode="decimal" required/><span class="addon">€</span></div></label>`
         }

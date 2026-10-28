@@ -22,7 +22,7 @@ import {
   toast,
   today,
 } from "../ui.js";
-import { attrValue, bindReminderActions, reminderItem, stateBadge } from "./components.js";
+import { attrValue, basePriceText, bindReminderActions, periodPriceInput, readPeriodPrice, reminderItem, stateBadge } from "./components.js";
 import { renderCompare } from "./compare.js";
 import { setupDrop } from "./contract-form.js";
 import { contractPayload, suggestionPicker } from "./ocr.js";
@@ -150,7 +150,7 @@ async function overviewTab(el, c, reload) {
   const colors = hist.series.map((s, i) => slotColor(((catSlot(c.category) - 1 + i) % 8) + 1));
   const cat = category(c.category);
   const facts = (cat.fields || [])
-    .map((f) => [f.label, attrValue(f, c.attributes?.[f.key])])
+    .map((f) => [f.label, f.key === "base_price_month" ? basePriceText(c, c.attributes?.[f.key]) : attrValue(f, c.attributes?.[f.key])])
     .filter(([, v]) => v !== null);
   if (c.attributes?.iban) facts.push(["IBAN (Abbuchung)", c.attributes.iban]);
 
@@ -570,7 +570,7 @@ export function priceModal(c, existing, done) {
       }
       ${
         energy && !isOnce
-          ? `<label class="field"><span>Grundpreis</span><div class="input-group"><input type="number" step="any" name="base_price_month" value="${esc(p.details?.base_price_month ?? c.attributes?.base_price_month ?? "")}"/><span class="addon">€/Monat</span></div></label>
+          ? `<label class="field"><span>Grundpreis</span>${periodPriceInput("base_price_month", p.details?.base_price_month ?? c.attributes?.base_price_month ?? "", c.attributes?.base_price_period)}</label>
              <label class="field"><span>Arbeitspreis</span><div class="input-group"><input type="number" step="any" name="unit_price_ct" value="${esc(p.details?.unit_price_ct ?? c.attributes?.unit_price_ct ?? "")}"/><span class="addon">ct/kWh</span></div></label>
              <div class="field span-all"><small>Tipp: Preis = neuer Abschlag. Grund- & Arbeitspreis werden zusätzlich als aktueller Tarif gespeichert.</small></div>`
           : ""
@@ -596,6 +596,12 @@ export function priceModal(c, existing, done) {
   $("[data-save]", m).addEventListener("click", async (e) => {
     const d = formData($("#pf", m));
     if (d.amount == null) return toast("Bitte Betrag angeben", "error");
+    let basePeriod = null;
+    if ("base_price_month__period" in d) {
+      const r = readPeriodPrice(d, "base_price_month");
+      d.base_price_month = r.monthly;
+      basePeriod = r.period;
+    }
     if (isOnce) d.amount = credit ? -Math.abs(d.amount) : Math.abs(d.amount);
     const details = {};
     if (d.base_price_month != null) details.base_price_month = d.base_price_month;
@@ -608,7 +614,7 @@ export function priceModal(c, existing, done) {
       else await api.addPrice(c.id, payload);
       if (energy && Object.keys(details).length && !p.id) {
         const body = contractPayload(c);
-        Object.assign(body.attributes, details, { installment: d.amount });
+        Object.assign(body.attributes, details, { installment: d.amount }, basePeriod ? { base_price_period: basePeriod } : {});
         await api.updateContract(c.id, body);
       }
       m.close();

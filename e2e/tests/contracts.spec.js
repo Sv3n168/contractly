@@ -324,3 +324,20 @@ test("a contract paid once shows its amount, not 0,00 € a month", async ({ pag
   await expect(page.locator(".contract-row", { hasText: "Sprachschule" })).toContainText("einmalig");
   check();
 });
+
+test("electricity base price can be entered per year", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/4/edit");
+  await page.fill("[name=attr_base_price_month]", "180");
+  await page.selectOption("[name=attr_base_price_month__period]", "year");
+  await page.click("#save");
+  await expect(page.locator(".fact", { hasText: "Grundpreis" })).toContainText("180 €/Jahr (15 €/Monat)");
+  const c = await (await page.request.get("/api/contracts/4")).json();
+  expect(c.attributes.base_price_month).toBe(15);
+  expect(c.attributes.base_price_period).toBe("year");
+  // editing again shows it per year
+  await page.goto("/#/contracts/4/edit");
+  await expect(page.locator("[name=attr_base_price_month]")).toHaveValue("180");
+  await expect(page.locator("[name=attr_base_price_month__period]")).toHaveValue("year");
+  check();
+});

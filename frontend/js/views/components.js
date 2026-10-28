@@ -11,6 +11,39 @@ export function attrValue(field, value) {
   return String(value);
 }
 
+// ------------------------------------------------------------------ price per month or per year
+// The base price of electricity/gas is often quoted per year. It is stored per month (all
+// calculations use that); the chosen period is kept for showing it the same way again.
+
+/** Input with a "€/Monat | €/Jahr" switch; ``monthly`` is the stored monthly value. */
+export function periodPriceInput(name, monthly, period = "month") {
+  const yearly = period === "year";
+  const shown = monthly == null || monthly === "" ? "" : yearly ? Math.round(Number(monthly) * 12 * 100) / 100 : monthly;
+  return `<div class="input-group period-input">
+      <input type="number" step="any" inputmode="decimal" name="${name}" value="${esc(shown)}"/>
+      <select class="addon addon-select" name="${name}__period" aria-label="pro Monat oder pro Jahr">
+        <option value="month" ${yearly ? "" : "selected"}>€/Monat</option>
+        <option value="year" ${yearly ? "selected" : ""}>€/Jahr</option>
+      </select></div>`;
+}
+
+/** Monthly value and period from form data of a periodPriceInput (removes the helper key). */
+export function readPeriodPrice(data, name) {
+  const period = data[`${name}__period`] === "year" ? "year" : "month";
+  delete data[`${name}__period`];
+  const v = data[name];
+  if (v == null || v === "") return { monthly: null, period };
+  return { monthly: period === "year" ? Math.round((Number(v) / 12) * 10000) / 10000 : Number(v), period };
+}
+
+/** "120 €/Jahr (10 €/Monat)" when the base price was entered per year. */
+export function basePriceText(c, monthly) {
+  if (monthly == null || monthly === "") return null;
+  return c.attributes?.base_price_period === "year"
+    ? `${num(Math.round(monthly * 12 * 100) / 100)} €/Jahr (${num(monthly)} €/Monat)`
+    : `${num(monthly)} €/Monat`;
+}
+
 /** Short chips with the most telling attributes, e.g. "40 GB · 5G · Telekom". */
 export function attrChips(c, max = 3) {
   const fields = category(c.category).fields || [];

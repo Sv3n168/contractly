@@ -39,6 +39,7 @@ test("new contract that is already cancelled ends on the given date", async ({ p
   await page.click("#save");
   await expect(page.getByRole("heading", { name: "Jahresabo Zeitung" })).toBeVisible();
   await expect(page.locator(".detail-head .badge, .page-head .badge").first()).toContainText("Gekündigt");
+  await expect(page.locator(".kpi", { hasText: "Endet am" })).toContainText(`31.01.${year}`);
   // not every provider confirms – the hint can be dismissed
   await expect(page.getByText("Bestätigung des Anbieters steht noch aus")).toBeVisible();
   await page.click("#no-confirm-btn");
@@ -260,5 +261,28 @@ test("a mis-tap on the check mark can be undone", async ({ page }) => {
   await expect(page.locator("#later .reminder-item .title", { hasText: title })).toHaveCount(0);
   await page.click(".toast-action");
   await expect(page.locator("#later .reminder-item .title", { hasText: title })).toHaveCount(1);
+  check();
+});
+
+
+test("a contract that starts later shows its coming price, not 0,00 €", async ({ page }) => {
+  const check = watchErrors(page);
+  const d = new Date();
+  const start = new Date(Date.UTC(d.getFullYear(), d.getMonth() + 2, 1)).toISOString().slice(0, 10);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Kfz" }).click();
+  await page.fill("[name=provider]", "Neue Kfz");
+  await page.fill("[name=price_amount]", "900");
+  await page.selectOption("[name=price_interval]", "yearly");
+  await page.fill("[name=start_date]", start);
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Neue Kfz" })).toBeVisible();
+  const hero = page.locator(".kpi.hero");
+  await expect(hero).toContainText("Pro Monat ab");
+  await expect(hero).toContainText("75,00");
+  await expect(page.locator(".kpi", { hasText: "Beginnt am" })).toBeVisible();
+  await expect(page.locator(".kpi", { hasText: "Bisher bezahlt" })).toHaveCount(0);
+  await page.goto("/#/contracts");
+  await expect(page.locator(".contract-row", { hasText: "Neue Kfz" })).toContainText("75,00");
   check();
 });

@@ -1,7 +1,7 @@
 import { api } from "../api.js";
 import { state } from "../store.js";
 import { $, busy, confirmDialog, esc, fileSize, formData, icon, modal, toast } from "../ui.js";
-import { router, start } from "../app.js";
+import { router, start, watchIdle } from "../app.js";
 import { bindRecoveryKey, recoveryKeyHtml } from "./auth.js";
 
 const isAdmin = () => state.user?.role === "admin";
@@ -44,6 +44,18 @@ export async function renderSettings(view) {
               <div class="sub">${me.totp_enabled ? "Aktiv – beim Anmelden wird zusätzlich ein Code aus der Authenticator-App abgefragt." : "Zusätzlicher Code aus einer Authenticator-App (z. B. Aegis, Google Authenticator)."}</div></div>
             <button class="btn btn-sm ${me.totp_enabled ? "btn-ghost" : "btn-primary"}" id="totp">${me.totp_enabled ? "Ausschalten" : "Einrichten"}</button>
           </div>
+          <label class="field" style="margin-top:14px"><span>Automatisch abmelden</span>
+            <select id="idle">${[
+              [0, "Nie – nur über „Abmelden“"],
+              [5, "nach 5 Minuten ohne Aktivität"],
+              [15, "nach 15 Minuten ohne Aktivität"],
+              [30, "nach 30 Minuten ohne Aktivität"],
+              [60, "nach 1 Stunde ohne Aktivität"],
+              [240, "nach 4 Stunden ohne Aktivität"],
+            ]
+              .map(([v, l]) => `<option value="${v}" ${Number(cfg.idle_minutes || 0) === v ? "selected" : ""}>${l}</option>`)
+              .join("")}</select>
+            <small>Danach bist du abgemeldet und deine Daten sind wieder verschlüsselt – auch wenn du den Tab einfach schließt. Gilt auch für „Angemeldet bleiben“.</small></label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
             <button class="btn" id="pw">${icon("key")} Passwort ändern</button>
             <button class="btn" id="rk">${icon("refresh")} Neuer Wiederherstellungsschlüssel</button>
@@ -134,7 +146,12 @@ export async function renderSettings(view) {
     e.preventDefault();
     const d = formData(e.target);
     try {
-      state.user = await api.saveAccountSettings({ notify_email: d.notify_email || "", ntfy_url: d.ntfy_url || "", reveal_names: !!d.reveal_names });
+      state.user = await api.saveAccountSettings({
+        notify_email: d.notify_email || "",
+        ntfy_url: d.ntfy_url || "",
+        reveal_names: !!d.reveal_names,
+        idle_minutes: Number(state.user?.settings?.idle_minutes || 0),
+      });
       toast("Benachrichtigungen gespeichert");
     } catch (err) {
       toast(err.message, "error");
@@ -160,6 +177,21 @@ export async function renderSettings(view) {
       await api.newCalendarToken();
       toast("Neuer Kalender-Link erstellt");
       router();
+    }
+  });
+  $("#idle", view).addEventListener("change", async (e) => {
+    const s = state.user?.settings || {};
+    try {
+      state.user = await api.saveAccountSettings({
+        notify_email: s.notify_email || "",
+        ntfy_url: s.ntfy_url || "",
+        reveal_names: !!s.reveal_names,
+        idle_minutes: Number(e.target.value),
+      });
+      watchIdle();
+      toast(Number(e.target.value) ? "Automatische Abmeldung eingestellt" : "Automatische Abmeldung aus");
+    } catch (err) {
+      toast(err.message, "error");
     }
   });
   $("#pw", view).addEventListener("click", changePasswordModal);

@@ -170,6 +170,8 @@ test("charts: whole history loaded, last two years shown, drag to go back, 'Alle
   expect(s.max - s.min + 1).toBe(24);
   expect(s.max).toBe(s.count - 1);
   // drag to the right = back in time
+  // the chart sits below "Wohin dein Geld geht": bring it into view before dragging
+  await page.locator("#hist").scrollIntoViewIfNeeded();
   const box = await page.locator("#hist").boundingBox();
   await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
   await page.mouse.down();

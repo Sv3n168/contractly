@@ -89,6 +89,17 @@ def _session_user(token: str | None) -> str:
     return user_id
 
 
+async def session_sweeper() -> None:
+    """Every minute: end expired sessions and drop the keys of users without one – so an
+    automatic logout really locks the data again, not just at the next hourly run."""
+    while True:
+        await asyncio.sleep(60)
+        try:
+            await asyncio.to_thread(vault.expire_sessions)
+        except Exception:  # noqa: BLE001
+            logging.getLogger("contractly.sessions").exception("session sweep failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # All user databases stay closed (encrypted) until their owner logs in.
@@ -96,7 +107,11 @@ async def lifespan(app: FastAPI):
     auth.log_setup_code()
     tasks = []
     if app.state.background:
-        tasks = [asyncio.create_task(notifier_loop()), asyncio.create_task(backup_loop())]
+        tasks = [
+            asyncio.create_task(notifier_loop()),
+            asyncio.create_task(backup_loop()),
+            asyncio.create_task(session_sweeper()),
+        ]
     yield
     # Only drop the in-memory keys: sessions stay valid across restarts and other instances.
     vault.forget_keys()

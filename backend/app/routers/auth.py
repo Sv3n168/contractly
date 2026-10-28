@@ -74,6 +74,8 @@ class AccountSettingsIn(BaseModel):
     reveal_names: bool = False
     notify_email: str = Field(default="", max_length=200)
     ntfy_url: str = Field(default="", max_length=500)
+    # Automatic logout after this many minutes without activity (0 = off); applies to every session.
+    idle_minutes: int = Field(default=0, ge=0, le=1440)
 
 
 class InviteIn(BaseModel):
@@ -320,6 +322,7 @@ def update_settings(data: AccountSettingsIn, user_id: str = Depends(current_user
     if data.ntfy_url and not ntfy_url_allowed(data.ntfy_url, vault.user(user_id)["role"] == "admin"):
         raise HTTPException(400, "Adressen im internen Netz kann nur ein Administrator eintragen")
     vault.update_settings(user_id, data.model_dump())
+    vault.limit_sessions(user_id, data.idle_minutes)
     refresh_outbox(user_id)
     return me(user_id)
 

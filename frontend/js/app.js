@@ -263,6 +263,7 @@ export function start() {
       state.user = st.user;
       hideAuth();
       paintUser();
+      watchIdle();
       router();
     } finally {
       starting = null;
@@ -271,11 +272,41 @@ export function start() {
   return starting;
 }
 
-async function logout() {
-  await api.logout();
+async function logout(message = "Abgemeldet – deine Daten sind wieder verschlüsselt 🔒") {
+  await api.logout().catch(() => {});
   authenticated = false;
-  toast("Abgemeldet – deine Daten sind wieder verschlüsselt 🔒");
+  toast(message);
   start();
+}
+
+// ------------------------------------------------------------------ automatic logout
+// The server ends an idle session on its own (and drops the key); here the screen follows at once,
+// and activity on the page keeps the session alive even while no data is loaded.
+
+let lastActivity = Date.now();
+let lastPing = Date.now();
+let idleTimer = null;
+
+export function watchIdle() {
+  clearInterval(idleTimer);
+  const minutes = Number(state.user?.settings?.idle_minutes || 0);
+  if (!minutes) return;
+  lastActivity = Date.now();
+  idleTimer = setInterval(() => {
+    if (authenticated && Date.now() - lastActivity > minutes * 60000) {
+      clearInterval(idleTimer);
+      logout("Automatisch abgemeldet – deine Daten sind wieder verschlüsselt 🔒");
+    }
+  }, 15000);
+}
+
+function noteActivity() {
+  lastActivity = Date.now();
+  // keep the server session alive while someone is reading (at most one ping a minute)
+  if (authenticated && state.user?.settings?.idle_minutes && Date.now() - lastPing > 60000) {
+    lastPing = Date.now();
+    api.authStatus().catch(() => {});
+  }
 }
 
 // ------------------------------------------------------------------ boot
@@ -300,6 +331,7 @@ function boot() {
     if (!document.documentElement.dataset.theme) router();
   });
   window.addEventListener("hashchange", router);
+  for (const ev of ["pointerdown", "keydown", "wheel", "touchstart"]) addEventListener(ev, noteActivity, { passive: true });
   window.addEventListener("auth-required", () => {
     if (authenticated) {
       authenticated = false;

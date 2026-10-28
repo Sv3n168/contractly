@@ -188,6 +188,19 @@ CATEGORIES: list[dict] = [
         ],
     },
     {
+        "key": "education",
+        "label": "Bildung",
+        "icon": "🎓",
+        # Studies, courses, school: usually no automatic renewal; a total (e.g. tuition) is common.
+        "defaults": {"min_term_months": None, "renewal_months": 1, "notice_value": 1, "notice_unit": "months"},
+        "fields": [
+            _f("institution", "Einrichtung"),
+            _f("program", "Studiengang / Kurs"),
+            _f("student_number", "Matrikel- / Teilnehmernummer"),
+            _f("planned_end", "Voraussichtliches Ende", "date"),
+        ],
+    },
+    {
         "key": "other",
         "label": "Sonstiges",
         "icon": "📄",

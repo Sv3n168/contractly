@@ -46,6 +46,7 @@ DEATH_HINTS = {
     "insurance": "Versicherer mit Sterbeurkunde informieren; bei Lebens-/Sterbegeldversicherung Auszahlung beantragen.",
     "streaming": "Mit Sterbeurkunde kündigen und die Abbuchung stoppen.",
     "fitness": "Mitgliedschaften enden meist mit dem Tod – mit Sterbeurkunde kündigen und Abbuchung stoppen.",
+    "education": "Hochschule bzw. Anbieter mit Sterbeurkunde informieren und Daueraufträge für Gebühren stoppen.",
     "loan": "Schulden gehen auf die Erben über – das Erbe kann innerhalb von sechs Wochen ausgeschlagen werden. "
     "Prüfen, ob eine Restschuldversicherung besteht, und die Bank mit Sterbeurkunde informieren.",
 }

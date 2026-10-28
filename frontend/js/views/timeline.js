@@ -136,8 +136,8 @@ function drawTimeline(view, contracts) {
       </div>
     </div>`;
   // Match the label column width on small screens.
-  const label = view.querySelector(".tl-label");
-  if (label) view.querySelector(".tl-today-wrap").style.left = label.offsetWidth + "px";
+  const track = view.querySelector(".tl-track");
+  if (track) view.querySelector(".tl-today-wrap").style.left = track.offsetLeft + "px";
 }
 
 function drawEvents(el, contracts) {

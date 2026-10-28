@@ -1,6 +1,7 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from .. import calc
@@ -23,6 +24,10 @@ from ..schemas import (
 from ..services import contract_detail, contract_summary, load_contracts, price_out, today
 
 router = APIRouter(prefix="/api/contracts", tags=["contracts"])
+
+
+class CheckedIn(BaseModel):
+    last_checked_on: date | None = None
 
 
 def get_contract(db: Session, contract_id: int) -> Contract:
@@ -185,6 +190,13 @@ def contract_history(
     for x in chain:
         for m, v in calc.extras_by_month(x, first, calc.month_end(last)).items():
             extras[m] = round(extras.get(m, 0.0) + v, 2)
+    # one-off credits (switching bonus): shown as a marker instead of a dip of the price line
+    credits: dict[str, float] = {}
+    for x in chain:
+        for p in x.prices:
+            if p.interval == "once" and p.amount < 0 and first <= p.valid_from <= calc.month_end(last):
+                m = calc.month_key(p.valid_from)
+                credits[m] = round(credits.get(m, 0.0) - p.amount * calc.share(x), 2)
     events = []
     for x in chain:
         for p in x.prices:
@@ -206,6 +218,7 @@ def contract_history(
         "series": series,
         "totals": totals,
         "extras": [extras.get(m, 0.0) for m in months],
+        "credits": [credits.get(m, 0.0) for m in months],
         "events": events,
         "chain": [contract_summary(x, ref) for x in chain],
     }
@@ -328,11 +341,22 @@ def no_confirmation(contract_id: int, db: Session = Depends(get_db)):
     return contract_detail(c)
 
 
-@router.post("/{contract_id}/still-used", response_model=ContractOut)
-def still_used(contract_id: int, db: Session = Depends(get_db)):
-    """Answer to the subscription check: keep it, ask again in a year."""
+@router.delete("/{contract_id}/cancellation-confirmed", response_model=ContractOut)
+def unconfirm_cancellation(contract_id: int, db: Session = Depends(get_db)):
+    """Undo "confirmation received"."""
     c = get_contract(db, contract_id)
-    c.last_checked_on = today()
+    c.cancellation_confirmed_on = None
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)
+
+
+@router.post("/{contract_id}/still-used", response_model=ContractOut)
+def still_used(contract_id: int, data: CheckedIn | None = None, db: Session = Depends(get_db)):
+    """Answer to the subscription check: keep it, ask again in a year. With a body it sets the
+    date of the last check directly (undo: back to the previous one)."""
+    c = get_contract(db, contract_id)
+    c.last_checked_on = data.last_checked_on if data else today()
     db.commit()
     db.refresh(c)
     return contract_detail(c)

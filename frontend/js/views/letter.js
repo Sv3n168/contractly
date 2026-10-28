@@ -106,7 +106,7 @@ export async function openLetter(c) {
             .join("")}</select></label>
           <label class="field"><span>Kündigen zum</span><input type="date" name="end_date" value="${esc(defaults.end_date || "")}"/></label>
           <label class="field move-only hidden"><span>Umzugsdatum</span><input type="date" name="move_date"/></label>
-          <label class="field move-only hidden span-2"><span>Neue Anschrift</span><input name="new_address" placeholder="Straße, PLZ Ort"/></label>
+          <label class="field move-only hidden span-2"><span>Neue Anschrift</span><input name="new_address"/></label>
           <label class="check span-all"><input type="checkbox" name="confirm" checked/> Schriftliche Bestätigung anfordern</label>
           <label class="check span-all"><input type="checkbox" name="sepa" checked/> SEPA-Lastschriftmandat widerrufen</label>
           <label class="check span-all"><input type="checkbox" name="no_ads" checked/> Werbung & Rückgewinnungsanrufen widersprechen</label>

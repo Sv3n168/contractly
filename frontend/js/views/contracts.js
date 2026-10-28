@@ -1,6 +1,6 @@
 import { api } from "../api.js";
 import { catIcon, catLabel, state } from "../store.js";
-import { $, esc, icon, money, toast } from "../ui.js";
+import { $, esc, icon, modal, money, toast } from "../ui.js";
 import { contractCard, contractRow, emptyState } from "./components.js";
 import { router } from "../app.js";
 
@@ -41,43 +41,94 @@ export async function renderContracts(view) {
   const monthly = running.filter((c) => !c.account).reduce((s, c) => s + c.monthly_cost, 0);
   const elsewhere = running.filter((c) => c.account).reduce((s, c) => s + c.monthly_cost, 0);
 
+  const SORTS = { category: "Nach Bereich", price: "Teuerste zuerst", deadline: "Nächste Frist zuerst", name: "Alphabetisch" };
+
   view.innerHTML = `
     <div class="page-head">
       <div><h1>Verträge</h1><p>${running.length} laufend · ${money(monthly)} im Monat · ${money(monthly * 12, true)} im Jahr${
         elsewhere ? ` · zzgl. ${money(elsewhere)} über andere Konten` : ""
       }</p></div>
-      <div class="page-actions"><a class="btn" href="#/import">${icon("upload")}<span class="label">Importieren</span></a>
-        <a class="btn btn-primary" href="#/contracts/new">${icon("plus")}<span class="label">Neuer Vertrag</span></a></div>
     </div>
-    <div class="card" style="padding:14px;margin-bottom:20px;display:flex;flex-direction:column;gap:12px">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-        <div class="field" style="flex:1;min-width:200px">
-          <input class="input" id="q" type="search" placeholder="Suchen nach Name, Anbieter, Eckdaten…" value="${esc(prefs.q)}" />
-        </div>
-        <select class="input" id="sort" style="width:auto">
-          <option value="category">Nach Kategorie</option>
-          <option value="price">Teuerste zuerst</option>
-          <option value="deadline">Nächste Frist zuerst</option>
-          <option value="name">Alphabetisch</option>
-        </select>
-        <div class="segmented" id="layout" role="group" aria-label="Ansicht">
-          <button type="button" data-layout="list" class="${prefs.layout === "list" ? "active" : ""}" aria-label="Liste" title="Liste">${icon("list")}</button>
-          <button type="button" data-layout="grid" class="${prefs.layout === "grid" ? "active" : ""}" aria-label="Kacheln" title="Kacheln">${icon("grid")}</button>
-        </div>
-        <label class="check small"><input type="checkbox" id="ended" ${prefs.showEnded ? "checked" : ""}/> Beendete zeigen</label>
-      </div>
-      <div class="scroll-x"><div class="chips" id="cats">
-        <button class="chip ${prefs.category === "all" ? "active" : ""}" data-cat="all">Alle <span class="count">${running.length}</span></button>
-        ${usedCats
-          .map(
-            (c) => `<button class="chip ${prefs.category === c.key ? "active" : ""}" data-cat="${c.key}">${c.icon} ${esc(c.label)} <span class="count">${counts[c.key]}</span></button>`,
-          )
-          .join("")}
-      </div></div>
+    <div class="list-toolbar">
+      <input class="input" id="q" type="search" placeholder="Suchen …" aria-label="Verträge durchsuchen (Name, Anbieter, Eckdaten)" value="${esc(prefs.q)}" />
+      <button class="btn" id="filter-btn">${icon("layers")}<span class="label">Filter</span><span class="count" id="filter-count"></span></button>
     </div>
+    <div class="chips active-filters" id="active"></div>
     <div id="list"></div>`;
 
-  $("#sort", view).value = prefs.sort;
+  // active filters as small chips, each removable – the defaults show nothing
+  const drawActive = () => {
+    const chips = [];
+    if (prefs.category !== "all") {
+      const cat = usedCats.find((c) => c.key === prefs.category);
+      chips.push(["category", `${cat?.icon ?? ""} ${esc(cat?.label ?? prefs.category)}`]);
+    }
+    if (prefs.sort !== "category") chips.push(["sort", SORTS[prefs.sort]]);
+    if (prefs.showEnded) chips.push(["ended", "mit beendeten"]);
+    $("#active", view).innerHTML = chips
+      .map(([k, t]) => `<button class="chip active" data-clear="${k}" title="Filter entfernen">${t} ${icon("x")}</button>`)
+      .join("");
+    $("#filter-count", view).textContent = chips.length ? chips.length : "";
+  };
+  $("#active", view).addEventListener("click", (e) => {
+    const k = e.target.closest("[data-clear]")?.dataset.clear;
+    if (!k) return;
+    if (k === "category") prefs.category = "all";
+    if (k === "sort") prefs.sort = "category";
+    if (k === "ended") prefs.showEnded = false;
+    update();
+  });
+
+  const openFilter = () => {
+    const m = modal({
+      title: "Filter & Ansicht",
+      body: `<div class="filter-sheet">
+          <div class="fs-group"><div class="fs-label">Bereich</div><div class="chips" data-set="category">
+            <button class="chip ${prefs.category === "all" ? "active" : ""}" data-v="all">Alle <span class="count">${running.length}</span></button>
+            ${usedCats
+              .map((c) => `<button class="chip ${prefs.category === c.key ? "active" : ""}" data-v="${c.key}">${c.icon} ${esc(c.label)} <span class="count">${counts[c.key]}</span></button>`)
+              .join("")}
+          </div></div>
+          <div class="fs-group"><div class="fs-label">Sortieren</div><div class="chips" data-set="sort">
+            ${Object.entries(SORTS).map(([k, l]) => `<button class="chip ${prefs.sort === k ? "active" : ""}" data-v="${k}">${l}</button>`).join("")}
+          </div></div>
+          <div class="fs-group"><div class="fs-label">Ansicht</div><div class="chips" data-set="layout">
+            <button class="chip ${prefs.layout === "list" ? "active" : ""}" data-v="list">${icon("list")} Liste</button>
+            <button class="chip ${prefs.layout === "grid" ? "active" : ""}" data-v="grid">${icon("grid")} Kacheln</button>
+          </div></div>
+          <label class="check"><input type="checkbox" id="ended" ${prefs.showEnded ? "checked" : ""}/> Beendete Verträge zeigen</label>
+        </div>`,
+      foot: `<button class="btn btn-ghost" data-reset style="margin-right:auto">Zurücksetzen</button><button class="btn btn-primary" data-close>Fertig</button>`,
+    });
+    m.addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-set] [data-v]");
+      if (chip) {
+        const set = chip.closest("[data-set]");
+        prefs[set.dataset.set] = chip.dataset.v;
+        set.querySelectorAll(".chip").forEach((c) => c.classList.toggle("active", c === chip));
+        if (set.dataset.set === "layout") rememberLayout();
+        update();
+      }
+      if (e.target.closest("[data-reset]")) {
+        Object.assign(prefs, { category: "all", sort: "category", showEnded: false });
+        m.close();
+        update();
+      }
+    });
+    $("#ended", m).addEventListener("change", (e) => {
+      prefs.showEnded = e.target.checked;
+      update();
+    });
+  };
+  const rememberLayout = () => {
+    try {
+      localStorage.setItem("contracts-layout", prefs.layout);
+    } catch {
+      /* private mode: the choice just isn't remembered */
+    }
+  };
+
+
 
   const draw = () => {
     let items = all.filter((c) => prefs.showEnded || c.state !== "ended");
@@ -133,36 +184,14 @@ export async function renderContracts(view) {
       .join("");
   };
 
+  const update = () => {
+    drawActive();
+    draw();
+  };
   $("#q", view).addEventListener("input", (e) => {
     prefs.q = e.target.value;
     draw();
   });
-  $("#sort", view).addEventListener("change", (e) => {
-    prefs.sort = e.target.value;
-    draw();
-  });
-  $("#layout", view).addEventListener("click", (e) => {
-    const b = e.target.closest("[data-layout]");
-    if (!b) return;
-    prefs.layout = b.dataset.layout;
-    try {
-      localStorage.setItem("contracts-layout", prefs.layout);
-    } catch {
-      /* private mode: the choice just isn't remembered */
-    }
-    view.querySelectorAll("#layout button").forEach((x) => x.classList.toggle("active", x === b));
-    draw();
-  });
-  $("#ended", view).addEventListener("change", (e) => {
-    prefs.showEnded = e.target.checked;
-    draw();
-  });
-  $("#cats", view).addEventListener("click", (e) => {
-    const chip = e.target.closest("[data-cat]");
-    if (!chip) return;
-    prefs.category = chip.dataset.cat;
-    view.querySelectorAll("#cats .chip").forEach((c) => c.classList.toggle("active", c === chip));
-    draw();
-  });
-  draw();
+  $("#filter-btn", view).addEventListener("click", openFilter);
+  update();
 }

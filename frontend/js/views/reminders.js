@@ -12,7 +12,7 @@ export async function reminderForm(existing = {}, done) {
     title: r.id ? "Erinnerung bearbeiten" : "Neue Erinnerung",
     body: `<form id="rf" class="form-grid">
       <label class="field span-all"><span>Woran soll ich dich erinnern?</span>
-        <input name="title" value="${esc(r.title ?? "")}" placeholder="z. B. Zählerstand ablesen, Tarif prüfen, Bonus einfordern" required/></label>
+        <input name="title" value="${esc(r.title ?? "")}" required/></label>
       <div class="chips span-all" id="presets">
         ${["Zählerstand ablesen", "Tarif prüfen & vergleichen", "Bonus prüfen", "Rechnung kontrollieren", "Kündigung bestätigt?"]
           .map((t) => `<button type="button" class="chip" data-t="${esc(t)}">${esc(t)}</button>`)
@@ -63,19 +63,18 @@ export async function reminderForm(existing = {}, done) {
 }
 
 export async function renderReminders(view) {
-  const [up, all, cal] = await Promise.all([api.upcoming({ horizon_days: 365 }), api.reminders(), api.calendarToken()]);
+  const [up, all] = await Promise.all([api.upcoming({ horizon_days: 365 }), api.reminders()]);
   const due = up.items.filter((i) => i.due);
   const later = up.items.filter((i) => !i.due);
-  const calUrl = `${location.origin}/api/calendar/${cal.token}.ics`;
   const ch = up.channels;
 
   view.innerHTML = `
     <div class="page-head">
-      <div><h1>Erinnerungen</h1><p>Kündigungsfristen kommen automatisch – eigene Erinnerungen legst du hier an.</p></div>
+      <div><h1>Erinnerungen</h1><p>Kündigungsfristen kommen automatisch – eigene Erinnerungen legst du hier an.
+        <a href="#/settings">${ch.ntfy || ch.email ? "Push & Kalender" : "Als Push oder im Kalender?"}</a></p></div>
       <div class="page-actions"><button class="btn btn-primary" id="add">${icon("plus")}<span class="label">Neue Erinnerung</span></button></div>
     </div>
-    <div class="grid grid-main">
-      <div class="stack">
+    <div class="stack reading">
         <div class="card">
           <div class="card-head"><div><h2>Jetzt fällig</h2><p>${due.length ? `${due.length} offene Punkte` : "Nichts zu tun"}</p></div></div>
           <div class="list" id="due">${
@@ -101,31 +100,6 @@ export async function renderReminders(view) {
               : `<p class="muted">Noch keine eigenen Erinnerungen.</p>`
           }</div>
         </div>
-      </div>
-      <div class="stack">
-        <div class="card">
-          <div class="card-head"><div><h2>${icon("calendar")} Kalender-Abo</h2></div></div>
-          <p class="small text-2" style="margin-top:0">Abonniere deine Fristen & Erinnerungen im Handy- oder Outlook-Kalender. Der Link ist geheim und persönlich –
-            Einträge heißen neutral (z. B. „Kündigungsfrist Mobilfunk-Vertrag“), außer du schaltest Vertragsnamen in den Einstellungen ein.</p>
-          <div class="input-group"><input class="input" readonly value="${esc(calUrl)}" id="cal"/><button class="btn" id="copy-cal" style="border-radius:0 var(--radius-sm) var(--radius-sm) 0">${icon("copy")}</button></div>
-          <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
-            <a class="btn" style="flex:1;justify-content:center" href="${calUrl.replace(/^https?/, "webcal")}">${icon("link")} Im Kalender öffnen</a>
-            <button class="btn btn-ghost" id="new-cal" title="Alten Link ungültig machen">${icon("refresh")} Neuer Link</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-head"><div><h2>${icon("bell")} Push & E-Mail</h2></div></div>
-          <div class="list">
-            <div class="list-item"><span class="grow">ntfy (Push aufs Handy)</span>${ch.ntfy ? `<span class="badge good">aktiv</span>` : `<span class="badge">nicht eingerichtet</span>`}</div>
-            <div class="list-item"><span class="grow">E-Mail</span>${ch.email ? `<span class="badge good">aktiv</span>` : `<span class="badge">nicht eingerichtet</span>`}</div>
-          </div>
-          ${
-            ch.ntfy || ch.email
-              ? `<button class="btn btn-block" id="test" style="margin-top:12px">${icon("sparkles")} Testnachricht senden</button>`
-              : `<a class="btn btn-block" href="#/settings" style="margin-top:12px">${icon("settings")} In den Einstellungen einrichten</a>`
-          }
-        </div>
-      </div>
     </div>`;
 
   const refresh = (msg) => {
@@ -138,26 +112,5 @@ export async function renderReminders(view) {
   $("#own", view).addEventListener("click", (e) => {
     const b = e.target.closest("[data-edit]");
     if (b) reminderForm(all.find((r) => r.id === Number(b.dataset.edit)), refresh);
-  });
-  $("#new-cal", view).addEventListener("click", async () => {
-    if (await confirmDialog("Der bisherige Kalender-Link funktioniert dann nicht mehr. Neuen Link erzeugen?", { okLabel: "Neuer Link", danger: false })) {
-      await api.newCalendarToken();
-      refresh("Neuer Kalender-Link erstellt");
-    }
-  });
-  $("#copy-cal", view).addEventListener("click", async () => {
-    await navigator.clipboard.writeText(calUrl);
-    toast("Link kopiert");
-  });
-  $("#test", view)?.addEventListener("click", async (e) => {
-    busy(e.currentTarget);
-    try {
-      const r = await api.testNotification();
-      toast(`Gesendet über ${r.sent.join(" & ")}`);
-    } catch (err) {
-      toast(err.message, "error");
-    } finally {
-      busy(e.currentTarget, false);
-    }
   });
 }

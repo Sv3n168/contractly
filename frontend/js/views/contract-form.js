@@ -52,7 +52,7 @@ export async function renderContractForm(view, id, query = {}) {
        <p>${
          predecessor
            ? `Ersetzt <b>${esc(predecessor.name)}</b> – der Kostenverlauf läuft nahtlos weiter.`
-           : "Nur drei Angaben sind Pflicht. Den Rest kannst du jederzeit ergänzen."
+           : "Pflicht sind nur Kategorie, Preis und Beginn (mit <b class=\"req\">*</b>). Den Rest kannst du jederzeit ergänzen."
        }</p>`;
 
   const drawCategoryStep = () => {
@@ -136,14 +136,14 @@ export async function renderContractForm(view, id, query = {}) {
           </div>
           <div class="form-grid">
             <label class="field span-2"><span>Anbieter</span>
-              <input name="provider" value="${esc(src.provider ?? "")}" placeholder="z. B. Telekom, FitX, HUK" list="providers" autocomplete="off" /></label>
+              <input name="provider" value="${esc(src.provider ?? "")}" list="providers" autocomplete="off" /></label>
             <label class="field span-2"><span>Bezeichnung / Tarif</span>
-              <input name="name" value="${esc(src.name ?? "")}" placeholder="${esc(c.label)}${c.key === "mobile" ? " – z. B. MagentaMobil M" : ""}" /></label>
+              <input name="name" value="${esc(src.name ?? "")}" /></label>
             ${
               editing
                 ? ""
-                : `<label class="field input-big"><span>Preis</span><div class="input-group">
-                    <input name="price_amount" type="number" step="0.01" inputmode="decimal" placeholder="0,00" required />
+                : `<label class="field input-big"><span>Preis <b class="req" title="Pflichtfeld">*</b></span><div class="input-group">
+                    <input name="price_amount" type="number" step="0.01" inputmode="decimal" required />
                     <span class="addon">€</span></div></label>
                   <label class="field"><span>Zahlweise</span><select name="price_interval">
                     ${Object.entries(state.meta.intervals)
@@ -151,8 +151,14 @@ export async function renderContractForm(view, id, query = {}) {
                       .map(([k, v]) => `<option value="${k}" ${k === priceInterval ? "selected" : ""}>${v.label}</option>`)
                       .join("")}</select></label>`
             }
-            <label class="field"><span>Vertragsbeginn</span>
+            <label class="field"><span>Vertragsbeginn <b class="req" title="Pflichtfeld">*</b></span>
               <input name="start_date" type="date" value="${esc(src.start_date || query.start || today())}" required /></label>
+          </div>
+          <div class="total-field">
+            <button type="button" class="btn btn-sm btn-ghost" id="total-toggle" ${src.max_total ? "hidden" : ""}>${icon("plus")} Gesamtsumme festlegen <span class="muted">– z. B. Ratenzahlung, Studiengebühren</span></button>
+            <label class="field" id="total-box" ${src.max_total ? "" : "hidden"}><span>Gesamtsumme</span><div class="input-group">
+              <input name="max_total" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(src.max_total ?? "")}"/><span class="addon">€</span></div>
+              <small>Contractly sagt dir, wann sie erreicht ist, wie hoch die letzte Zahlung sein muss – und warnt, wenn mehr bezahlt wurde.</small></label>
           </div>
           <div id="dup-hint"></div>
           ${
@@ -183,7 +189,7 @@ export async function renderContractForm(view, id, query = {}) {
         }
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small" style="font-weight:500">– vorbelegt</span>${icon("chevDown", "chev")}</summary>
+          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small" style="font-weight:500">– Mindestlaufzeit, Frist, Erinnerung · vorbelegt</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <label class="field"><span>Mindestlaufzeit</span><div class="input-group">
               <input name="min_term_months" type="number" min="0" value="${esc(src.min_term_months ?? d.min_term_months ?? "")}" /><span class="addon">Monate</span></div></label>
@@ -199,9 +205,6 @@ export async function renderContractForm(view, id, query = {}) {
             <label class="field"><span>Erinnern vor Frist</span><div class="input-group">
               <input name="reminder_days" type="number" min="0" value="${esc(editing ? src.reminder_days ?? "" : 30)}" placeholder="aus" /><span class="addon">Tage</span></div>
               <small>Leer lassen = keine Erinnerung</small></label>
-            <label class="field"><span>Gesamtsumme <span class="muted">(optional)</span></span><div class="input-group">
-              <input name="max_total" type="number" min="0" step="0.01" inputmode="decimal" placeholder="z. B. 19900" value="${esc(src.max_total ?? "")}"/><span class="addon">€</span></div>
-              <small>Fester Gesamtbetrag, z. B. Studiengebühren: Contractly sagt dir, wann er erreicht ist, wie hoch die letzte Zahlung sein muss – und warnt, wenn mehr bezahlt wurde.</small></label>
             ${
               editing
                 ? `<label class="field"><span>Vertragsende</span><input name="end_date" type="date" value="${esc(src.end_date ?? "")}" />
@@ -212,7 +215,7 @@ export async function renderContractForm(view, id, query = {}) {
         </details>
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("file")} Nummern, Kostenanteil & Notizen${icon("chevDown", "chev")}</summary>
+          <summary>${icon("file")} Anteil, Konto & Nummern <span class="muted small" style="font-weight:500">– Partneranteil, Bezahlt über, Verwaltet von, Kunden- & Vertragsnummer, Notizen</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <div class="field share-field">
               <span>Mein Anteil</span>
@@ -223,7 +226,7 @@ export async function renderContractForm(view, id, query = {}) {
               <div class="input-group" data-share="percent" ${src.partner_amount ? "hidden" : ""}>
                 <input name="share_percent" type="number" min="0" max="100" value="${esc(src.share_percent ?? 100)}" ${src.partner_amount ? "disabled" : ""}/><span class="addon">%</span></div>
               <div class="input-group" data-share="amount" ${src.partner_amount ? "" : "hidden"}>
-                <input name="partner_amount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="z. B. 20" value="${esc(src.partner_amount ?? "")}" ${src.partner_amount ? "" : "disabled"}/><span class="addon">€ / Monat</span></div>
+                <input name="partner_amount" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(src.partner_amount ?? "")}" ${src.partner_amount ? "" : "disabled"}/><span class="addon">€ / Monat</span></div>
               <small data-share="percent" ${src.partner_amount ? "hidden" : ""}>z. B. 50, wenn Partner:in die Hälfte zahlt</small>
               <small data-share="amount" ${src.partner_amount ? "" : "hidden"}>So viel übernimmt Partner:in jeden Monat – der Rest zählt als deine Kosten, auch wenn der Preis steigt.</small>
             </div>
@@ -233,10 +236,9 @@ export async function renderContractForm(view, id, query = {}) {
             <label class="check" style="align-self:center"><input type="checkbox" name="tax_relevant" ${
               (src.tax_relevant ?? category(cat).tax_default) ? "checked" : ""
             }/> Steuerlich relevant</label>
-            <label class="field"><span>Kundennummer</span><input name="customer_number" value="${esc(src.customer_number ?? pred.customer_number ?? "")}" /></label>
-            <label class="field"><span>Vertragsnummer</span><input name="contract_number" value="${esc(src.contract_number ?? "")}" /></label>
+            ${ownFieldsHtml(src, pred)}
             <label class="field span-2"><span>Anschrift des Anbieters <span class="muted">(für Kündigungsschreiben)</span></span>
-              <textarea name="provider_address" rows="3" placeholder="Firma&#10;Straße Nr.&#10;PLZ Ort">${esc(src.provider_address ?? "")}</textarea></label>
+              <textarea name="provider_address" rows="3">${esc(src.provider_address ?? "")}</textarea></label>
             <label class="field span-all"><span>Notizen</span><textarea name="notes" rows="3">${esc(src.notes ?? "")}</textarea></label>
           </div></div>
         </details>
@@ -276,6 +278,12 @@ export async function renderContractForm(view, id, query = {}) {
     bindIconPicker(form);
     bindAlreadyCancelled(form);
     bindShareMode(form);
+    bindOwnFields(form);
+    $("#total-toggle", form)?.addEventListener("click", (e) => {
+      e.currentTarget.hidden = true;
+      $("#total-box", form).hidden = false;
+      $("[name=max_total]", form).focus();
+    });
     if (pendingSuggestions?.length) {
       applySuggestionsToForm(form, pendingSuggestions);
       toast("Erkannte Daten übernommen – bitte kurz prüfen");
@@ -300,7 +308,7 @@ export async function renderContractForm(view, id, query = {}) {
         notice_unit: data.notice_unit || "months",
         reminder_days: data.reminder_days,
         notes: data.notes,
-        attributes: { ...(editing?.attributes || {}), ...collectAttributes(data) },
+        attributes: { ...(editing?.attributes || {}), ...collectAttributes(data), ...collectOwnFields(form) },
         share_percent: data.share_percent == null || data.share_percent === 100 ? null : data.share_percent,
         partner_amount: data.partner_amount || null,
         account: data.account || null,
@@ -500,3 +508,105 @@ function bindShareMode(form) {
   });
 }
 
+// ------------------------------------------------------------------ own fields
+// Customer and contract number can be renamed (✎), and any number of own fields added (+):
+// "Mitgliedsnummer", "Zählernummer", "Ansprechpartner" … Kept in attributes.field_labels and
+// attributes.custom_fields.
+
+const NUMBER_FIELDS = [
+  ["managed_by", "Verwaltet von"], // e.g. an insurance broker; kept in attributes.managed_by
+  ["customer_number", "Kundennummer"],
+  ["contract_number", "Vertragsnummer"],
+];
+
+function ownFieldRow({ key = "", label, value = "", custom = false, editLabel = false }) {
+  return `<div class="own-field ${custom ? "custom" : ""}" ${key ? `data-key="${key}"` : ""}>
+      <div class="own-label">
+        <span class="lbl" ${editLabel ? "hidden" : ""}>${esc(label)}</span>
+        <input class="lbl-input" maxlength="40" placeholder="Bezeichnung" value="${esc(label)}" ${editLabel ? "" : "hidden"} aria-label="Bezeichnung"/>
+        <button type="button" class="icon-btn" data-rename title="Bezeichnung ändern" aria-label="Bezeichnung ändern">${icon("edit")}</button>
+        ${custom ? `<button type="button" class="icon-btn" data-remove title="Feld entfernen" aria-label="Feld entfernen">${icon("trash")}</button>` : ""}
+      </div>
+      <input ${key ? `name="${key}"` : `class="cf-value"`} maxlength="200" value="${esc(value)}" aria-label="${esc(label || "Wert")}"/>
+    </div>`;
+}
+
+function ownFieldsHtml(src, pred) {
+  const labels = src.attributes?.field_labels || {};
+  const values = {
+    managed_by: src.attributes?.managed_by ?? pred.attributes?.managed_by ?? "",
+    customer_number: src.customer_number ?? pred.customer_number ?? "",
+    contract_number: src.contract_number ?? "",
+  };
+  return `<div class="field span-all own-fields" id="own-fields">
+      <span>Verwaltung, Nummern & eigene Felder</span>
+      <div class="own-grid">
+        ${NUMBER_FIELDS.map(([key, def]) => ownFieldRow({ key, label: labels[key] || def, value: values[key] })).join("")}
+        ${(src.attributes?.custom_fields || []).map((f) => ownFieldRow({ label: f.label, value: f.value, custom: true })).join("")}
+      </div>
+      <button type="button" class="btn btn-sm btn-ghost own-add" id="own-add">${icon("plus")} Feld hinzufügen</button>
+    </div>`;
+}
+
+function bindOwnFields(form) {
+  const box = $("#own-fields", form);
+  if (!box) return;
+  const grid = $(".own-grid", box);
+  const finishRename = (row) => {
+    const input = $(".lbl-input", row);
+    if (input.hidden) return;
+    const text = input.value.trim();
+    if (!text && !row.classList.contains("custom")) input.value = $(".lbl", row).textContent;
+    $(".lbl", row).textContent = input.value.trim() || "Eigenes Feld";
+    input.hidden = true;
+    $(".lbl", row).hidden = false;
+  };
+  box.addEventListener("click", (e) => {
+    const row = e.target.closest(".own-field");
+    if (e.target.closest("[data-rename]")) {
+      const input = $(".lbl-input", row);
+      if (input.hidden) {
+        input.hidden = false;
+        $(".lbl", row).hidden = true;
+        input.focus();
+        input.select();
+      } else finishRename(row);
+    }
+    if (e.target.closest("[data-remove]")) row.remove();
+  });
+  box.addEventListener("keydown", (e) => {
+    if (e.target.matches(".lbl-input") && e.key === "Enter") {
+      e.preventDefault();
+      finishRename(e.target.closest(".own-field"));
+      e.target.closest(".own-field").querySelector("input:not(.lbl-input)").focus();
+    }
+  });
+  box.addEventListener("focusout", (e) => {
+    if (e.target.matches(".lbl-input") && !e.target.closest(".own-field").contains(e.relatedTarget)) finishRename(e.target.closest(".own-field"));
+  });
+  $("#own-add", box).addEventListener("click", () => {
+    grid.insertAdjacentHTML("beforeend", ownFieldRow({ label: "", custom: true, editLabel: true }));
+    $(".own-field:last-child .lbl-input", grid).focus();
+  });
+}
+
+function collectOwnFields(form) {
+  const box = $("#own-fields", form);
+  if (!box) return {};
+  const labelOf = (row) => {
+    const input = $(".lbl-input", row);
+    return (input.hidden ? $(".lbl", row).textContent : input.value).trim();
+  };
+  const field_labels = {};
+  for (const [key, def] of NUMBER_FIELDS) {
+    const row = $(`.own-field[data-key="${key}"]`, box);
+    const label = row && labelOf(row);
+    if (label && label !== def) field_labels[key] = label;
+  }
+  const custom_fields = $$(".own-field.custom", box)
+    .map((row) => ({ label: labelOf(row), value: $(".cf-value", row).value.trim() }))
+    .filter((f) => f.label || f.value)
+    .map((f) => ({ label: f.label || "Eigenes Feld", value: f.value }));
+  const managed = $("[name=managed_by]", box)?.value.trim();
+  return { field_labels, custom_fields, managed_by: managed || undefined };
+}

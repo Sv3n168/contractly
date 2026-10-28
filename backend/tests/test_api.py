@@ -349,3 +349,12 @@ def test_app_files_are_revalidated(anon_client):
     assert r.status_code == 200
     assert r.headers["cache-control"] == "no-cache"
     assert anon_client.get("/").headers["cache-control"] == "no-cache"
+
+
+def test_undo_reminder_actions(client):
+    r = client.post("/api/reminders", json={"title": "Zähler ablesen", "due_date": "2026-01-10"}).json()
+    client.post(f"/api/reminders/{r['id']}/done")
+    back = client.post(f"/api/reminders/{r['id']}/reopen", json={"due_date": "2026-01-10"}).json()
+    assert back["done_at"] is None and back["due_date"] == "2026-01-10"
+    client.post("/api/reminders/dismiss", params={"key": "deadline:1:2026-11-30"})
+    assert client.post("/api/reminders/undismiss", params={"key": "deadline:1:2026-11-30"}).json() == {"ok": True}

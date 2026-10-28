@@ -3,6 +3,7 @@
 // so the following month automatically falls back to the regular price.
 
 import { api } from "../api.js";
+import { bindDelete } from "./contract-detail.js";
 import { $, busy, esc, icon, modal, money, signedMoney, toast, today } from "../ui.js";
 
 const PRESETS = {
@@ -50,11 +51,13 @@ export function extraModal(c, existing, done) {
         <label class="field span-all"><span id="amount-label">Mehrbetrag</span><div class="input-group input-big">
           <input type="number" step="0.01" name="amount" value="${esc(p.amount ?? "")}" inputmode="decimal" required/><span class="addon">€</span></div>
           <small id="preview"></small></label>
-        <label class="field span-all"><span>Grund</span><input name="note" value="${esc(p.note ?? "")}" placeholder="z. B. Auslandstelefonate"/></label>
+        <label class="field span-all"><span>Grund</span><input name="note" value="${esc(p.note ?? "")}"/></label>
         <div class="chips span-all" id="presets">${presets.map((t) => `<button type="button" class="chip" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
       </form>`,
-    foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
+    foot: `${p.id ? `<button class="btn btn-ghost btn-danger" data-del style="margin-right:auto">${icon("trash")} Löschen</button>` : ""}
+      <button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
+  bindDelete(m, c, p, () => done?.());
 
   const form = $("#xf", m);
   const amountInput = $("[name=amount]", form);

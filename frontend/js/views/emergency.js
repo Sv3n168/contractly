@@ -17,7 +17,7 @@ export async function renderEmergency(view) {
       <form class="card" id="note-form">
         <div class="card-head"><div><h2>${icon("edit")} Hinweise für Angehörige</h2>
           <p>Wo liegen Passwörter, Unterlagen, das Testament? Wen sollen sie anrufen?</p></div></div>
-        <textarea class="input" name="note" rows="6" maxlength="5000" placeholder="z. B. „Passwort-Manager: Zugang im Umschlag im grünen Ordner. Steuerberaterin: Frau Meier, 0151 …“">${esc(f.note || "")}</textarea>
+        <textarea class="input" name="note" rows="6" maxlength="5000">${esc(f.note || "")}</textarea>
         <div class="form-actions" style="margin-top:10px"><button class="btn" type="submit">${icon("check")} Speichern</button></div>
       </form>
       <form class="card" id="export-form">

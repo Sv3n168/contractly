@@ -1,7 +1,7 @@
 // Reusable view fragments.
 
 import { STATE_LABEL, catColorVar, contractIcon, catLabel, category, intervalLabel } from "../store.js";
-import { daysUntil, esc, fmtDate, icon, money, num, relDays } from "../ui.js";
+import { daysUntil, esc, fmtDate, icon, modal, money, num, relDays, toast } from "../ui.js";
 
 export function attrValue(field, value) {
   if (value === null || value === undefined || value === "") return null;
@@ -41,6 +41,16 @@ export function deadlineHint(c) {
     return cls
       ? `<span class="badge ${cls}">${icon("alert")} Kündigen bis ${fmtDate(c.cancellation_deadline)}</span>`
       : `<span>Kündbar bis ${fmtDate(c.cancellation_deadline)}</span>`;
+  }
+  return "";
+}
+
+/** In the list only what needs attention: a contract ending, a deadline coming up. */
+function rowHint(c) {
+  if (c.state === "cancelled" && c.end_date) return `<span>${icon("clock")} endet ${fmtDate(c.end_date)}</span>`;
+  if (c.cancellation_deadline && !c.monthly_cancellable) {
+    const d = daysUntil(c.cancellation_deadline);
+    if (d <= 45) return `<span class="badge ${d <= 14 ? "bad" : "warn"}">${icon("alert")} Kündigen bis ${fmtDate(c.cancellation_deadline)}</span>`;
   }
   return "";
 }
@@ -116,8 +126,8 @@ export function contractRow(c) {
   <a class="contract-row ${c.state === "ended" ? "ended" : ""}" href="#/contracts/${c.id}">
     <div class="cat-icon sm" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
     <div class="cr-title"><b>${esc(c.name)}</b><span>${esc(subtitle(c))}</span></div>
-    <div class="cr-meta">${flags}${attrChips(c, 2)}</div>
-    <div class="cr-deadline">${deadlineHint(c)}</div>
+    <div class="cr-meta">${flags}</div>
+    <div class="cr-deadline">${rowHint(c)}</div>
     <div class="cr-price"><b class="num">${money(c.monthly_cost)}</b><span class="num">${sub}</span></div>
   </a>`;
 }
@@ -127,85 +137,133 @@ export function datePill(d, urgency = "") {
   return `<div class="date-pill ${urgency}"><b>${x.getDate()}</b><span>${x.toLocaleDateString("de-DE", { month: "short" })}</span></div>`;
 }
 
-export function reminderItem(item, { actions = true, compact = false } = {}) {
+export function reminderItem(item, { actions = true } = {}) {
   const urgency = item.days_left < 0 || item.days_left <= 7 ? "urgent" : item.days_left <= 30 ? "soon" : "";
-  const kindIcon =
-    {
-      deadline: "alert",
-      contract_end: "clock",
-      custom: "bell",
-      price_increase: "trendUp",
-      price_guarantee: "shield",
-      withdrawal: "refresh",
-      confirmation: "mail",
-      subscription_check: "sparkles",
-      installment_check: "gauge",
-      checkup: "refresh",
-      total_reached: "check",
-      total_exceeded: "alert",
-    }[item.kind] || "bell";
-  const href = item.contract_id ? `#/contracts/${item.contract_id}` : item.kind === "checkup" ? "#/checkup" : "#/reminders";
+  // Read first: the row shows what and when; tapping it opens the details and every option.
+  // Next to it only one quiet check mark – "done" in whatever sense fits the reminder.
   return `
-  <div class="list-item reminder-item">
+  <div class="list-item reminder-item" data-item="${esc(JSON.stringify(item))}">
     ${datePill(item.date, urgency)}
-    <a class="grow" href="${href}" style="color:inherit">
-      <div class="title">${esc(item.title)}</div>
-      <div class="sub">${icon(kindIcon, "inline")} ${esc(relDays(item.days_left))}${item.detail && !compact ? " · " + esc(item.detail) : ""}</div>
-    </a>
-    ${actions ? reminderActions(item, compact) : ""}
+    <button type="button" class="grow reminder-open" data-open>
+      <span class="title">${esc(item.title)}</span>
+      <span class="sub">${icon(KIND_ICON[item.kind] || "bell", "inline")} ${esc(relDays(item.days_left))}</span>
+    </button>
+    ${actions ? quickAction(item) : ""}
   </div>`;
+}
+
+const KIND_ICON = {
+  deadline: "alert",
+  contract_end: "clock",
+  custom: "bell",
+  price_increase: "trendUp",
+  price_guarantee: "shield",
+  withdrawal: "refresh",
+  confirmation: "mail",
+  subscription_check: "sparkles",
+  installment_check: "gauge",
+  checkup: "refresh",
+  total_reached: "check",
+  total_exceeded: "alert",
+};
+
+/** The one action next to a reminder: mark it done (or answer it) right away. */
+function quickAction(item) {
+  const btn = (attr, title) =>
+    `<button class="btn btn-sm btn-icon quick-done" ${attr} title="${title}" aria-label="${title}">${icon("check")}</button>`;
+  if (item.kind === "custom") return btn(`data-done="${item.reminder_id}"`, "Erledigt");
+  if (item.kind === "subscription_check") return btn(`data-still-used="${item.contract_id}"`, "Nutze ich noch");
+  if (item.kind === "confirmation") return btn(`data-confirmed="${item.contract_id}"`, "Bestätigung erhalten");
+  return btn(`data-dismiss="${esc(item.key)}"`, "Erledigt – ausblenden");
+}
+
+/** Everything one can do with a reminder, in a small sheet. */
+function reminderSheet(item, api, onChange) {
+  const contract = item.contract_id ? `#/contracts/${item.contract_id}` : null;
+  const primary = {
+    checkup: `<a class="btn btn-primary" href="#/checkup">${icon("chevRight")} Jahres-Check starten</a>`,
+    installment_check: `<a class="btn btn-primary" href="${contract}?tab=prices">${icon("euro")} Abschlag anpassen</a>`,
+    price_increase: `<a class="btn btn-primary" href="${contract}?tab=compare">${icon("scale")} Angebote vergleichen</a>`,
+    price_guarantee: `<a class="btn btn-primary" href="${contract}?tab=compare">${icon("scale")} Angebote vergleichen</a>`,
+    subscription_check: `<button class="btn btn-primary" data-still-used="${item.contract_id}">${icon("check")} Nutze ich noch</button>
+      <a class="btn" href="${contract}">${icon("ban")} Kündigen …</a>`,
+    confirmation: `<button class="btn btn-primary" data-confirmed="${item.contract_id}">${icon("check")} Bestätigung erhalten</button>`,
+    custom: `<button class="btn btn-primary" data-done="${item.reminder_id}">${icon("check")} Erledigt</button>`,
+  }[item.kind];
+  const m = modal({
+    title: item.title,
+    className: "reminder-sheet",
+    body: `<p class="sheet-when">${icon(KIND_ICON[item.kind] || "bell", "inline")} ${esc(relDays(item.days_left))} · ${fmtDate(item.date)}</p>
+      ${item.detail ? `<p class="sheet-detail">${esc(item.detail)}</p>` : ""}
+      <div class="sheet-actions">
+        ${primary || (contract ? `<a class="btn btn-primary" href="${contract}">${icon("file")} Zum Vertrag</a>` : "")}
+        ${primary && contract ? `<a class="btn" href="${contract}">${icon("file")} Zum Vertrag</a>` : ""}
+        ${item.kind === "custom" ? "" : `<button class="btn btn-ghost" data-dismiss="${esc(item.key)}">${icon("x")} Ausblenden</button>`}
+      </div>`,
+  });
+  m.addEventListener("click", async (e) => {
+    if (e.target.closest("a[href]")) return m.close();
+    if (await runAction(e.target, api, onChange, item)) m.close();
+  });
+}
+
+async function runAction(target, api, onChange, sheetItem = null) {
+  const done = target.closest("[data-done]");
+  const dismiss = target.closest("[data-dismiss]");
+  const used = target.closest("[data-still-used]");
+  const confirmed = target.closest("[data-confirmed]");
+  const row = target.closest("[data-item]");
+  const item = sheetItem ?? (row ? JSON.parse(row.dataset.item) : null);
+  let msg;
+  let undo;
+  if (used) {
+    const id = used.dataset.stillUsed;
+    const before = (await api.contract(id)).last_checked_on;
+    await api.stillUsed(id);
+    msg = "Prima – wir fragen in einem Jahr wieder";
+    undo = () => api.stillUsed(id, { last_checked_on: before });
+  } else if (confirmed) {
+    const id = confirmed.dataset.confirmed;
+    await api.confirmCancellation(id);
+    msg = "Bestätigung vermerkt";
+    undo = () => api.unconfirmCancellation(id);
+  } else if (done) {
+    const id = done.dataset.done;
+    await api.completeReminder(id);
+    msg = "Erledigt";
+    if (item?.date) undo = () => api.reopenReminder(id, item.date);
+  } else if (dismiss) {
+    const key = dismiss.dataset.dismiss;
+    await api.dismissReminder(key);
+    msg = "Ausgeblendet";
+    undo = () => api.undismissReminder(key);
+  } else return false;
+  // a mis-tap is never final: the message offers to undo it
+  toast(msg, "ok", null, undo && {
+    label: "Rückgängig",
+    run: async () => {
+      await undo();
+      onChange();
+    },
+  });
+  onChange();
+  return true;
+}
+
+/** Wire reminder lists: the check mark acts at once, the row opens the sheet. */
+export function bindReminderActions(root, api, onChange) {
+  root.addEventListener("click", async (e) => {
+    if (e.target.closest("[data-open]")) {
+      const row = e.target.closest("[data-item]");
+      return reminderSheet(JSON.parse(row.dataset.item), api, onChange);
+    }
+    await runAction(e.target, api, onChange);
+  });
 }
 
 export function emptyState({ art = "📭", title, text, actions = "" }) {
   return `<div class="card empty"><div class="art">${art}</div><h2>${esc(title)}</h2><p>${text}</p>
     <div class="actions">${actions}</div></div>`;
-}
-
-/** Wire "done" / "dismiss" buttons of reminder lists. */
-export function bindReminderActions(root, api, onChange) {
-  root.addEventListener("click", async (e) => {
-    const done = e.target.closest("[data-done]");
-    const dismiss = e.target.closest("[data-dismiss]");
-    const used = e.target.closest("[data-still-used]");
-    const confirmed = e.target.closest("[data-confirmed]");
-    if (used) {
-      await api.stillUsed(used.dataset.stillUsed);
-      onChange("Prima – wir fragen in einem Jahr wieder");
-    } else if (confirmed) {
-      await api.confirmCancellation(confirmed.dataset.confirmed);
-      onChange("Bestätigung vermerkt ✓");
-    } else if (done) {
-      await api.completeReminder(done.dataset.done);
-      onChange("Erledigt ✓");
-    } else if (dismiss) {
-      await api.dismissReminder(dismiss.dataset.dismiss);
-      onChange("Ausgeblendet");
-    }
-  });
-}
-
-function reminderActions(item, compact = false) {
-  // In narrow lists (dashboard) buttons show only their icon, so the title keeps its space.
-  const label = (text) => (compact ? "" : `<span class="label">${text}</span>`);
-  const dismiss = `<button class="btn btn-sm btn-ghost" data-dismiss="${esc(item.key)}" title="Ausblenden">${icon("x")}</button>`;
-  switch (item.kind) {
-    case "custom":
-      return `<button class="btn btn-sm" data-done="${item.reminder_id}" title="Erledigt">${icon("check")}</button>`;
-    case "subscription_check":
-      return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-still-used="${item.contract_id}" title="Nutze ich noch">${icon("check")}${label("Nutze ich")}</button>
-        <a class="btn btn-sm btn-ghost" href="#/contracts/${item.contract_id}" title="Kündigen">${icon("ban")}</a></div>`;
-    case "confirmation":
-      return `<div style="display:flex;gap:6px;flex:none"><button class="btn btn-sm" data-confirmed="${item.contract_id}" title="Bestätigung erhalten">${icon("check")}</button>${dismiss}</div>`;
-    case "checkup":
-      return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm btn-primary" href="#/checkup" title="Jahres-Check starten">${icon("chevRight")}${label("Starten")}</a>${dismiss}</div>`;
-    case "installment_check":
-      return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm" href="#/contracts/${item.contract_id}?tab=prices" title="Abschlag anpassen">${icon("euro")}${label("Anpassen")}</a>${dismiss}</div>`;
-    case "price_increase":
-    case "price_guarantee":
-      return `<div style="display:flex;gap:6px;flex:none"><a class="btn btn-sm" href="#/contracts/${item.contract_id}?tab=compare" title="Vergleichen">${icon("scale")}</a>${dismiss}</div>`;
-    default:
-      return dismiss;
-  }
 }
 
 // ------------------------------------------------------------------ own emoji

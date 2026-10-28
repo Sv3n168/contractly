@@ -15,18 +15,19 @@
 
 :root {
   color-scheme: light;
-  --bg: #fbfaf7;
+  /* cool grey page, white panels, one clear blue */
+  --bg: #f0f2f5;
   --surface: #ffffff;
-  --surface-2: #f2f1ec;
-  --surface-3: #e8e6df;
-  --border: #e6e3db;
-  --border-strong: #d5d1c6;
-  --text: #0b0f14;
-  --text-2: #3e4653;
-  --muted: #727885;
-  --primary: #163a6b;
-  --primary-hover: #0f2b52;
-  --primary-soft: #e8eef7;
+  --surface-2: #f1f3f6;
+  --surface-3: #e6e9ee;
+  --border: #e4e7ec;
+  --border-strong: #cfd4dc;
+  --text: #101828;
+  --text-2: #344054;
+  --muted: #667085;
+  --primary: #2348b8;
+  --primary-hover: #1b3a96;
+  --primary-soft: #eaf0fd;
   --primary-ink: #ffffff;
   --good: #0b7f57;
   --good-soft: #e3f3eb;
@@ -35,9 +36,9 @@
   --warn-soft: #fbf1df;
   --bad: #c23b3b;
   --bad-soft: #fbeaea;
-  --info-soft: #e8eef7;
-  --grid: #ebe9e3;
-  --axis: #cbc7bc;
+  --info-soft: #eaf0fd;
+  --grid: #eceff3;
+  --axis: #cfd4dc;
   --shadow-sm: 0 1px 2px rgba(11, 15, 20, 0.05);
   --shadow: 0 1px 2px rgba(11, 15, 20, 0.04), 0 4px 18px rgba(11, 15, 20, 0.06);
   --shadow-lg: 0 12px 40px rgba(11, 15, 20, 0.2);
@@ -47,6 +48,14 @@
   --ink-text: #f4f1ea;
   --ink-muted: rgba(244, 241, 234, 0.62);
   --ink-line: rgba(244, 241, 234, 0.1);
+  /* the app's frame (sidebar): a quiet paper tone, not black */
+  --chrome: #ffffff;
+  --chrome-text: var(--text);
+  --chrome-muted: var(--muted);
+  --chrome-line: var(--border);
+  --chrome-hover: rgba(11, 15, 20, 0.04);
+  --chrome-active: var(--surface);
+  --chrome-active-shadow: 0 1px 2px rgba(11, 15, 20, 0.06), 0 0 0 1px var(--border);
   --emerald: #2fbf88;
   --font-display: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
   /* Motion: iOS-like curves – a spring for things that move, a soft ease-out for fades */
@@ -101,6 +110,10 @@
     --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
     --ink: #000000;
     --ink-2: #0c1420;
+    --chrome: #0d1116;
+    --chrome-hover: rgba(255, 255, 255, 0.04);
+    --chrome-active: var(--surface-2);
+    --chrome-active-shadow: none;
     --series-1: #3987e5;
     --series-2: #d95926;
     --series-3: #199e70;
@@ -141,6 +154,10 @@
   --shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
   --ink: #000000;
   --ink-2: #0c1420;
+  --chrome: #0d1116;
+  --chrome-hover: rgba(255, 255, 255, 0.04);
+  --chrome-active: var(--surface-2);
+  --chrome-active-shadow: none;
   --series-1: #3987e5;
   --series-2: #d95926;
   --series-3: #199e70;
@@ -191,8 +208,8 @@ h4 {
 }
 h1 {
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 750;
+  font-size: 26px;
+  font-weight: 700;
   letter-spacing: -0.035em;
 }
 h2 {
@@ -262,10 +279,9 @@ h3 {
   flex-direction: column;
   gap: 4px;
   padding: 20px 14px;
-  color: var(--ink-text);
-  background: url("guilloche.svg") right -120px bottom -40px / 560px auto no-repeat,
-    linear-gradient(180deg, var(--ink) 0%, var(--ink) 55%, var(--ink-2) 100%);
-  border-right: 1px solid var(--ink-line);
+  color: var(--chrome-text);
+  background: var(--chrome);
+  border-right: 1px solid var(--chrome-line);
   overflow-y: auto;
 }
 .brand {
@@ -281,14 +297,14 @@ h3 {
 }
 .sidebar .brand,
 .auth-side .brand {
-  color: var(--ink-text);
+  color: var(--chrome-text);
 }
 .brand-mark {
   width: 34px;
   height: 34px;
   border-radius: 10px;
   background: url("/icon.svg") center / cover;
-  box-shadow: 0 0 0 1px var(--ink-line), 0 6px 16px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 0 0 1px var(--chrome-line);
 }
 .brand-mark .svg-icon {
   display: none;
@@ -299,7 +315,7 @@ h3 {
   font-weight: 650;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
   opacity: 0.75;
 }
 .nav-link {
@@ -308,18 +324,19 @@ h3 {
   gap: 12px;
   padding: 9px 12px;
   border-radius: var(--radius-sm);
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
   font-weight: 550;
   transition: background 0.15s, color 0.15s;
   position: relative;
 }
 .nav-link:hover {
-  background: rgba(244, 241, 234, 0.06);
-  color: var(--ink-text);
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
 }
 .nav-link.active {
-  background: rgba(244, 241, 234, 0.09);
-  color: var(--ink-text);
+  background: var(--chrome-active);
+  color: var(--chrome-text);
+  box-shadow: var(--chrome-active-shadow);
 }
 .nav-link.active::before {
   /* green marker: where you are */
@@ -348,37 +365,32 @@ h3 {
   display: grid;
   place-items: center;
 }
+/* the one place for "Neuer Vertrag" on a big screen (phones: the + in the bottom bar) */
 .sidebar .btn-new {
   margin: 0 2px 10px;
   justify-content: center;
-  background: var(--ink-text);
-  border-color: var(--ink-text);
-  color: var(--ink);
-}
-.sidebar .btn-new:hover {
-  background: #fff;
 }
 .sidebar .user-chip,
 .sidebar .user-chip b {
-  color: var(--ink-text);
+  color: var(--chrome-text);
 }
 .sidebar .user-chip small {
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
 }
 .sidebar .user-chip:hover {
-  background: rgba(244, 241, 234, 0.06);
+  background: var(--chrome-hover);
 }
 .sidebar .btn-ghost {
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
 }
 .sidebar .btn-ghost:hover {
-  background: rgba(244, 241, 234, 0.08);
-  color: var(--ink-text);
+  background: var(--chrome-hover);
+  color: var(--chrome-text);
 }
 .sidebar-footer {
   margin-top: auto;
   padding-top: 12px;
-  border-top: 1px solid var(--ink-line);
+  border-top: 1px solid var(--chrome-line);
   display: flex;
   align-items: center;
   gap: 4px;
@@ -390,10 +402,10 @@ h3 {
   width: 100%;
   margin-bottom: 8px;
   padding: 8px 12px;
-  border: 1px solid var(--ink-line);
+  border: 1px solid var(--chrome-line);
   border-radius: var(--radius-sm);
-  background: rgba(244, 241, 234, 0.05);
-  color: var(--ink-muted);
+  background: var(--chrome-hover);
+  color: var(--chrome-muted);
   cursor: pointer;
   text-align: left;
 }
@@ -401,10 +413,10 @@ h3 {
   margin-left: auto;
   font-size: 11px;
   padding: 1px 6px;
-  border: 1px solid var(--ink-line);
+  border: 1px solid var(--chrome-line);
   border-radius: 5px;
   background: transparent;
-  color: var(--ink-muted);
+  color: var(--chrome-muted);
 }
 
 .main {
@@ -763,20 +775,20 @@ h3 {
   height: 16px;
 }
 .kpi-value {
-  margin-top: 12px;
+  margin-top: 6px;
   font-family: var(--font-display);
-  font-size: 30px;
-  font-weight: 750;
-  letter-spacing: -0.04em;
+  font-size: 21px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
   line-height: 1.1;
   font-variant-numeric: lining-nums tabular-nums;
 }
 .kpi-value.kpi-date {
-  font-size: 22px;
+  font-size: 17px;
 }
 .kpi-sub {
-  margin-top: 6px;
-  font-size: 13px;
+  margin-top: 4px;
+  font-size: 12.5px;
   color: var(--muted);
 }
 .kpi.hero {
@@ -933,7 +945,7 @@ h3 {
 }
 
 .dash-hero .kpi-value {
-  font-size: 40px;
+  font-size: 32px;
   margin: 14px 0 10px;
 }
 .dash-hero .kpi-sub {
@@ -1020,8 +1032,8 @@ h3 {
   gap: 6px;
 }
 .cc-price strong {
-  font-size: 24px;
-  font-weight: 750;
+  font-size: 19px;
+  font-weight: 650;
   letter-spacing: -0.02em;
 }
 .cc-meta {
@@ -1084,9 +1096,7 @@ h3 {
 }
 .cr-title b,
 .cr-title span {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .cr-title span {
   font-size: 13px;
@@ -1166,9 +1176,8 @@ a.list-item:hover {
 }
 .list-item .title {
   font-weight: 600;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  /* full titles: wrap instead of "…" */
+  overflow-wrap: anywhere;
 }
 .list-item .sub {
   font-size: 13px;
@@ -1392,7 +1401,7 @@ table.table {
 }
 .fact .v {
   margin-top: 2px;
-  font-weight: 650;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
@@ -1486,8 +1495,8 @@ table.table {
   left: 16px;
 }
 .offer-card .big {
-  font-size: 26px;
-  font-weight: 750;
+  font-size: 21px;
+  font-weight: 650;
   letter-spacing: -0.02em;
 }
 .offer-card dl {
@@ -1754,9 +1763,13 @@ details.more > .body {
 .tl-label .t {
   font-weight: 600;
   font-size: 14px;
-  white-space: nowrap;
+  line-height: 1.3;
+  /* long names take a second line instead of "…" */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 .tl-label .s {
   font-size: 12px;
@@ -1835,7 +1848,7 @@ details.more > .body {
 
 .chart-box {
   position: relative;
-  height: 300px;
+  height: 240px;
 }
 .chart-box.sm {
   height: 220px;
@@ -2293,9 +2306,9 @@ details.more > .body {
     border-radius: 16px;
     display: grid;
     place-items: center;
-    color: var(--ink-text);
-    background: linear-gradient(135deg, var(--ink-2), var(--ink));
-    box-shadow: 0 6px 18px rgba(11, 15, 20, 0.35), inset 0 -2px 0 var(--emerald);
+    color: #fff;
+    background: var(--primary);
+    box-shadow: 0 6px 16px color-mix(in srgb, var(--primary) 30%, transparent);
   }
   .bottom-nav .nav-badge {
     position: absolute;
@@ -2323,35 +2336,11 @@ details.more > .body {
   .kpi-label .kpi-icon {
     display: none;
   }
-  /* four tiles with the black card: it gets the full width, the rest share one row */
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) {
-    padding: 10px 12px;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-label {
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    font-size: 11.5px;
-    line-height: 1.25;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-value {
-    font-size: 17px;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-value.kpi-date {
-    font-size: 15px;
-  }
-  .kpis:has(> .hero):has(> :nth-child(4):last-child) > .kpi:not(.hero) .kpi-sub {
-    font-size: 11.5px;
-  }
   .kpis > .kpi.hero {
     grid-column: 1 / -1;
   }
   .kpis > .kpi.hero .kpi-value {
-    font-size: 26px;
+    font-size: 22px;
   }
   .card.contract-list {
     padding: 4px 0;
@@ -2379,17 +2368,6 @@ details.more > .body {
     min-height: 38px;
     min-width: 38px;
     justify-content: center;
-  }
-  /* reminders: the text keeps the row next to the date, buttons move below it */
-  .reminder-item {
-    flex-wrap: wrap;
-    row-gap: 8px;
-  }
-  .reminder-item > .grow {
-    flex: 1 1 calc(100% - 70px);
-  }
-  .reminder-item > .grow + .btn {
-    margin-left: auto;
   }
   .kpi-value {
     margin-top: 4px;
@@ -2482,16 +2460,47 @@ details.more > .body {
     bottom: calc(84px + env(safe-area-inset-bottom));
   }
   .chart-box {
-    height: 240px;
+    height: 200px;
   }
   .chart-box.lg {
     height: 280px;
   }
+  /* phones: the name above, the bar below over the full width – no sideways scrolling */
+  .tl-inner {
+    min-width: 0;
+  }
   .tl-axis {
-    margin-left: 130px;
+    margin-left: 0;
+  }
+  .tl-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 0 4px;
   }
   .tl-label {
-    width: 130px;
+    width: auto;
+    position: relative;
+    z-index: 1;
+    background: var(--surface);
+    padding: 0 0 4px;
+  }
+  .tl-label .cat-icon {
+    display: none;
+  }
+  .tl-label .t {
+    -webkit-line-clamp: unset;
+  }
+  .tl-label > span {
+    display: flex;
+    gap: 6px;
+    align-items: baseline;
+    flex-wrap: wrap;
+  }
+  .tl-track {
+    height: 30px;
+  }
+  .tl-bar {
+    top: 3px;
   }
   .letter {
     padding: 24px 20px;
@@ -2842,7 +2851,7 @@ body:not(.is-admin) .admin-only {
   gap: 2px;
 }
 .checkup-stats b {
-  font-size: 28px;
+  font-size: 22px;
 }
 .checkup-stats span {
   font-size: 13px;
@@ -2966,7 +2975,7 @@ body:not(.is-admin) .admin-only {
   flex-wrap: wrap;
 }
 .loan-balance .big {
-  font-size: 26px;
+  font-size: 21px;
   font-weight: 700;
 }
 .loan-balance .grow {
@@ -3289,60 +3298,68 @@ canvas.explorable:active {
  */
 
 .main .card:not(.kpi.hero):not(.contract-card) {
-  background: transparent;
-  border: 0;
-  border-top: 1px solid var(--border);
-  border-radius: 0;
-  box-shadow: none;
-  padding: 22px 0 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+  padding: 16px 20px;
 }
 .main .card-head {
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 .main .card-head h2 {
-  font-size: 13px;
+  font-size: 15px;
   font-weight: 650;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--muted);
+  letter-spacing: -0.01em;
+  color: var(--text);
 }
 .main .card-head h2 .svg-icon {
   width: 15px;
   height: 15px;
+  color: var(--muted);
 }
 .main .card-head p {
   font-size: 13px;
 }
 .main .grid,
 .main .dash-top {
-  column-gap: 48px;
-  row-gap: 12px;
+  gap: 16px;
 }
 .main .stack {
-  gap: 12px;
+  gap: 16px;
 }
 
-/* key figures: one row with thin dividers, no boxes */
+/* key figures: one white strip with thin dividers between the figures */
 .main .kpis {
   gap: 0;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
 }
-/* .card.kpi: outranks the section rule above, which takes the side padding off */
+/* .card.kpi: outranks the section rule above */
 .main .kpis > .card.kpi:not(.hero) {
-  border-top: 1px solid var(--border);
-  padding: 18px 22px;
-}
-.main .kpis > .kpi:not(.hero):first-child {
-  padding-left: 0;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 10px 18px;
 }
 .main .kpis > .kpi:not(.hero) + .kpi:not(.hero) {
   border-left: 1px solid var(--border);
 }
 .main .kpis > .kpi.hero {
-  margin: 0 16px 0 0;
+  margin: 0 8px 0 0;
+}
+/* every figure of a row starts at the same height: the tinted card's 1px border plus its
+   padding equals its neighbours' padding, so labels, numbers and sub lines align */
+.main .kpis > .card.kpi.hero {
+  padding: 9px 16px;
 }
 .main .kpis > .kpi.hero:last-child {
-  margin: 0 0 0 16px;
+  margin: 0 0 0 8px;
 }
 .main .kpi-label .kpi-icon {
   display: none;
@@ -3351,6 +3368,7 @@ canvas.explorable:active {
 /* lists run edge to edge inside a section */
 .main .card.contract-list {
   padding-top: 4px;
+  padding-bottom: 4px;
 }
 .main .contract-row,
 .main .cl-group {
@@ -3358,15 +3376,7 @@ canvas.explorable:active {
   padding-right: 0;
 }
 .main .settings-link {
-  padding: 16px 0;
-}
-/* the tab bar already draws the line above a tab's first section */
-.main #tab > .card:first-child,
-.main #tab > .grid:first-child > .card,
-.main #tab > .grid:first-child > .stack > .card:first-child,
-.main #tab > .kpis:first-child > .kpi:not(.hero) {
-  border-top: 0;
-  padding-top: 4px;
+  padding: 16px 20px;
 }
 .main .table th:first-child,
 .main .table td:first-child {
@@ -3379,7 +3389,8 @@ canvas.explorable:active {
 
 @media (max-width: 720px) {
   .main .card:not(.kpi.hero):not(.contract-card) {
-    padding: 18px 0 6px;
+    padding: 14px 16px;
+    border-radius: 12px;
   }
   .main .kpis {
     row-gap: 12px;
@@ -3389,11 +3400,51 @@ canvas.explorable:active {
     margin: 0;
   }
   .main .kpis > .card.kpi:not(.hero) {
-    padding: 12px 10px 12px 12px;
+    padding: 10px 12px;
   }
-  .main .kpis > .kpi:not(.hero):first-child,
-  .main .kpis:has(> .hero) > .kpi:not(.hero):first-child {
-    padding-left: 0;
+  .main .kpis > .card.kpi.hero {
+    padding: 14px 16px;
+  }
+  /* next to the headline card the other figures become a plain list: label left, number right –
+     nothing squeezed into three narrow columns, nothing cut off */
+  .main .kpis:has(> .hero) {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 0;
+  }
+  .main .kpis:has(> .hero) > .kpi.hero {
+    margin-bottom: 6px;
+  }
+  .main .kpis:has(> .hero) > .card.kpi:not(.hero) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "label value" "sub value";
+    column-gap: 16px;
+    align-items: center;
+    padding: 11px 10px;
+    border-left: 0;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-label {
+    grid-area: label;
+    font-size: 14px;
+    color: var(--text);
+    white-space: normal;
+    display: block;
+    -webkit-line-clamp: unset;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-value,
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-value.kpi-date {
+    grid-area: value;
+    margin: 0;
+    font-size: 17px;
+    text-align: right;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-sub {
+    grid-area: sub;
+    margin-top: 1px;
+    font-size: 12.5px;
+  }
+  .main .kpis:has(> .hero) > .kpi:not(.hero) .kpi-sub:empty {
+    display: none;
   }
 }
 
@@ -3423,10 +3474,407 @@ canvas.explorable:active {
   flex-wrap: wrap;
 }
 .income-now .big {
-  font-size: 24px;
-  font-weight: 750;
+  font-size: 20px;
+  font-weight: 650;
   letter-spacing: -0.03em;
 }
 .income-card.ended {
   opacity: 0.7;
+}
+
+/* ------------------------------------------------------------------ contract chain (switches) */
+
+.chain-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin-top: 12px;
+  font-size: 13px;
+}
+.chain-item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--text);
+  padding: 4px 0;
+}
+.chain-item .dot {
+  flex: none;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  transform: translateY(1px);
+}
+.chain-item:not(.current) b {
+  font-weight: 550;
+}
+.chain-item:not(.current):hover b {
+  text-decoration: underline;
+}
+.chain-arrow {
+  color: var(--muted);
+  display: inline-flex;
+}
+.chain-arrow .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.switch-banner {
+  margin-bottom: 18px;
+  align-items: center;
+  color: var(--text);
+}
+a.switch-banner:hover {
+  filter: brightness(0.98);
+}
+.switch-banner .switch-go {
+  margin-left: auto;
+  flex: none;
+}
+.kpi-sub a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--border);
+  text-underline-offset: 2px;
+}
+
+.callout-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin-top: 10px;
+}
+
+/* ------------------------------------------------------------------ facts: read like a list
+ * Label left, value right, a hairline between – instead of a grid of grey boxes. */
+
+.main .facts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+}
+.main .fact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 0;
+  background: none;
+  border-radius: 0;
+  border-bottom: 1px solid var(--border);
+}
+.main .fact:last-child {
+  border-bottom: 0;
+}
+.main .fact .k {
+  font-size: 13.5px;
+  color: var(--muted);
+}
+.main .fact .v {
+  margin: 0;
+  text-align: right;
+  font-weight: 550;
+}
+.main .fact .v small {
+  display: block;
+  font-weight: 400;
+}
+
+/* ------------------------------------------------------------------ own fields (form) */
+
+.own-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 16px;
+}
+.own-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.own-label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 28px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.own-label .lbl {
+  overflow-wrap: anywhere;
+}
+.own-label .lbl-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  font-size: 13px;
+}
+.own-label .icon-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.own-label .icon-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.own-label .icon-btn .svg-icon {
+  width: 14px;
+  height: 14px;
+}
+.own-add {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+@media (max-width: 720px) {
+  .own-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ------------------------------------------------------------------ reminders: read first */
+
+.stack.reading {
+  max-width: 780px;
+}
+.reminder-item {
+  align-items: center;
+}
+.reminder-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+/* full titles: wrap instead of "…" */
+.reminder-open .title {
+  white-space: normal;
+  overflow: visible;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+}
+.reminder-open:hover .title {
+  text-decoration: underline;
+  text-decoration-color: var(--border-strong);
+  text-underline-offset: 3px;
+}
+.quick-done {
+  flex: none;
+  color: var(--muted);
+}
+.quick-done:hover {
+  color: var(--good);
+  border-color: var(--good);
+}
+.reminder-sheet .sheet-when {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+.reminder-sheet .sheet-detail {
+  margin: 0 0 16px;
+  line-height: 1.5;
+}
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.sheet-actions .btn {
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------------ contract list toolbar */
+
+.list-toolbar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.list-toolbar .input {
+  flex: 1;
+  min-width: 0;
+}
+.list-toolbar .btn .count:not(:empty) {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 11px;
+  display: inline-grid;
+  place-items: center;
+}
+.active-filters:not(:empty) {
+  margin-bottom: 12px;
+}
+.active-filters .chip .svg-icon {
+  width: 13px;
+  height: 13px;
+}
+.filter-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.fs-label {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.filter-sheet .chips {
+  flex-wrap: wrap;
+}
+
+.costs-toolbar {
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.costs-toolbar .active-filters {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.assumptions {
+  margin-bottom: 14px;
+}
+.assumptions > summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13.5px;
+  color: var(--text-2);
+  cursor: pointer;
+  list-style: none;
+}
+.assumptions > summary::-webkit-details-marker {
+  display: none;
+}
+.assumptions > summary .svg-icon {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+.assumptions[open] > summary .chev {
+  transform: rotate(180deg);
+}
+.chips .chip .dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+}
+
+.kpis.kpis-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 720px) {
+  /* a page head with a switch (2 Jahre · 5 Jahre …): the text keeps the full width, the switch goes below */
+  .page-head:has(> .segmented) > div:first-child {
+    flex: 1 1 100%;
+  }
+}
+
+/* required fields */
+.req {
+  color: var(--bad);
+  font-weight: 650;
+}
+.total-field {
+  margin-top: 10px;
+}
+.total-field .btn .muted {
+  font-weight: 450;
+}
+
+/* table rows that open their dialog */
+.row-link {
+  cursor: pointer;
+}
+.row-link:hover td {
+  background: var(--surface-2);
+}
+.row-link .row-go {
+  width: 28px;
+  color: var(--muted);
+}
+.row-link .row-go .svg-icon {
+  width: 15px;
+  height: 15px;
+}
+/* "what do you want to record?" */
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.choice:hover {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.choice > .svg-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--primary);
+}
+.choice span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.choice small {
+  color: var(--muted);
+}
+
+.toast-action {
+  margin-left: 8px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  color: inherit;
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.toast-action:hover {
+  background: rgba(255, 255, 255, 0.26);
 }

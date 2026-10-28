@@ -153,7 +153,7 @@ function sourceModal(kinds, s = null) {
         .map((k) => `<option value="${k.key}" ${(s?.kind || "salary") === k.key ? "selected" : ""}>${k.icon} ${esc(k.label)}</option>`)
         .join("")}</select></label>
       <label class="field"><span>Bezeichnung</span><input name="name" value="${esc(s?.name || "Gehalt")}" required/></label>
-      <label class="field"><span>Von (optional)</span><input name="payer" value="${esc(s?.payer || "")}" placeholder="z. B. Arbeitgeber"/></label>
+      <label class="field"><span>Von (optional)</span><input name="payer" value="${esc(s?.payer || "")}"/></label>
       <label class="field"><span>Seit</span><input type="date" name="start_date" value="${esc(s?.start_date || today())}" required/></label>
       ${
         s
@@ -217,7 +217,7 @@ function entryModal(sourceId, mode) {
       <label class="field"><span>Netto</span><div class="input-group"><input type="number" step="0.01" min="0" name="net" required inputmode="decimal"/><span class="addon">€</span></div></label>
       <label class="field"><span>Brutto (optional)</span><div class="input-group"><input type="number" step="0.01" min="0" name="gross" inputmode="decimal"/><span class="addon">€</span></div></label>
       ${bonus ? "" : `<label class="field"><span>Zahlweise</span><select name="interval"><option value="monthly">monatlich</option><option value="yearly">jährlich</option></select></label>`}
-      <label class="field span-all"><span>Notiz</span><input name="note" placeholder="${bonus ? "z. B. Bonus, Urlaubsgeld, Weihnachtsgeld" : "z. B. Gehaltserhöhung, Tariferhöhung, Jobwechsel"}"/></label>
+      <label class="field span-all"><span>Notiz</span><input name="note"/></label>
     </form>`,
     foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });

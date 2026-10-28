@@ -1,5 +1,8 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from sqlalchemy import select
+from pydantic import BaseModel
+from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -84,6 +87,22 @@ def complete_reminder(reminder_id: int, db: Session = Depends(get_db)):
     return r
 
 
+class ReopenIn(BaseModel):
+    due_date: date
+
+
+@router.post("/{reminder_id}/reopen", response_model=ReminderOut)
+def reopen_reminder(reminder_id: int, data: ReopenIn, db: Session = Depends(get_db)):
+    """Undo "done": open again with the due date it had."""
+    r = _get(db, reminder_id)
+    r.done_at = None
+    r.due_date = data.due_date
+    db.commit()
+    db.refresh(r)
+    svc.refresh_outbox(require_user())
+    return r
+
+
 @router.delete("/{reminder_id}", status_code=204)
 def delete_reminder(reminder_id: int, db: Session = Depends(get_db)):
     db.delete(_get(db, reminder_id))
@@ -100,6 +119,14 @@ def dismiss(key: str = Query(min_length=3, max_length=180), db: Session = Depend
         db.commit()
     except IntegrityError:
         db.rollback()
+    return {"ok": True}
+
+
+@router.post("/undismiss")
+def undismiss(key: str = Query(min_length=3, max_length=180), db: Session = Depends(get_db)):
+    """Undo "hide": show an automatic reminder again."""
+    db.execute(delete(NotificationLog).where(NotificationLog.key == f"dismiss:{key}"))
+    db.commit()
     return {"ok": True}
 
 

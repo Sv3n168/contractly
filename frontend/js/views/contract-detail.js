@@ -1,5 +1,5 @@
 import { api } from "../api.js";
-import { chainLine, legendHtml } from "../charts.js";
+import { chainLine } from "../charts.js";
 import { catColorVar, category, contractIcon, catLabel, catSlot, intervalLabel, isEnergy, slotColor, state } from "../store.js";
 import {
   $,
@@ -22,7 +22,7 @@ import {
   toast,
   today,
 } from "../ui.js";
-import { attrValue, reminderItem, stateBadge } from "./components.js";
+import { attrValue, bindReminderActions, reminderItem, stateBadge } from "./components.js";
 import { renderCompare } from "./compare.js";
 import { setupDrop } from "./contract-form.js";
 import { contractPayload, suggestionPicker } from "./ocr.js";
@@ -52,10 +52,11 @@ export async function renderContractDetail(view, id, query = {}) {
       <div class="cat-icon lg" style="--c:${catColorVar(c.category)}">${esc(contractIcon(c))}</div>
       <div class="title">
         <h1>${esc(c.name)}</h1>
-        <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))} ${stateBadge(c)}</div>
+        <div class="sub">${esc(c.provider || "")}${c.provider ? " · " : ""}${esc(catLabel(c.category))}${
+          c.attributes?.managed_by ? ` · ${esc(c.attributes?.field_labels?.managed_by || "Verwaltet von")} ${esc(c.attributes.managed_by)}` : ""
+        } ${stateBadge(c)}</div>
       </div>
       <div class="page-actions">
-        ${c.state !== "ended" && !loan ? `<a class="btn btn-primary" href="#/contracts/${id}?tab=compare">${icon("scale")} Vergleichen</a>` : ""}
         <a class="btn" href="#/contracts/${id}/edit">${icon("edit")}<span class="label">Bearbeiten</span></a>
         <div class="menu">
           <button class="btn btn-icon" data-menu aria-label="Mehr Aktionen">${icon("more")}</button>
@@ -65,14 +66,14 @@ export async function renderContractDetail(view, id, query = {}) {
             ${c.state === "active" ? `<button data-act="pause">${icon("clock")} Pausieren (ruhend stellen)</button>` : ""}
             ${
               c.state === "active"
-                ? `<button data-act="cancel">${icon("ban")} Als gekündigt markieren</button>`
+                ? `<button data-act="cancel">${icon("ban")} Kündigen …</button>`
                 : c.state === "cancelled"
                   ? `${c.cancellation_confirmed_on ? "" : `<button data-act="confirmed">${icon("check")} Kündigungsbestätigung erhalten</button>`}
                      <button data-act="reactivate">${icon("refresh")} Kündigung zurücknehmen</button>`
                   : ""
             }
-            <button data-act="letter">${icon("mail")} Kündigungsschreiben</button>
-            <button data-act="successor">${icon("swap")} Durch neuen Vertrag ersetzen</button>
+            ${c.state === "cancelled" ? `<button data-act="letter">${icon("mail")} Kündigungsschreiben</button>` : ""}
+            <button data-act="successor">${icon("swap")} Anbieter oder Tarif wechseln</button>
             <button data-act="reminder">${icon("bell")} Erinnerung hinzufügen</button>
             <hr/>
             <button data-act="delete" class="danger">${icon("trash")} Löschen</button>
@@ -160,7 +161,14 @@ async function overviewTab(el, c, reload) {
   // Shared costs: next to the own part always the whole contract's price.
   const shared = Boolean(c.partner_amount) || (c.share_percent != null && c.share_percent !== 100);
   const fullYearly = c.full_monthly_cost * 12;
+  // neighbours in the chain of switches (old contract → new contract)
+  const pos = chain.findIndex((x) => x.id === c.id);
+  const prev = pos > 0 ? chain[pos - 1] : null;
+  const next = pos >= 0 && pos < chain.length - 1 ? chain[pos + 1] : null;
+  const ended = c.state === "ended";
   el.innerHTML = `
+    ${ended ? endedBanner(c, next) : ""}
+    ${ended ? endedKpis(c, next, runtime) : `
     <div class="kpis">
       <div class="card kpi hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Pro Monat</div>
@@ -198,31 +206,31 @@ async function overviewTab(el, c, reload) {
              <div class="kpi-value num">${money(c.loan.balance, true)}</div>
              <div class="kpi-sub">${c.loan.payoff_date ? `schuldenfrei ${new Date(c.loan.payoff_date).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}` : ""}</div></div>`
           : c.switch_savings != null
-          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>Seit dem Wechsel</div>
-             <div class="kpi-value num ${c.switch_savings >= 0 ? "better" : "worse"}">${signedMoney(c.switch_savings)}</div>
-             <div class="kpi-sub">${c.switch_savings >= 0 ? "gespart ggü. altem Vertrag" : "Mehrkosten ggü. altem Vertrag"}</div></div>`
+          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>${c.switch_savings >= 0 ? "Gespart seit dem Wechsel" : "Mehrkosten seit dem Wechsel"}</div>
+             <div class="kpi-value num ${c.switch_savings >= 0 ? "better" : "worse"}">${money(Math.abs(c.switch_savings), true)}</div>
+             <div class="kpi-sub">ggü. ${prev ? `<a href="#/contracts/${prev.id}">${esc(prev.name)}</a>` : "altem Vertrag"}</div></div>`
           : `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("clock")}</span>Kündbar bis</div>
              <div class="kpi-value num kpi-date">${c.cancellation_deadline ? fmtDate(c.cancellation_deadline) : c.end_date ? "endet " + fmtDate(c.end_date) : "–"}</div>
              <div class="kpi-sub">${c.cancellation_deadline ? relDays(daysUntil(c.cancellation_deadline)) : ""}</div></div>`
       }
-    </div>
+    </div>`}
 
     ${budgetCard(c)}
 
     <div class="card" style="margin-bottom:20px">
       <div class="card-head" style="align-items:flex-start"><div><h2>Kostenverlauf</h2>
-        <p>${chain.length > 1 ? `Durchgehend über alle Wechsel: ${chain.map((x) => esc(x.name)).join(" → ")}` : "Monatliche Kosten · gestrichelt = Vorschau"}${hist.extras.some((v) => v) ? " · Punkte = Monate mit Zusatzkosten" : ""}</p></div>
-        ${c.state !== "ended" ? `<button class="btn btn-sm" id="extra-btn">${icon("plus")} Zusatzkosten</button>` : ""}</div>
+        <p>${chain.length > 1 ? "Durchgehend über alle Wechsel" : "Monatliche Kosten"} · gestrichelt = Vorschau${hist.extras.some((v) => v) || hist.credits.some((v) => v) ? " · Punkte = Zusatzkosten oder Bonus" : ""}</p></div>
+</div>
       <div class="chart-box"><canvas id="hist"></canvas></div>
-      ${hist.series.length > 1 ? legendHtml(hist.series.map((s, i) => ({ label: esc(s.name), color: colors[i] }))) : ""}
       ${
-        chain.length > 1
-          ? `<div class="chips" style="margin-top:14px">${chain
+        hist.series.length > 1
+          ? `<div class="chain-legend">${hist.series
               .map(
-                (x) => `<a class="chip ${x.id === c.id ? "active" : ""}" href="#/contracts/${x.id}">${esc(x.name)}
-                  <span class="count">${fmtDate(x.start_date)}${x.end_date ? " – " + fmtDate(x.end_date) : " – heute"}</span></a>`,
+                (s, i) => `<a class="chain-item ${s.contract_id === c.id ? "current" : ""}" href="#/contracts/${s.contract_id}">
+                  <span class="dot" style="background:${colors[i]}"></span>
+                  <span><b>${esc(s.name)}</b><span class="muted"> · ${fmtDate(s.start_date)} – ${s.end_date ? fmtDate(s.end_date) : "heute"}</span></span></a>`,
               )
-              .join(`<span class="muted" style="align-self:center">${icon("chevRight")}</span>`)}</div>`
+              .join(`<span class="chain-arrow">${icon("chevRight")}</span>`)}</div>`
           : ""
       }
     </div>
@@ -230,29 +238,31 @@ async function overviewTab(el, c, reload) {
     <div class="grid grid-2">
       <div class="stack">
         <div class="card">
-          <div class="card-head"><div><h2>Leistungen & Eckdaten</h2></div>
-            <a class="btn btn-sm btn-ghost" href="#/contracts/${c.id}/edit">${icon("edit")} Ändern</a></div>
+          <div class="card-head"><div><h2>Leistungen & Eckdaten</h2></div></div>
           ${
             facts.length
               ? `<div class="facts">${facts.map(([k, v]) => `<div class="fact"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join("")}</div>`
               : `<p class="muted" style="margin:0">Noch keine Eckdaten hinterlegt. <a href="#/contracts/${c.id}/edit">Jetzt ergänzen</a> – oder ein Dokument hochladen und erkennen lassen.</p>`
           }
           <div class="facts" style="margin-top:10px">
-            ${c.customer_number ? `<div class="fact"><div class="k">Kundennummer</div><div class="v">${esc(c.customer_number)}</div></div>` : ""}
-            ${c.contract_number ? `<div class="fact"><div class="k">Vertragsnummer</div><div class="v">${esc(c.contract_number)}</div></div>` : ""}
+            ${c.attributes?.managed_by ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.managed_by || "Verwaltet von")}</div><div class="v">${esc(c.attributes.managed_by)}</div></div>` : ""}
+            ${c.customer_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.customer_number || "Kundennummer")}</div><div class="v">${esc(c.customer_number)}</div></div>` : ""}
+            ${c.contract_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.contract_number || "Vertragsnummer")}</div><div class="v">${esc(c.contract_number)}</div></div>` : ""}
+            ${(c.attributes?.custom_fields || [])
+              .filter((f) => f.value)
+              .map((f) => `<div class="fact"><div class="k">${esc(f.label)}</div><div class="v">${esc(f.value)}</div></div>`)
+              .join("")}
           </div>
         </div>
-        ${energyCard(c)}
+        ${ended ? "" : energyCard(c)}
         ${loanCard(c)}
         ${c.notes ? `<div class="card"><div class="card-head"><h2>Notizen</h2></div><p style="margin:0;white-space:pre-wrap">${esc(c.notes)}</p></div>` : ""}
       </div>
       <div class="card">
         <div class="card-head"><div><h2>Laufzeit & Kündigung</h2></div></div>
         ${
-          c.state === "ended"
-            ? `<div class="callout">${icon("info")}<div>Beendet am <b>${fmtDate(c.end_date)}</b>.${
-                c.successor_ids.length ? ` Nachfolger: <a href="#/contracts/${c.successor_ids[0]}">ansehen</a>` : ""
-              }</div></div>`
+          ended
+            ? ""
             : c.state === "cancelled"
               ? `<div class="callout warn">${icon("clock")}<div>Gekündigt${c.cancelled_on ? ` am ${fmtDate(c.cancelled_on)}` : ""} – läuft noch bis <b>${fmtDate(c.end_date)}</b> (${relDays(daysUntil(c.end_date))}).
                   ${
@@ -276,25 +286,30 @@ async function overviewTab(el, c, reload) {
                <div class="term-legend"><span>${fmtDate(termStart)}</span><span>Laufzeitende ${fmtDate(c.next_term_end)}</span></div>`
             : ""
         }
+        ${
+          ended
+            ? `<div class="facts">
+                <div class="fact"><div class="k">Beginn</div><div class="v">${fmtDate(c.start_date)}</div></div>
+                <div class="fact"><div class="k">Beendet</div><div class="v">${fmtDate(c.end_date)}</div></div>
+                ${c.cancelled_on ? `<div class="fact"><div class="k">Gekündigt am</div><div class="v">${fmtDate(c.cancelled_on)}</div></div>` : ""}
+              </div>`
+            : `
         <div class="facts" style="margin-top:16px">
           <div class="fact"><div class="k">Beginn</div><div class="v">${fmtDate(c.start_date)}</div></div>
           <div class="fact"><div class="k">Mindestlaufzeit</div><div class="v">${c.min_term_months ? `${c.min_term_months} Monat${c.min_term_months === 1 ? "" : "e"}` : "keine"}</div></div>
           <div class="fact"><div class="k">Verlängerung</div><div class="v">${c.renewal_months ? `um ${c.renewal_months} Monat${c.renewal_months > 1 ? "e" : ""}` : "–"}</div></div>
           <div class="fact"><div class="k">Kündigungsfrist</div><div class="v">${noticeText(c)}</div></div>
           <div class="fact"><div class="k">Erinnerung</div><div class="v">${c.reminder_days != null ? `${c.reminder_days} Tage vorher` : "aus"}</div></div>
-          ${c.predecessor_id ? `<div class="fact"><div class="k">Vorgänger</div><div class="v"><a href="#/contracts/${c.predecessor_id}">ansehen</a></div></div>` : ""}
-        </div>
-        ${
-          c.state === "active"
-            ? `<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-                <button class="btn" id="cancel-btn">${icon("ban")} Kündigen</button>
-                <button class="btn btn-ghost" id="letter-btn">${icon("mail")} Kündigungsschreiben</button></div>`
-            : ""
+        </div>`
         }
       </div>
     </div>`;
 
-  chainLine($("#hist", el), hist.months, hist.series, colors, { currentMonth: hist.current_month, extras: hist.extras });
+  chainLine($("#hist", el), hist.months, hist.series, colors, {
+    currentMonth: hist.current_month,
+    extras: hist.extras,
+    credits: hist.credits,
+  });
   $("#extra-btn", el)?.addEventListener("click", () => extraModal(c, null, () => reload()));
   $("#cancel-btn", el)?.addEventListener("click", () => cancelModal(c, () => reload()));
   $("#confirm-btn", el)?.addEventListener("click", async () => {
@@ -318,9 +333,17 @@ function deadlineCallout(c) {
   }
   const d = daysUntil(c.cancellation_deadline);
   const cls = d <= 14 ? "bad" : d <= 45 ? "warn" : "good";
+  // the actions show up only when they matter: a deadline coming up
   return `<div class="callout ${cls}">${icon(cls === "good" ? "check" : "alert")}<div>
     Nächste Kündigungsmöglichkeit: bis <b>${fmtDate(c.cancellation_deadline)}</b> (${relDays(d)}) zum ${fmtDate(c.next_term_end)}.
-    ${cls === "good" ? "Entspannt – genug Zeit zum Vergleichen." : "Jetzt vergleichen lohnt sich!"}</div></div>`;
+    ${cls === "good" ? "Entspannt – genug Zeit zum Vergleichen." : "Jetzt vergleichen lohnt sich."}${
+      cls === "good"
+        ? ""
+        : `<div class="callout-actions">
+            ${c.category === "loan" ? "" : `<a class="btn btn-sm" href="#/contracts/${c.id}?tab=compare">${icon("scale")} Angebote vergleichen</a>`}
+            <button class="btn btn-sm btn-ghost" id="cancel-btn">${icon("ban")} Kündigen …</button>
+          </div>`
+    }</div></div>`;
 }
 
 const MONTH_INITIALS = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"];
@@ -411,9 +434,8 @@ function progressPct(a, b) {
 function pricesTab(el, c, reload) {
   const recurring = c.prices.filter((p) => p.interval !== "once").sort((a, b) => b.valid_from.localeCompare(a.valid_from));
   const once = c.prices.filter((p) => p.interval === "once").sort((a, b) => b.valid_from.localeCompare(a.valid_from));
-  const actions = (p) => `<td class="r" style="white-space:nowrap">
-      <button class="btn btn-ghost btn-sm" data-edit="${p.id}" aria-label="Bearbeiten">${icon("edit")}</button>
-      <button class="btn btn-ghost btn-sm btn-danger" data-del="${p.id}" aria-label="Löschen">${icon("trash")}</button></td>`;
+  // a row opens its dialog (edit, delete) – no pencil and trash can in every line
+  const actions = () => `<td class="r row-go">${icon("chevRight")}</td>`;
   el.innerHTML = `
     <div class="card" style="margin-bottom:20px">
       <div class="card-head"><div><h2>Preishistorie</h2><p>Der reguläre Preis – jede Änderung gilt ab ihrem Datum bis zur nächsten.</p></div>
@@ -426,7 +448,7 @@ function pricesTab(el, c, reload) {
                 .map((p, i) => {
                   const prev = recurring[i + 1];
                   const diff = prev ? p.monthly_equivalent - prev.monthly_equivalent : null;
-                  return `<tr>
+                  return `<tr class="row-link" data-edit="${p.id}" tabindex="0">
                     <td class="num">${fmtDate(p.valid_from)}</td>
                     <td class="r num"><b>${money(p.amount)}</b></td>
                     <td class="hide-sm">${intervalLabel(p.interval)}</td>
@@ -442,10 +464,7 @@ function pricesTab(el, c, reload) {
     <div class="card">
       <div class="card-head"><div><h2>Zusatzkosten & Einmalzahlungen</h2>
         <p>Teurere Monate (z. B. Auslandstelefonate), Gebühren, Boni und Gutschriften – ändern den regulären Preis nicht.</p></div>
-        <div class="page-actions">
-          <button class="btn btn-sm" data-add="once">${icon("plus")} Einmalzahlung / Bonus</button>
-          <button class="btn btn-sm btn-primary" data-add="extra">${icon("plus")} Zusatzkosten</button>
-        </div></div>
+        <button class="btn btn-sm btn-primary" data-add="choose">${icon("plus")} Erfassen</button></div>
       ${
         c.extras_12m
           ? `<div class="callout" style="margin-bottom:14px">${icon("info")}<div>Letzte 12 Monate: <b>${money(c.extras_12m)}</b> Zusatzkosten in
@@ -462,7 +481,7 @@ function pricesTab(el, c, reload) {
                   const kind = extra
                     ? `<span class="badge warn">Zusatzkosten</span>`
                     : `<span class="badge ${p.amount < 0 ? "good" : ""}">${p.amount < 0 ? "Gutschrift" : "einmalig"}</span>`;
-                  return `<tr>
+                  return `<tr class="row-link" data-edit="${p.id}" tabindex="0">
                     <td class="num">${extra ? esc(monthLabel(ym)) : fmtDate(p.valid_from)}</td>
                     <td class="hide-sm">${kind}</td>
                     <td class="muted">${esc(p.note || "")}</td>
@@ -471,26 +490,47 @@ function pricesTab(el, c, reload) {
                     ${actions(p)}</tr>`;
                 })
                 .join("")}</tbody></table></div>`
-          : `<p class="muted" style="margin:0">Keine Zusatzkosten erfasst. War eine Rechnung mal höher als sonst? Einfach oben eintragen.</p>`
+          : `<p class="muted" style="margin:0">Noch nichts erfasst. War eine Rechnung mal höher als sonst, gab es eine Gebühr oder einen Bonus? Oben auf „Erfassen“.</p>`
       }
     </div>`;
-  el.addEventListener("click", async (e) => {
+  const done = () => reload("prices");
+  const open = (row) => {
+    const p = c.prices.find((x) => x.id === Number(row.dataset.edit));
+    if (isExtra(p)) extraModal(c, p, done);
+    else priceModal(c, p, done);
+  };
+  el.addEventListener("click", (e) => {
     const add = e.target.closest("[data-add]");
-    const edit = e.target.closest("[data-edit]");
-    const del = e.target.closest("[data-del]");
-    const done = () => reload("prices");
-    if (add?.dataset.add === "extra") extraModal(c, null, done);
-    else if (add) priceModal(c, add.dataset.add === "once" ? { interval: "once" } : null, done);
-    if (edit) {
-      const p = c.prices.find((x) => x.id === Number(edit.dataset.edit));
-      if (isExtra(p)) extraModal(c, p, done);
-      else priceModal(c, p, done);
+    const row = e.target.closest("[data-edit]");
+    if (add?.dataset.add === "choose") onceChooser(c, done);
+    else if (add) priceModal(c, null, done);
+    if (row) open(row);
+  });
+  el.addEventListener("keydown", (e) => {
+    const row = e.target.closest("[data-edit]");
+    if (row && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      open(row);
     }
-    if (del && (await confirmDialog("Diesen Eintrag löschen?"))) {
-      await api.deletePrice(c.id, del.dataset.del);
-      toast("Gelöscht");
-      done();
-    }
+  });
+}
+
+/** What happened? A higher bill, a one-off cost or a credit – each with its own simple dialog. */
+function onceChooser(c, done) {
+  const m = modal({
+    title: "Was möchtest du erfassen?",
+    body: `<div class="choice-list">
+        <button class="choice" data-k="extra">${icon("trendUp")}<span><b>Eine Rechnung war höher</b><small>z. B. Auslandstelefonate, Nachzahlung – nur in diesem Monat</small></span></button>
+        <button class="choice" data-k="cost">${icon("euro")}<span><b>Einmalige Kosten</b><small>z. B. Anschlussgebühr, Gerät, Aufnahmegebühr</small></span></button>
+        <button class="choice" data-k="credit">${icon("piggy")}<span><b>Gutschrift oder Bonus</b><small>z. B. Wechselbonus, Erstattung</small></span></button>
+      </div>`,
+  });
+  m.addEventListener("click", (e) => {
+    const k = e.target.closest("[data-k]")?.dataset.k;
+    if (!k) return;
+    m.close();
+    if (k === "extra") extraModal(c, null, done);
+    else priceModal(c, { interval: "once", amount: null, credit: k === "credit" }, done);
   });
 }
 
@@ -499,12 +539,20 @@ export function priceModal(c, existing, done) {
   const cur = c.current_price;
   const p = existing || {};
   const isOnce = p.interval === "once";
+  let credit = isOnce && (p.credit || p.amount < 0);
   const m = modal({
-    title: p.id ? "Preis bearbeiten" : isOnce ? "Einmalzahlung / Bonus" : "Preisänderung erfassen",
+    title: isOnce ? (p.id ? "Einmalbetrag bearbeiten" : credit ? "Gutschrift oder Bonus" : "Einmalige Kosten") : p.id ? "Preis bearbeiten" : "Preisänderung erfassen",
     body: `<form class="form-grid" id="pf">
-      <label class="field"><span>Gültig ab</span><input type="date" name="valid_from" value="${esc(p.valid_from || today())}" required/></label>
-      <label class="field"><span>${isOnce ? "Betrag (negativ = Gutschrift)" : "Neuer Preis"}</span><div class="input-group">
-        <input type="number" step="0.01" name="amount" value="${esc(p.amount ?? "")}" placeholder="${cur && !isOnce ? cur.amount : ""}" required inputmode="decimal"/><span class="addon">€</span></div></label>
+      ${
+        isOnce
+          ? `<div class="field span-all"><div class="segmented" id="sign">
+              <button type="button" data-s="cost" class="${credit ? "" : "active"}">Kosten</button>
+              <button type="button" data-s="credit" class="${credit ? "active" : ""}">Gutschrift / Bonus</button></div></div>`
+          : ""
+      }
+      <label class="field"><span>${isOnce ? "Datum" : "Gültig ab"}</span><input type="date" name="valid_from" value="${esc(p.valid_from || today())}" required/></label>
+      <label class="field"><span>${isOnce ? "Betrag" : "Neuer Preis"}</span><div class="input-group">
+        <input type="number" step="0.01" ${isOnce ? 'min="0"' : ""} name="amount" value="${esc(p.amount == null ? "" : isOnce ? Math.abs(p.amount) : p.amount)}" required inputmode="decimal"/><span class="addon">€</span></div></label>
       ${
         isOnce
           ? `<input type="hidden" name="interval" value="once"/>`
@@ -521,17 +569,26 @@ export function priceModal(c, existing, done) {
       }
       ${
         c.category === "loan" && !isOnce
-          ? `<label class="field"><span>Sollzins ab hier</span><div class="input-group"><input type="number" step="0.01" name="interest_rate" value="${esc(p.details?.interest_rate ?? "")}" placeholder="${esc(c.attributes?.interest_rate ?? "")}"/><span class="addon">%</span></div></label>
+          ? `<label class="field"><span>Sollzins ab hier</span><div class="input-group"><input type="number" step="0.01" name="interest_rate" value="${esc(p.details?.interest_rate ?? "")}"/><span class="addon">%</span></div></label>
              <div class="field span-all"><small>Für eine Anschlussfinanzierung: neue Rate und neuen Zins ab dem Ende der Zinsbindung eintragen.</small></div>`
           : ""
       }
-      <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(p.note ?? "")}" placeholder="${isOnce ? "z. B. Neukundenbonus, Anschlussgebühr" : "z. B. Preiserhöhung, Aktionspreis endet"}"/></label>
+      <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(p.note ?? "")}"/></label>
     </form>`,
-    foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
+    foot: `${p.id ? `<button class="btn btn-ghost btn-danger" data-del style="margin-right:auto">${icon("trash")} Löschen</button>` : ""}
+      <button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
+  $("#sign", m)?.addEventListener("click", (e) => {
+    const b = e.target.closest("[data-s]");
+    if (!b) return;
+    credit = b.dataset.s === "credit";
+    m.querySelectorAll("#sign button").forEach((x) => x.classList.toggle("active", x === b));
+  });
+  bindDelete(m, c, p, done);
   $("[data-save]", m).addEventListener("click", async (e) => {
     const d = formData($("#pf", m));
     if (d.amount == null) return toast("Bitte Betrag angeben", "error");
+    if (isOnce) d.amount = credit ? -Math.abs(d.amount) : Math.abs(d.amount);
     const details = {};
     if (d.base_price_month != null) details.base_price_month = d.base_price_month;
     if (d.unit_price_ct != null) details.unit_price_ct = d.unit_price_ct;
@@ -552,6 +609,18 @@ export function priceModal(c, existing, done) {
     } catch (err) {
       busy(e.currentTarget, false);
       toast(err.message, "error");
+    }
+  });
+}
+
+/** "Löschen" inside an edit dialog (instead of a trash can in every row). */
+export function bindDelete(m, c, p, done) {
+  $("[data-del]", m)?.addEventListener("click", async () => {
+    m.close();
+    if (await confirmDialog("Diesen Eintrag löschen?")) {
+      await api.deletePrice(c.id, p.id);
+      toast("Gelöscht");
+      done();
     }
   });
 }
@@ -640,7 +709,7 @@ function documentsTab(el, c, reload) {
                     <a class="grow" href="/api/documents/${d.id}" target="_blank" rel="noopener" style="color:inherit">
                       <div class="title">${esc(d.original_name)}</div>
                       <div class="sub">${fileSize(d.size)} · ${fmtDate(d.uploaded_at)}${d.description ? " · " + esc(d.description) : ""}</div></a>
-                    ${ocrOk ? `<button class="btn btn-sm" data-ocr="${d.id}" title="Daten erkennen">${icon("scan")}<span class="label">Erkennen</span></button>` : ""}
+                    ${ocrOk ? `<button class="btn btn-sm" data-ocr="${d.id}" title="Inhalt erkennen">${icon("scan")}<span class="label">Erkennen</span></button>` : ""}
                     <a class="btn btn-sm btn-ghost" href="/api/documents/${d.id}?download=true" aria-label="Herunterladen">${icon("download")}</a>
                     <button class="btn btn-sm btn-ghost btn-danger" data-del="${d.id}" aria-label="Löschen">${icon("trash")}</button></div>`,
                 )
@@ -651,8 +720,8 @@ function documentsTab(el, c, reload) {
       <div class="card">
         <label class="dropzone" id="drop">${icon("upload")}<b>Dokument hochladen</b>
           <span class="muted small">PDF oder Bild, max. Größe laut Server</span><input type="file" hidden/></label>
-        <label class="check small" style="margin-top:12px"><input type="checkbox" id="auto-ocr" ${ocrOk ? "checked" : "disabled"}/> Nach dem Upload Daten erkennen (OCR)</label>
-        ${ocrOk ? "" : `<p class="small muted">OCR ist auf diesem Server nicht verfügbar.</p>`}
+        <label class="check small" style="margin-top:12px"><input type="checkbox" id="auto-ocr" ${ocrOk ? "checked" : "disabled"}/> Inhalt erkennen und Änderungen vorschlagen</label>
+        ${ocrOk ? "" : `<p class="small muted">Texterkennung ist auf diesem Server nicht eingerichtet.</p>`}
       </div>
     </div>`;
   setupDrop(el, async (file) => {
@@ -782,14 +851,9 @@ function remindersTab(el, c, reload) {
       </div>
     </div>`;
   $("#add-rem", el).addEventListener("click", () => reminderForm({ contract_id: c.id }, () => reload("reminders")));
-  $("#rem-list", el).addEventListener("click", async (e) => {
-    const done = e.target.closest("[data-done]");
-    if (done) {
-      await api.completeReminder(done.dataset.done);
-      toast("Erledigt ✓");
-      refreshBadge();
-      reload("reminders");
-    }
+  bindReminderActions($("#rem-list", el), api, () => {
+    refreshBadge();
+    reload("reminders");
   });
 }
 
@@ -832,4 +896,39 @@ function budgetCard(c) {
     <div class="term-bar ${b.exceeded ? "over" : ""}"><div style="width:${b.percent}%"></div></div>
     ${plan}
   </div>`;
+}
+
+/** An ended contract: say right away what replaced it. */
+function endedBanner(c, next) {
+  if (!next) return `<div class="callout switch-banner">${icon("info")}<div>Beendet am <b>${fmtDate(c.end_date)}</b>.</div></div>`;
+  const diff = next.monthly_cost - (c.current_price?.monthly_equivalent ?? 0);
+  return `<a class="callout switch-banner" href="#/contracts/${next.id}">${icon("swap")}<div>
+      Beendet am <b>${fmtDate(c.end_date)}</b> – abgelöst durch <b>${esc(next.name)}</b>${next.provider ? ` (${esc(next.provider)})` : ""}${
+        Math.abs(diff) >= 0.01 ? `, ${money(Math.abs(diff))} ${diff < 0 ? "günstiger" : "teurer"} im Monat` : ""
+      }.</div>${icon("chevRight", "switch-go")}</a>`;
+}
+
+/** Key figures of an ended contract: what it cost last, how long it ran, what it cost in total. */
+function endedKpis(c, next, runtime) {
+  const last = c.current_price?.monthly_equivalent ?? 0;
+  return `<div class="kpis">
+      <div class="card kpi hero">
+        <div class="kpi-label">Zuletzt pro Monat</div>
+        <div class="kpi-value num">${money(last)}</div>
+        <div class="kpi-sub">bis ${fmtDate(c.end_date)}</div>
+      </div>
+      <div class="card kpi"><div class="kpi-label">Laufzeit</div>
+        <div class="kpi-value num kpi-date">${durationText(Math.max(runtime, 0))}</div>
+        <div class="kpi-sub">${fmtDate(c.start_date)} – ${fmtDate(c.end_date)}</div></div>
+      <div class="card kpi"><div class="kpi-label">Insgesamt bezahlt</div>
+        <div class="kpi-value num">${money(c.total_paid, true)}</div>
+        <div class="kpi-sub">${c.payments?.count ? `${c.payments.count} Buchungen` : ""}</div></div>
+      ${
+        next
+          ? `<div class="card kpi"><div class="kpi-label">Heute</div>
+              <div class="kpi-value num">${money(next.monthly_cost)}</div>
+              <div class="kpi-sub">im Monat bei <a href="#/contracts/${next.id}">${esc(next.name)}</a></div></div>`
+          : ""
+      }
+    </div>`;
 }

@@ -330,11 +330,15 @@ test("electricity base price can be entered per year", async ({ page }) => {
   await page.goto("/#/contracts/4/edit");
   await page.fill("[name=attr_base_price_month]", "180");
   await page.selectOption("[name=attr_base_price_month__period]", "year");
+  await page.fill("[name=attr_installment]", "960");
+  await page.selectOption("[name=attr_installment__period]", "year");
   await page.click("#save");
   await expect(page.locator(".fact", { hasText: "Grundpreis" })).toContainText("180 €/Jahr (15 €/Monat)");
   const c = await (await page.request.get("/api/contracts/4")).json();
   expect(c.attributes.base_price_month).toBe(15);
   expect(c.attributes.base_price_period).toBe("year");
+  expect(c.attributes.installment).toBe(80);
+  await expect(page.locator(".fact", { hasText: "Abschlag" }).first()).toContainText("960 €/Jahr (80 €/Monat)");
   // editing again shows it per year
   await page.goto("/#/contracts/4/edit");
   await expect(page.locator("[name=attr_base_price_month]")).toHaveValue("180");

@@ -36,10 +36,13 @@ export function readPeriodPrice(data, name) {
   return { monthly: period === "year" ? Math.round((Number(v) / 12) * 10000) / 10000 : Number(v), period };
 }
 
-/** "120 €/Jahr (10 €/Monat)" when the base price was entered per year. */
-export function basePriceText(c, monthly) {
+/** Attributes that can be entered per month or per year, and where the chosen period is kept. */
+export const PERIOD_FIELDS = { base_price_month: "base_price_period", installment: "installment_period" };
+
+/** "120 €/Jahr (10 €/Monat)" when the value was entered per year. */
+export function basePriceText(c, monthly, key = "base_price_month") {
   if (monthly == null || monthly === "") return null;
-  return c.attributes?.base_price_period === "year"
+  return c.attributes?.[PERIOD_FIELDS[key]] === "year"
     ? `${num(Math.round(monthly * 12 * 100) / 100)} €/Jahr (${num(monthly)} €/Monat)`
     : `${num(monthly)} €/Monat`;
 }

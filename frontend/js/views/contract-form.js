@@ -4,7 +4,7 @@
 import { api } from "../api.js";
 import { catColorVar, category, catIcon, isEnergy, state } from "../store.js";
 import { $, $$, busy, esc, formData, icon, today, toast } from "../ui.js";
-import { bindIconPicker, iconPicker, periodPriceInput, readPeriodPrice } from "./components.js";
+import { PERIOD_FIELDS, bindIconPicker, iconPicker, periodPriceInput, readPeriodPrice } from "./components.js";
 import { applySuggestionsToForm } from "./ocr.js";
 
 const form_q = (root, sel) => root.querySelector(sel);
@@ -19,8 +19,8 @@ export function attributeInputs(cat, values = {}, prefix = "attr_", fields = nul
       if (f.type === "select")
         return `<label class="field"><span>${esc(f.label)}</span><select name="${name}"><option value="">–</option>
           ${f.options.map((o) => `<option ${o === v ? "selected" : ""}>${esc(o)}</option>`).join("")}</select></label>`;
-      if (f.key === "base_price_month")
-        return `<label class="field"><span>${esc(f.label)}</span>${periodPriceInput(name, v, values?.base_price_period)}</label>`;
+      if (f.key in PERIOD_FIELDS)
+        return `<label class="field"><span>${esc(f.label)}</span>${periodPriceInput(name, v, values?.[PERIOD_FIELDS[f.key]])}</label>`;
       const type = f.type === "number" ? "number" : f.type === "date" ? "date" : "text";
       const input = `<input type="${type}" name="${name}" ${type === "number" ? 'step="any" inputmode="decimal"' : ""}
         value="${esc(v ?? "")}" placeholder="${esc(f.placeholder || "")}" />`;
@@ -34,10 +34,11 @@ export function attributeInputs(cat, values = {}, prefix = "attr_", fields = nul
 export function collectAttributes(data, prefix = "attr_") {
   const attrs = {};
   data = { ...data };
-  if (`${prefix}base_price_month__period` in data) {
-    const { monthly, period } = readPeriodPrice(data, `${prefix}base_price_month`);
-    data[`${prefix}base_price_month`] = monthly;
-    if (monthly != null) attrs.base_price_period = period;
+  for (const [key, periodKey] of Object.entries(PERIOD_FIELDS)) {
+    if (!(`${prefix}${key}__period` in data)) continue;
+    const { monthly, period } = readPeriodPrice(data, `${prefix}${key}`);
+    data[`${prefix}${key}`] = monthly;
+    if (monthly != null) attrs[periodKey] = period;
   }
   for (const [k, v] of Object.entries(data)) {
     if (!k.startsWith(prefix)) continue;

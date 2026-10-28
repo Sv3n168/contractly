@@ -168,7 +168,7 @@ async function overviewTab(el, c, reload) {
   const ended = c.state === "ended";
   el.innerHTML = `
     ${ended ? endedBanner(c, next) : ""}
-    ${ended ? endedKpis(c, next, runtime) : `
+    ${ended ? endedKpis(c, next, runtime) : c.state === "planned" ? plannedKpis(c) : `
     <div class="kpis">
       <div class="card kpi hero">
         <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Pro Monat</div>
@@ -209,6 +209,10 @@ async function overviewTab(el, c, reload) {
           ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>${c.switch_savings >= 0 ? "Gespart seit dem Wechsel" : "Mehrkosten seit dem Wechsel"}</div>
              <div class="kpi-value num ${c.switch_savings >= 0 ? "better" : "worse"}">${money(Math.abs(c.switch_savings), true)}</div>
              <div class="kpi-sub">ggü. ${prev ? `<a href="#/contracts/${prev.id}">${esc(prev.name)}</a>` : "altem Vertrag"}</div></div>`
+          : c.state === "cancelled" && c.end_date
+          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("clock")}</span>Endet am</div>
+             <div class="kpi-value num kpi-date">${fmtDate(c.end_date)}</div>
+             <div class="kpi-sub">${relDays(daysUntil(c.end_date))} · gekündigt</div></div>`
           : `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("clock")}</span>Kündbar bis</div>
              <div class="kpi-value num kpi-date">${c.cancellation_deadline ? fmtDate(c.cancellation_deadline) : c.end_date ? "endet " + fmtDate(c.end_date) : "–"}</div>
              <div class="kpi-sub">${c.cancellation_deadline ? relDays(daysUntil(c.cancellation_deadline)) : ""}</div></div>`
@@ -228,7 +232,11 @@ async function overviewTab(el, c, reload) {
               .map(
                 (s, i) => `<a class="chain-item ${s.contract_id === c.id ? "current" : ""}" href="#/contracts/${s.contract_id}">
                   <span class="dot" style="background:${colors[i]}"></span>
-                  <span><b>${esc(s.name)}</b><span class="muted"> · ${fmtDate(s.start_date)} – ${s.end_date ? fmtDate(s.end_date) : "heute"}</span></span></a>`,
+                  <span><b>${esc(s.name)}</b><span class="muted"> · ${
+                    s.start_date > today()
+                      ? `ab ${fmtDate(s.start_date)}`
+                      : `${fmtDate(s.start_date)} – ${s.end_date ? fmtDate(s.end_date) : "heute"}`
+                  }</span></span></a>`,
               )
               .join(`<span class="chain-arrow">${icon("chevRight")}</span>`)}</div>`
           : ""
@@ -928,6 +936,38 @@ function endedKpis(c, next, runtime) {
           ? `<div class="card kpi"><div class="kpi-label">Heute</div>
               <div class="kpi-value num">${money(next.monthly_cost)}</div>
               <div class="kpi-sub">im Monat bei <a href="#/contracts/${next.id}">${esc(next.name)}</a></div></div>`
+          : ""
+      }
+    </div>`;
+}
+
+/** Own part of a monthly price (partner's fixed amount or percentage). */
+function ownMonthly(c, monthly) {
+  if (c.partner_amount) return Math.max(0, monthly - c.partner_amount);
+  if (c.share_percent != null) return (monthly * c.share_percent) / 100;
+  return monthly;
+}
+
+/** A contract that hasn't started yet: what it will cost and when it begins – not 0,00 €. */
+function plannedKpis(c) {
+  const p = c.current_price;
+  const monthly = ownMonthly(c, p?.monthly_equivalent ?? 0);
+  const start = fmtDate(c.start_date);
+  return `<div class="kpis">
+      <div class="card kpi hero">
+        <div class="kpi-label">Pro Monat ab ${start}</div>
+        <div class="kpi-value num">${money(monthly)}</div>
+        <div class="kpi-sub">${p && p.interval !== "monthly" ? `${money(p.amount)} ${intervalLabel(p.interval)}` : "erster Preis"}</div>
+      </div>
+      <div class="card kpi"><div class="kpi-label">Pro Jahr</div>
+        <div class="kpi-value num">${money(monthly * 12)}</div><div class="kpi-sub">ab Beginn</div></div>
+      <div class="card kpi"><div class="kpi-label">Beginnt am</div>
+        <div class="kpi-value num kpi-date">${start}</div><div class="kpi-sub">${relDays(daysUntil(c.start_date))}</div></div>
+      ${
+        c.cancellation_deadline
+          ? `<div class="card kpi"><div class="kpi-label">Kündbar bis</div>
+              <div class="kpi-value num kpi-date">${fmtDate(c.cancellation_deadline)}</div>
+              <div class="kpi-sub">${relDays(daysUntil(c.cancellation_deadline))}</div></div>`
           : ""
       }
     </div>`;

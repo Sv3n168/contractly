@@ -118,7 +118,14 @@ export function contractCard(c) {
 /** One compact line per contract: the default contract list. */
 export function contractRow(c) {
   const price = c.current_price;
-  const sub = price && price.interval !== "monthly" ? `${money(price.amount)} ${intervalLabel(price.interval)}` : `${money(c.yearly_cost, true)}/Jahr`;
+  // a contract that starts later shows what it will cost, not 0,00 €
+  const planned = c.state === "planned" && price;
+  const monthly = planned ? price.monthly_equivalent : c.monthly_cost;
+  const sub = planned
+    ? `ab ${fmtDate(c.start_date)}`
+    : price && price.interval !== "monthly"
+      ? `${money(price.amount)} ${intervalLabel(price.interval)}`
+      : `${money(c.yearly_cost, true)}/Jahr`;
   const flags = `${c.state !== "active" ? stateBadge(c) : ""}${
     c.current_price?.details?.kind === "pause" ? `<span class="badge warn">${icon("clock")} pausiert</span>` : ""
   }${shareBadge(c)}`;
@@ -128,7 +135,7 @@ export function contractRow(c) {
     <div class="cr-title"><b>${esc(c.name)}</b><span>${esc(subtitle(c))}</span></div>
     <div class="cr-meta">${flags}</div>
     <div class="cr-deadline">${rowHint(c)}</div>
-    <div class="cr-price"><b class="num">${money(c.monthly_cost)}</b><span class="num">${sub}</span></div>
+    <div class="cr-price"><b class="num">${money(monthly)}</b><span class="num">${sub}</span></div>
   </a>`;
 }
 

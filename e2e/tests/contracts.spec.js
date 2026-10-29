@@ -351,6 +351,7 @@ test("Abschlag and price differ: the contract page offers to take the Abschlag o
   // Ökostrom Flex: price 74 €; set the Abschlag in the facts to 80 €
   await page.goto("/#/contracts/4/edit");
   await page.fill("[name=attr_installment]", "80");
+  await page.selectOption("[name=attr_installment__period]", "month");
   await page.click("#save");
   const hint = page.locator(".callout", { hasText: "Abschlag laut Eckdaten" });
   await expect(hint).toContainText("80,00");

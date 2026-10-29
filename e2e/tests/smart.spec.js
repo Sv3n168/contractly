@@ -113,3 +113,26 @@ test("dashboard: insights can be dismissed", async ({ page }) => {
   await expect(page.locator("#smart .insight b", { hasText: title })).toHaveCount(0);
   check();
 });
+
+test("dashboard: the open-data note can be acknowledged and comes back for new gaps", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/");
+  await createContract(page, { name: "Offen Eins", category: "mobile" });
+  await page.goto("/#/contracts");
+  await page.goto("/");
+  const line = page.locator("#smart .gaps-line");
+  await expect(line).toContainText("mit offenen Angaben");
+  await line.getByRole("button", { name: "Zur Kenntnis genommen" }).click();
+  await expect(page.locator("#smart .gaps-line")).toHaveCount(0);
+  await page.locator(".toast").getByRole("button", { name: "Rückgängig" }).click();
+  await expect(page.locator("#smart .gaps-line")).toBeVisible();
+  await page.locator("#smart .gaps-line").getByRole("button", { name: "Zur Kenntnis genommen" }).click();
+  await page.reload();
+  await expect(page.locator(".kpi.hero")).toBeVisible();
+  await expect(page.locator("#smart .gaps-line")).toHaveCount(0);
+  // something new missing: the note is back, naming only the new contract
+  await createContract(page, { name: "Offen Zwei", category: "internet" });
+  await page.reload();
+  await expect(page.locator("#smart .gaps-line")).toContainText("1 Vertrag mit offenen Angaben: Offen Zwei");
+  check();
+});

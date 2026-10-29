@@ -58,7 +58,8 @@ export const api = {
   meta: () => request("GET", "/api/meta"),
   summary: (params) => request("GET", `/api/stats/summary${qs(params || {})}`),
   insights: () => request("GET", "/api/insights"),
-  dismissInsight: (key) => request("POST", "/api/insights/dismiss", { key }),
+  dismissInsights: (keys) => request("POST", "/api/insights/dismiss", { keys }),
+  restoreInsights: (keys) => request("POST", "/api/insights/restore", { keys }),
   timeseries: (params) => request("GET", `/api/stats/timeseries${qs(params)}`),
   projection: (params) => request("GET", `/api/stats/projection${qs(params)}`),
 

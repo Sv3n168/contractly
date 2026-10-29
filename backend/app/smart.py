@@ -79,10 +79,17 @@ def gaps(c: Contract, ref: date) -> list[dict]:
     return [g for g in out if g["key"] not in ignored]
 
 
-def incomplete(contracts: list[Contract], ref: date) -> list[dict]:
+def gap_ack(contract_id: int, gap_key: str) -> str:
+    """Key under which the dashboard's "open data" note was acknowledged for one gap."""
+    return f"gap:{contract_id}:{gap_key}"
+
+
+def incomplete(contracts: list[Contract], ref: date, acknowledged: set[str] = frozenset()) -> list[dict]:
+    """Contracts with open data, without the gaps already acknowledged on the dashboard."""
     out = []
     for c in contracts:
-        missing = gaps(c, ref)
+        missing = [{**g, "ack": gap_ack(c.id, g["key"])} for g in gaps(c, ref)]
+        missing = [g for g in missing if g["ack"] not in acknowledged]
         if missing:
             out.append({"contract_id": c.id, "name": c.name, "category": c.category, "gaps": missing})
     return out
@@ -91,22 +98,38 @@ def incomplete(contracts: list[Contract], ref: date) -> list[dict]:
 # ------------------------------------------------------------------ insights
 
 
-def _dismissed(db: Session, ref: date) -> set[str]:
-    row = db.get(AppSetting, DISMISSED)
+def _active(value: dict, ref: date) -> dict:
+    """Dismissals of the last year (older ones show again)."""
     keep = {}
-    for key, day in (row.value if row else {}).items():
+    for key, day in value.items():
         try:
             if (ref - date.fromisoformat(day)).days < DISMISS_DAYS:
                 keep[key] = day
         except (TypeError, ValueError):
             continue
-    return set(keep)
+    return keep
 
 
-def dismiss(db: Session, key: str, ref: date) -> None:
+def dismissed(db: Session, ref: date) -> set[str]:
+    return set(_active(_stored(db), ref))
+
+
+def dismiss(db: Session, keys: list[str], ref: date) -> None:
+    _store(db, {**_active(_stored(db), ref), **dict.fromkeys(keys, ref.isoformat())})
+
+
+def restore(db: Session, keys: list[str]) -> None:
+    """Undo a dismissal."""
+    _store(db, {k: v for k, v in _stored(db).items() if k not in keys})
+
+
+def _stored(db: Session) -> dict:
     row = db.get(AppSetting, DISMISSED)
-    value = dict(row.value) if row else {}
-    value[key] = ref.isoformat()
+    return dict(row.value) if row else {}
+
+
+def _store(db: Session, value: dict) -> None:
+    row = db.get(AppSetting, DISMISSED)
     if row is None:
         db.add(AppSetting(key=DISMISSED, value=value))
     else:
@@ -237,7 +260,7 @@ def insights(db: Session, contracts: list[Contract], ref: date, limit: int = 3) 
     running = [c for c in contracts if calc.contract_state(c, ref) == "active"]
     found = [i for i in (_trend(contracts, ref),) if i]
     found += _bundles(running, ref) + _yearly_payment(running, ref) + _loyalty(running, ref)
-    hidden = _dismissed(db, ref)
+    hidden = dismissed(db, ref)
     found = [i for i in found if i["key"] not in hidden]
     found.sort(key=lambda i: i["weight"], reverse=True)
     for i in found:

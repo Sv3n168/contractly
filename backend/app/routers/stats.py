@@ -171,18 +171,24 @@ def summary(
 
 @router.get("/insights")
 def insights(account: str = ACCOUNT_QUERY, db: Session = Depends(get_db)):
-    """Computed insights and the contracts that still lack data."""
+    """Computed insights and the contracts that still lack data (minus what was acknowledged)."""
     ref = today()
     every = load_contracts(db)
     return {
         "insights": smart.insights(db, on_account(every, account), ref),
-        "incomplete": smart.incomplete(every, ref),
+        "incomplete": smart.incomplete(every, ref, smart.dismissed(db, ref)),
     }
 
 
 @router.post("/insights/dismiss", status_code=204)
 def dismiss_insight(data: InsightDismissIn, db: Session = Depends(get_db)):
-    smart.dismiss(db, data.key, today())
+    """Hide insights or acknowledge open data for a year (keys from GET /insights)."""
+    smart.dismiss(db, data.keys, today())
+
+
+@router.post("/insights/restore", status_code=204)
+def restore_insight(data: InsightDismissIn, db: Session = Depends(get_db)):
+    smart.restore(db, data.keys)
 
 
 INTERVALS_QUERY = Query(None, description="comma list: monthly,quarterly,half_yearly,yearly")

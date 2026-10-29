@@ -1,5 +1,5 @@
 from datetime import date, datetime
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -305,4 +305,4 @@ class ConfirmIn(BaseModel):
 
 
 class InsightDismissIn(BaseModel):
-    key: str = Field(min_length=1, max_length=120)
+    keys: list[Annotated[str, Field(min_length=1, max_length=120)]] = Field(min_length=1, max_length=500)

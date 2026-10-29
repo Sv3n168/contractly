@@ -87,5 +87,22 @@ def test_insight_old_tariff_suggests_comparing(client):
 def test_dismissed_insight_disappears(client):
     _contract(client, 3, 50, category="car_insurance", name="HUK Kfz")
     key = client.get("/api/insights").json()["insights"][0]["key"]
-    assert client.post("/api/insights/dismiss", json={"key": key}).status_code == 204
+    assert client.post("/api/insights/dismiss", json={"keys": [key]}).status_code == 204
     assert key not in {i["key"] for i in client.get("/api/insights").json()["insights"]}
+
+
+def test_open_data_note_can_be_acknowledged_until_something_new_is_missing(client):
+    _contract(client, 3, 30, category="mobile", name="Handy")
+    entries = client.get("/api/insights").json()["incomplete"]
+    keys = [g["ack"] for e in entries for g in e["gaps"]]
+    assert client.post("/api/insights/dismiss", json={"keys": keys}).status_code == 204
+    assert client.get("/api/insights").json()["incomplete"] == []
+    # the contract itself still names its gaps
+    cid = entries[0]["contract_id"]
+    assert client.get(f"/api/contracts/{cid}").json()["gaps"]
+    # a new contract with open data brings the note back – only with the new one
+    new = _contract(client, 1, 20, category="internet", name="DSL")
+    assert [e["contract_id"] for e in client.get("/api/insights").json()["incomplete"]] == [new["id"]]
+    # undo
+    client.post("/api/insights/restore", json={"keys": keys})
+    assert len(client.get("/api/insights").json()["incomplete"]) == 2

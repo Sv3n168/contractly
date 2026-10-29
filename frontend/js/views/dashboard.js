@@ -121,12 +121,21 @@ export async function renderDashboard(view) {
   );
   bindReminderActions(view.querySelector("#dash-reminders"), api, () => router());
   view.querySelector("#smart")?.addEventListener("click", async (e) => {
-    const key = e.target.closest("[data-dismiss]")?.dataset.dismiss;
-    if (!key) return;
-    e.target.closest(".insight").remove();
-    await api.dismissInsight(key);
-    toast("Ausgeblendet – für ein Jahr");
+    const btn = e.target.closest("[data-dismiss]");
+    if (!btn) return;
+    // an insight goes for a year; the open-data note until something new is missing
+    const gaps = btn.dataset.dismiss === "gaps";
+    const keys = gaps ? smart.incomplete.flatMap((c) => c.gaps.map((g) => g.ack)) : [btn.dataset.dismiss];
+    btn.closest(".insight, .gaps-line").remove();
     if (!view.querySelector("#smart .insight, #smart .gaps-line")) view.querySelector("#smart").remove();
+    await api.dismissInsights(keys);
+    toast(gaps ? "Quittiert – bis wieder etwas Neues fehlt" : "Ausgeblendet – für ein Jahr", "ok", null, {
+      label: "Rückgängig",
+      run: async () => {
+        await api.restoreInsights(keys);
+        router();
+      },
+    });
   });
 }
 
@@ -152,10 +161,11 @@ function smartCard({ insights, incomplete }) {
           .join("")}
         ${
           incomplete.length
-            ? `<div class="gaps-line">${icon("info")}<div><b>${incomplete.length === 1 ? "1 Vertrag" : `${incomplete.length} Verträge`} mit offenen Angaben:</b>
+            ? `<div class="gaps-line">${icon("info")}<div class="gaps-text"><b>${incomplete.length === 1 ? "1 Vertrag" : `${incomplete.length} Verträge`} mit offenen Angaben:</b>
                 ${shown
                   .map((c) => `<a href="#/contracts/${c.contract_id}" title="Fehlt: ${esc(c.gaps.map((g) => g.label).join(", "))}">${esc(c.name)}</a>`)
-                  .join(", ")}${incomplete.length > shown.length ? ` und ${incomplete.length - shown.length} weitere` : ""}</div></div>`
+                  .join(", ")}${incomplete.length > shown.length ? ` und ${incomplete.length - shown.length} weitere` : ""}</div>
+                <button class="btn btn-sm" data-dismiss="gaps" title="Ausblenden, bis wieder etwas Neues fehlt">${icon("check")} Zur Kenntnis genommen</button></div>`
             : ""
         }
       </div>

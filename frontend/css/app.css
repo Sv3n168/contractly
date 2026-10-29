@@ -4032,6 +4032,12 @@ a.switch-banner:hover {
   border-top: 0;
   padding-top: 0;
 }
+.gaps-text {
+  flex: 1;
+}
+.gaps-line > .btn {
+  flex-shrink: 0;
+}
 .gaps-line > .svg-icon {
   color: var(--primary);
   margin-top: 2px;
@@ -4076,9 +4082,16 @@ a.switch-banner:hover {
   .insight-actions {
     grid-column: 2;
   }
+  .gap-row,
+  .gaps-line {
+    flex-wrap: wrap;
+  }
   .gap-row {
     flex-direction: column;
     align-items: flex-start;
+  }
+  .gaps-line > .btn {
+    margin-left: 26px;
   }
 }
 .issue-list {

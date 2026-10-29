@@ -8,7 +8,9 @@ function watchErrors(page) {
 }
 
 async function noHorizontalScroll(page) {
-  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  // On an emulated phone the layout viewport grows with too wide content (the browser zooms out),
+  // so compare with the screen, not with innerWidth.
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - Math.min(window.innerWidth, screen.width));
   expect(overflow, "page scrolls horizontally").toBeLessThanOrEqual(1);
 }
 

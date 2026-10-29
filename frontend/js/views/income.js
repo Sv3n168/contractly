@@ -5,6 +5,7 @@ import { chartHint, incomeChart, legendHtml, showLast } from "../charts.js";
 import { cssVar } from "../store.js";
 import { $, busy, confirmDialog, esc, fmtDate, formData, icon, modal, money, signedMoney, toast, today } from "../ui.js";
 import { bindIconPicker, iconPicker } from "./components.js";
+import { router } from "../app.js";
 
 const pct = (v) => `${(v * 100).toLocaleString("de-DE", { maximumFractionDigits: 0 })} %`;
 
@@ -194,7 +195,7 @@ function sourceModal(kinds, s = null) {
       else await api.createIncomeSource(payload);
       m.close();
       toast("Gespeichert");
-      renderIncome($("#view"));
+      router();
     } catch (err) {
       busy(e.currentTarget, false);
       toast(err.message, "error");
@@ -204,7 +205,7 @@ function sourceModal(kinds, s = null) {
     if (!(await confirmDialog(`„${s.name}“ mit allen Einträgen löschen?`))) return;
     await api.deleteIncomeSource(s.id);
     m.close();
-    renderIncome($("#view"));
+    router();
   });
 }
 
@@ -235,7 +236,7 @@ function entryModal(sourceId, mode) {
       });
       m.close();
       toast(bonus ? "Sonderzahlung eingetragen 🎉" : "Neuer Betrag eingetragen");
-      renderIncome($("#view"));
+      router();
     } catch (err) {
       busy(e.currentTarget, false);
       toast(err.message, "error");

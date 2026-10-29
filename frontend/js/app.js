@@ -63,7 +63,12 @@ const SECTIONS = {
 /** An area with tabs: its title and tab bar stay, the page renders below them. */
 function sectionShell(view, section, name) {
   const s = SECTIONS[section];
-  if (!s) return view;
+  if (!s) {
+    // every page draws into its own element: a slower page of an earlier route then only writes
+    // into a detached one instead of over the current page
+    view.innerHTML = `<div class="view-page"><div class="skeleton" style="height:300px"></div></div>`;
+    return view.firstElementChild;
+  }
   view.innerHTML = `
     <div class="section-head">
       <h1>${s.title}</h1>

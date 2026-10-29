@@ -119,6 +119,8 @@ test("income: salary with net only, raise and bonus", async ({ page }) => {
   await page.click(".modal [data-save]");
   const card = page.locator(".income-card", { hasText: "Nachhilfe" });
   await expect(card).toContainText("300,00 €");
+  // the page redraws inside its area: the tabs of "Auswertung" stay
+  await expect(page.locator(".section-tabs a.active")).toHaveText("Einnahmen");
   await card.locator("[data-bonus]").click();
   await page.fill(".modal [name=net]", "150");
   await page.fill(".modal [name=note]", "Ferienkurs");

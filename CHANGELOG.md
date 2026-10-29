@@ -26,6 +26,10 @@ Alle nennenswerten Änderungen an Contractly. Versionen folgen [Semantic Version
 ### Behoben
 
 - Das Monatsfeld im Dialog für Zusatzkosten hat das Format „JJJJ-MM“ nicht geprüft.
+- Beim schnellen Seitenwechsel konnte eine noch ladende Seite (z. B. die Übersicht) die gerade
+  geöffnete überschreiben.
+- Nach dem Speichern einer Einnahmequelle verschwanden die Reiter von „Auswertung“.
+- Das Vertragsformular war auf dem Handy breiter als der Bildschirm.
 
 ## 1.0.0
 

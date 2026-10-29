@@ -2983,12 +2983,18 @@ body:not(.is-admin) .admin-only {
 }
 
 
+/* a page's own element (see app.js sectionShell); takes no part in the layout */
+.view-page {
+  display: contents;
+}
+
 /* ------------------------------------------------------------------ motion
  * iOS-like: content rises in with a spring and a short stagger, touch targets give
  * way slightly when pressed, sheets slide up from the bottom on phones.
  */
 
 #view.entering > *,
+#view.entering > .view-page > *,
 #view.entering .kpis > *,
 #view.entering .grid > *,
 #view.entering .contract-grid > *,
@@ -2996,21 +3002,25 @@ body:not(.is-admin) .admin-only {
   animation: rise var(--dur-slow) var(--spring) both;
 }
 #view.entering > :nth-child(2),
+#view.entering > .view-page > :nth-child(2),
 #view.entering .kpis > :nth-child(2),
 #view.entering .grid > :nth-child(2) {
   animation-delay: 40ms;
 }
 #view.entering > :nth-child(3),
+#view.entering > .view-page > :nth-child(3),
 #view.entering .kpis > :nth-child(3),
 #view.entering .grid > :nth-child(3) {
   animation-delay: 80ms;
 }
 #view.entering > :nth-child(4),
+#view.entering > .view-page > :nth-child(4),
 #view.entering .kpis > :nth-child(4),
 #view.entering .grid > :nth-child(4) {
   animation-delay: 120ms;
 }
-#view.entering > :nth-child(n + 5) {
+#view.entering > :nth-child(n + 5),
+#view.entering > .view-page > :nth-child(n + 5) {
   animation-delay: 160ms;
 }
 @keyframes rise {
@@ -3741,6 +3751,13 @@ a.switch-banner:hover {
 }
 .total-field {
   margin-top: 10px;
+}
+.total-field .btn {
+  /* the hint wraps on phones instead of widening the page */
+  white-space: normal;
+  text-align: left;
+  height: auto;
+  min-height: 34px;
 }
 .total-field .btn .muted {
   font-weight: 450;

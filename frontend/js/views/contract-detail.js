@@ -171,10 +171,12 @@ async function overviewTab(el, c, reload) {
     ${ended ? endedKpis(c, next, runtime) : c.state === "planned" && c.current_price ? plannedKpis(c) : !c.current_price && c.one_off_total ? oneOffKpis(c) : `
     <div class="kpis">
       <div class="card kpi hero">
-        <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Pro Monat</div>
+        <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>${isEnergy(c.category) ? "Abschlag pro Monat" : "Pro Monat"}</div>
         <div class="kpi-value num">${money(c.monthly_cost)}</div>
         <div class="kpi-sub">${
-          c.current_price?.details?.kind === "pause"
+          c.energy?.settlement_estimate != null
+            ? settlementLine(c.energy)
+            : c.current_price?.details?.kind === "pause"
             ? "pausiert – keine Kosten"
             : c.partner_amount
             ? `Gesamt ${money(c.full_monthly_cost)} · Partner:in zahlt ${money(c.partner_amount)}`
@@ -219,6 +221,7 @@ async function overviewTab(el, c, reload) {
       }
     </div>`}
 
+    ${installmentHint(c)}
     ${budgetCard(c)}
 
     <div class="card" style="margin-bottom:20px">
@@ -313,6 +316,13 @@ async function overviewTab(el, c, reload) {
       </div>
     </div>`;
 
+  // Abschlag in the facts and the price differ: take it over from a date, or for the whole time
+  const inst = Number(c.attributes?.installment);
+  $("#sync-from", el)?.addEventListener("click", () => priceModal(c, { amount: inst, interval: "monthly" }, () => reload("prices")));
+  $("#sync-all", el)?.addEventListener("click", () => {
+    const row = c.prices.find((p) => p.id === c.current_price?.id);
+    priceModal(c, { ...row, amount: inst, interval: "monthly" }, () => reload());
+  });
   chainLine($("#hist", el), hist.months, hist.series, colors, {
     currentMonth: hist.current_month,
     extras: hist.extras,
@@ -1002,4 +1012,28 @@ function oneOffKpis(c) {
         <div class="kpi-value num">${money(c.total_paid, true)}</div>
         <div class="kpi-sub">${c.payments?.count ? `${c.payments.count} ${c.payments.count === 1 ? "Buchung" : "Buchungen"}` : ""}</div></div>
     </div>`;
+}
+
+/** Electricity/gas: the Abschlag in the facts is what leaves the account – it should be the price. */
+function installmentHint(c) {
+  const inst = Number(c.attributes?.installment);
+  const price = c.current_price;
+  if (!isEnergy(c.category) || !inst || !price || c.state === "ended") return "";
+  if (Math.abs(inst - price.monthly_equivalent) < 0.5) return "";
+  const recurring = c.prices.filter((p) => p.interval !== "once");
+  return `<div class="callout warn" style="margin-bottom:16px">${icon("alert")}<div>
+      In den Eckdaten steht ein Abschlag von <b>${money(inst)}</b>, gerechnet wird mit <b>${money(price.monthly_equivalent)}</b> pro Monat.
+      Welcher stimmt? Mit dem Abschlag rechnen „Pro Monat“, „Bisher bezahlt“, die Auswertung und die Prognose.
+      <div class="callout-actions">
+        <button class="btn btn-sm" id="sync-from">${icon("euro")} ${money(inst)} ab einem Datum</button>
+        ${recurring.length === 1 ? `<button class="btn btn-sm btn-ghost" id="sync-all">Galt schon immer – Preis korrigieren</button>` : ""}
+      </div></div></div>`;
+}
+
+/** "bei 3.000 kWh: ca. 227 € Nachzahlung" – what the Abschlag means at the expected consumption. */
+function settlementLine(e) {
+  const s = e.settlement_estimate;
+  const kwh = e.consumption_used ? `bei ${num(e.consumption_used)} kWh: ` : "";
+  if (Math.abs(s) < 5) return `${kwh}passt – kaum Nachzahlung oder Guthaben`;
+  return `${kwh}ca. <b class="${s >= 0 ? "better" : "worse"}">${money(Math.abs(s), true)} ${s >= 0 ? "Guthaben" : "Nachzahlung"}</b>`;
 }

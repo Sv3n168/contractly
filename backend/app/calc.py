@@ -644,9 +644,10 @@ def energy_analysis(contract: Contract, today: date) -> dict | None:
     if fc:
         result["cost_low"] = round(cost(fc["low_kwh"]), 2)
         result["cost_high"] = round(cost(fc["high_kwh"]), 2)
-    installment = attrs.get("installment")
-    if installment is None and current is not None:
-        installment = monthly_equivalent(current.amount, current.interval)
+    # The price is the Abschlag (what leaves the account); the facts field is only a fallback.
+    installment = monthly_equivalent(current.amount, current.interval) if current is not None else None
+    if installment is None:
+        installment = attrs.get("installment")
     if not installment:
         return result
     installment = float(installment)

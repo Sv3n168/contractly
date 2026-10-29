@@ -345,3 +345,62 @@ test("electricity base price can be entered per year", async ({ page }) => {
   await expect(page.locator("[name=attr_base_price_month__period]")).toHaveValue("year");
   check();
 });
+
+test("electricity: the Abschlag is the price, with the expected settlement", async ({ page }) => {
+  const check = watchErrors(page);
+  // like a contract recorded before: 61 € in the facts, 58,18 € as the price
+  const res = await page.request.post("/api/contracts", {
+    data: {
+      name: "Spar Strom", category: "electricity", provider: "Bodensee Energy", start_date: "2026-02-24",
+      initial_price: { valid_from: "2026-02-24", amount: 58.18, interval: "monthly" },
+      attributes: { installment: 61, base_price_month: 188.07 / 12, unit_price_ct: 25.7, consumption_kwh: 3000 },
+    },
+  });
+  const id = (await res.json()).id;
+  await page.goto(`/#/contracts/${id}`);
+  const hint = page.locator(".callout", { hasText: "In den Eckdaten steht ein Abschlag" });
+  await expect(hint).toContainText("61,00");
+  // the edit form keeps the 61 € and asks from when they apply
+  await page.goto(`/#/contracts/${id}/edit`);
+  await expect(page.locator("[name=attr_installment]")).toHaveValue("61");
+  await expect(page.locator("#inst-from")).toBeVisible();
+  await page.check("[name=inst_always]");
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Spar Strom" })).toBeVisible();
+  const hero = page.locator(".kpi.hero");
+  await expect(hero).toContainText("Abschlag pro Monat");
+  await expect(hero).toContainText("61,00");
+  // 188,07 € + 3.000 kWh × 25,7 ct = 959,07 € a year vs 732 € paid
+  await expect(hero).toContainText("bei 3.000 kWh");
+  await expect(hero).toContainText("Nachzahlung");
+  await expect(hint).toHaveCount(0);
+  const c = await (await page.request.get(`/api/contracts/${id}`)).json();
+  expect(c.prices.filter((p) => p.interval !== "once")).toHaveLength(1);
+  expect(c.monthly_cost).toBe(61);
+  check();
+});
+
+test("electricity: a new Abschlag in the form becomes a price change from a date", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts/new");
+  await page.locator(".cat-tile", { hasText: "Strom" }).click();
+  await expect(page.locator("label", { hasText: "Abschlag" }).first()).toBeVisible();
+  await page.fill("[name=provider]", "Abschlag Test");
+  await page.fill("[name=price_amount]", "70");
+  await page.fill("[name=start_date]", "2025-01-01");
+  await page.click("#save");
+  await expect(page.getByRole("heading", { name: "Abschlag Test" })).toBeVisible();
+  const id = page.url().match(/contracts\/(\d+)/)[1];
+  await page.goto(`/#/contracts/${id}/edit`);
+  await expect(page.locator("[name=attr_installment]")).toHaveValue("70");
+  await page.fill("[name=attr_installment]", "85");
+  await expect(page.locator("#inst-from")).toBeVisible();
+  await page.fill("[name=inst_from]", "2026-01-01");
+  await page.click("#save");
+  await expect(page.locator(".kpi.hero")).toContainText("85,00");
+  const c = await (await page.request.get(`/api/contracts/${id}`)).json();
+  const prices = c.prices.filter((p) => p.interval !== "once").map((p) => [p.valid_from, p.amount]);
+  expect(prices).toEqual(expect.arrayContaining([["2025-01-01", 70], ["2026-01-01", 85]]));
+  check();
+});
+

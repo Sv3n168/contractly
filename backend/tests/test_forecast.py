@@ -119,3 +119,21 @@ def test_demo_gas_contract_shows_forecast(client):
     e = client.get(f"/api/contracts/{gas['id']}").json()["energy"]
     assert e["consumption_source"] == "readings" and e["forecast"]["annual_kwh"] == pytest.approx(10_500, rel=0.05)
     assert e["settlement_estimate"] < 0 and e["needed_installment"] > 95
+
+
+def test_the_price_is_the_installment(client):
+    """An Abschlag in the facts that differs from the price doesn't change the settlement: the price does."""
+    start = date.today().replace(day=1) - timedelta(days=200)
+    r = client.post(
+        "/api/contracts",
+        json={
+            "name": "Strom",
+            "category": "electricity",
+            "start_date": start.isoformat(),
+            "attributes": {"base_price_month": 15, "unit_price_ct": 30, "consumption_kwh": 2400, "installment": 99},
+            "initial_price": {"valid_from": start.isoformat(), "amount": 70},
+        },
+    )
+    e = client.get(f"/api/contracts/{r.json()['id']}").json()["energy"]
+    assert e["installment"] == 70
+    assert e["settlement_estimate"] == round(70 * 12 - (15 * 12 + 30 * 2400 / 100), 2)

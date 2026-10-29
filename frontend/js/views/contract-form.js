@@ -3,7 +3,7 @@
 
 import { api } from "../api.js";
 import { catColorVar, category, catIcon, isEnergy, state } from "../store.js";
-import { $, $$, busy, esc, formData, icon, today, toast } from "../ui.js";
+import { $, $$, busy, esc, formData, icon, money, today, toast } from "../ui.js";
 import { PERIOD_FIELDS, bindIconPicker, iconPicker, periodPriceInput, readPeriodPrice } from "./components.js";
 import { applySuggestionsToForm } from "./ocr.js";
 
@@ -151,7 +151,7 @@ export async function renderContractForm(view, id, query = {}) {
             ${
               editing
                 ? ""
-                : `<label class="field input-big"><span>Preis <b class="req" title="Pflichtfeld">*</b></span><div class="input-group">
+                : `<label class="field input-big"><span>${isEnergy(cat) ? "Abschlag" : "Preis"} <b class="req" title="Pflichtfeld">*</b></span><div class="input-group">
                     <input name="price_amount" type="number" step="0.01" inputmode="decimal" required />
                     <span class="addon">€</span></div></label>
                   <label class="field"><span>Zahlweise</span><select name="price_interval">
@@ -192,7 +192,11 @@ export async function renderContractForm(view, id, query = {}) {
           (c.fields || []).length
             ? `<details class="more" ${editing || cat === "loan" ? "open" : ""}>
                 <summary>${icon("list")} Leistungen & Eckdaten <span class="muted small" style="font-weight:500">– optional, hilft beim Vergleichen</span>${icon("chevDown", "chev")}</summary>
-                <div class="body"><div class="form-grid">${attributeInputs(cat, src.attributes || pred.attributes || {})}</div></div></details>`
+                <div class="body"><div class="form-grid">${
+                  isEnergy(cat)
+                    ? energyFactInputs(cat, src, pred, editing)
+                    : attributeInputs(cat, src.attributes || pred.attributes || {})
+                }</div></div></details>`
             : ""
         }
 
@@ -292,6 +296,7 @@ export async function renderContractForm(view, id, query = {}) {
     bindShareMode(form);
     bindOwnFields(form);
     bindTermPreview(form);
+    bindInstallment(form, editing);
     $("#total-toggle", form)?.addEventListener("click", (e) => {
       e.currentTarget.hidden = true;
       $("#total-box", form).hidden = false;
@@ -350,6 +355,7 @@ export async function renderContractForm(view, id, query = {}) {
           payload.cancelled_on = data.end_date ? editing.cancelled_on || today() : null;
           payload.predecessor_id = editing.predecessor_id;
           result = await api.updateContract(id, payload);
+          await saveInstallmentAsPrice(editing, data, payload.attributes.installment);
           toast("Gespeichert");
         } else {
           if (data.price_amount === null || isNaN(data.price_amount)) {
@@ -364,6 +370,11 @@ export async function renderContractForm(view, id, query = {}) {
             interval: data.price_interval || "monthly",
             details: energyDetails(payload.attributes),
           };
+          // electricity/gas: the price is the Abschlag
+          if (isEnergy(cat)) {
+            const months = state.meta.intervals[payload.initial_price.interval]?.months || 1;
+            payload.attributes.installment = Math.round((data.price_amount / months) * 100) / 100;
+          }
           if (data.already_cancelled) {
             if (!data.cancel_end || data.cancel_end < payload.start_date) {
               busy(btn, false);
@@ -729,4 +740,65 @@ function bindTermPreview(form) {
     if (e.target !== renewsOn) draw();
   });
   draw();
+}
+
+// ------------------------------------------------------------------ electricity/gas: Abschlag = price
+// There is one Abschlag: the price. Creating a contract asks for it as "Abschlag"; editing shows the
+// current price in the facts and turns a change into a price change from a chosen date.
+
+function energyFactInputs(cat, src, pred, editing) {
+  const attrs = { ...(src.attributes || pred.attributes || {}) };
+  const fields = (category(cat).fields || []).filter((f) => editing || f.key !== "installment");
+  if (!editing) return attributeInputs(cat, attrs, "attr_", fields);
+  const price = editing.current_price;
+  const priced = price && price.interval !== "once" ? price.monthly_equivalent : null;
+  // an Abschlag entered in the facts that differs from the price is kept and offered as a change
+  const typed = Number(attrs.installment);
+  const differs = priced != null && typed && Math.abs(typed - priced) >= 0.005;
+  if (priced != null && !differs) {
+    attrs.installment = priced;
+    attrs.installment_period = "month";
+  }
+  const single = editing.prices.filter((p) => p.interval !== "once").length === 1;
+  return `${attributeInputs(cat, attrs, "attr_", fields)}
+    <div class="span-all inst-from" id="inst-from" data-price="${priced ?? ""}" ${differs ? "" : "hidden"}>
+      ${differs ? `<p class="small muted" style="margin:0 0 8px">Gerechnet wird bisher mit ${money(priced)} – ab wann gilt dein Abschlag?</p>` : ""}
+      <div class="form-grid">
+        <label class="field"><span>Neuer Abschlag gilt ab</span><input type="date" name="inst_from" value="${today()}"/></label>
+        ${
+          single
+            ? `<label class="check" style="align-self:end;min-height:42px"><input type="checkbox" name="inst_always"/> Galt schon immer – bisherigen Preis korrigieren</label>`
+            : ""
+        }
+      </div>
+    </div>`;
+}
+
+function bindInstallment(form, editing) {
+  const input = form.elements.attr_installment;
+  const box = $("#inst-from", form);
+  if (!editing || !input || !box) return;
+  // shown whenever the entered Abschlag (per month) differs from the price
+  const price = Number(box.dataset.price);
+  const show = () => {
+    const v = Number(input.value);
+    const monthly = form.elements.attr_installment__period?.value === "year" ? v / 12 : v;
+    box.hidden = !input.value || !box.dataset.price || Math.abs(monthly - price) < 0.005;
+  };
+  input.addEventListener("input", show);
+  form.elements.attr_installment__period?.addEventListener("change", show);
+}
+
+/** A changed Abschlag becomes a price change (or corrects the only price when it always applied). */
+async function saveInstallmentAsPrice(editing, data, monthly) {
+  if (!isEnergy(editing.category) || monthly == null) return;
+  const current = editing.current_price;
+  if (current && Math.abs(current.monthly_equivalent - monthly) < 0.005) return;
+  const row = editing.prices.find((p) => p.id === current?.id);
+  if (data.inst_always && row) {
+    await api.updatePrice(editing.id, row.id, { ...row, amount: monthly, interval: "monthly" });
+  } else {
+    const from = data.inst_from && data.inst_from > editing.start_date ? data.inst_from : today();
+    await api.addPrice(editing.id, { valid_from: from, amount: monthly, interval: "monthly", note: "Neuer Abschlag", details: {} });
+  }
 }

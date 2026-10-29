@@ -171,10 +171,12 @@ async function overviewTab(el, c, reload) {
     ${ended ? endedKpis(c, next, runtime) : c.state === "planned" && c.current_price ? plannedKpis(c) : !c.current_price && c.one_off_total ? oneOffKpis(c) : `
     <div class="kpis">
       <div class="card kpi hero">
-        <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>Pro Monat</div>
+        <div class="kpi-label"><span class="kpi-icon">${icon("euro")}</span>${isEnergy(c.category) ? "Abschlag pro Monat" : "Pro Monat"}</div>
         <div class="kpi-value num">${money(c.monthly_cost)}</div>
         <div class="kpi-sub">${
-          c.current_price?.details?.kind === "pause"
+          c.energy?.settlement_estimate != null
+            ? settlementLine(c.energy)
+            : c.current_price?.details?.kind === "pause"
             ? "pausiert – keine Kosten"
             : c.partner_amount
             ? `Gesamt ${money(c.full_monthly_cost)} · Partner:in zahlt ${money(c.partner_amount)}`
@@ -1020,10 +1022,18 @@ function installmentHint(c) {
   if (Math.abs(inst - price.monthly_equivalent) < 0.5) return "";
   const recurring = c.prices.filter((p) => p.interval !== "once");
   return `<div class="callout warn" style="margin-bottom:16px">${icon("alert")}<div>
-      Dein Abschlag laut Eckdaten ist <b>${money(inst)}</b>, als Preis ist aber <b>${money(price.monthly_equivalent)}</b> pro Monat hinterlegt –
-      mit dem Preis rechnen „Pro Monat“, „Bisher bezahlt“ und die Auswertung.
+      In den Eckdaten steht ein Abschlag von <b>${money(inst)}</b>, gerechnet wird mit <b>${money(price.monthly_equivalent)}</b> pro Monat.
+      Welcher stimmt? Mit dem Abschlag rechnen „Pro Monat“, „Bisher bezahlt“, die Auswertung und die Prognose.
       <div class="callout-actions">
-        <button class="btn btn-sm" id="sync-from">${icon("euro")} Ab einem Datum ${money(inst)}</button>
+        <button class="btn btn-sm" id="sync-from">${icon("euro")} ${money(inst)} ab einem Datum</button>
         ${recurring.length === 1 ? `<button class="btn btn-sm btn-ghost" id="sync-all">Galt schon immer – Preis korrigieren</button>` : ""}
       </div></div></div>`;
+}
+
+/** "bei 3.000 kWh: ca. 227 € Nachzahlung" – what the Abschlag means at the expected consumption. */
+function settlementLine(e) {
+  const s = e.settlement_estimate;
+  const kwh = e.consumption_used ? `bei ${num(e.consumption_used)} kWh: ` : "";
+  if (Math.abs(s) < 5) return `${kwh}passt – kaum Nachzahlung oder Guthaben`;
+  return `${kwh}ca. <b class="${s >= 0 ? "better" : "worse"}">${money(Math.abs(s), true)} ${s >= 0 ? "Guthaben" : "Nachzahlung"}</b>`;
 }

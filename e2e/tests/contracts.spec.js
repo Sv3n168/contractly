@@ -52,7 +52,7 @@ test("agreed total: last payment is smaller, so the total comes out exactly", as
   const d = new Date();
   const start = new Date(Date.UTC(d.getFullYear(), d.getMonth() - 13, 1)).toISOString().slice(0, 10);
   await page.goto("/#/contracts/new");
-  await page.locator(".cat-tile", { hasText: "Streaming" }).click();
+  await page.locator(".cat-tile", { hasText: "Bildung" }).click();
   await page.fill("[name=name]", "Master");
   await page.fill("[name=price_amount]", "1105");
   await page.fill("[name=start_date]", start);

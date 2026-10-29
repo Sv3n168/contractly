@@ -223,6 +223,7 @@ async function overviewTab(el, c, reload) {
 
     ${installmentHint(c)}
     ${budgetCard(c)}
+    ${gapsCard(c)}
 
     <div class="card" style="margin-bottom:20px">
       <div class="card-head" style="align-items:flex-start"><div><h2>Kostenverlauf</h2>
@@ -341,6 +342,19 @@ async function overviewTab(el, c, reload) {
     reload();
   });
   $("#letter-btn", el)?.addEventListener("click", () => openLetter(c));
+  $("#gaps", el)?.addEventListener("click", async (e) => {
+    const key = e.target.closest("[data-gap-ignore]")?.dataset.gapIgnore;
+    if (!key) return;
+    await api.ignoreGap(c.id, key);
+    toast("Wird nicht mehr abgefragt", "ok", null, {
+      label: "Rückgängig",
+      run: async () => {
+        await api.unignoreGap(c.id, key);
+        reload();
+      },
+    });
+    reload();
+  });
   bindLoan(el, c, reload);
 }
 
@@ -888,6 +902,23 @@ function remindersTab(el, c, reload) {
   });
 }
 
+
+/** What the contract still lacks – each with a jump to the field, or "not needed here". */
+function gapsCard(c) {
+  if (!c.gaps?.length) return "";
+  const href = (g) => (g.field === "documents" ? `#/contracts/${c.id}?tab=documents` : `#/contracts/${c.id}/edit?focus=${g.field}`);
+  return `<div class="card gaps-card" id="gaps">
+      <div class="card-head"><div><h2>${icon("info")} Noch ${c.gaps.length === 1 ? "eine Angabe" : `${c.gaps.length} Angaben`} offen</h2>
+        <p>Damit Kündigungsschreiben, Erinnerungen und Notfall-Mappe vollständig sind.</p></div></div>
+      <div class="gap-list">${c.gaps
+        .map(
+          (g) => `<div class="gap-row"><div><b>${esc(g.label)}</b><span class="muted small"> – ${esc(g.why)}</span></div>
+            <div class="gap-actions"><a class="btn btn-sm" href="${href(g)}">${icon("plus")} Ergänzen</a>
+              <button class="btn btn-sm btn-ghost" data-gap-ignore="${g.key}">Brauche ich nicht</button></div></div>`,
+        )
+        .join("")}</div>
+    </div>`;
+}
 
 /** Progress towards the agreed total: how much is left, the odd last amount, a warning when more was paid. */
 function budgetCard(c) {

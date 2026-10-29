@@ -57,6 +57,8 @@ export const api = {
 
   meta: () => request("GET", "/api/meta"),
   summary: (params) => request("GET", `/api/stats/summary${qs(params || {})}`),
+  insights: () => request("GET", "/api/insights"),
+  dismissInsight: (key) => request("POST", "/api/insights/dismiss", { key }),
   timeseries: (params) => request("GET", `/api/stats/timeseries${qs(params)}`),
   projection: (params) => request("GET", `/api/stats/projection${qs(params)}`),
 
@@ -153,6 +155,8 @@ export const api = {
   confirmCancellation: (id, data = {}) => request("POST", `/api/contracts/${id}/cancellation-confirmed`, data),
   noConfirmation: (id) => request("POST", `/api/contracts/${id}/no-confirmation`),
   stillUsed: (id, body) => request("POST", `/api/contracts/${id}/still-used`, body),
+  ignoreGap: (id, key) => request("POST", `/api/contracts/${id}/gaps/${key}/ignore`),
+  unignoreGap: (id, key) => request("DELETE", `/api/contracts/${id}/gaps/${key}/ignore`),
   unconfirmCancellation: (id) => request("DELETE", `/api/contracts/${id}/cancellation-confirmed`),
 
   analyzeContractList: (file) => {

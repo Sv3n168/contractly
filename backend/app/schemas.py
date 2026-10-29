@@ -192,6 +192,8 @@ class ContractOut(ContractSummary):
     switch_savings: float | None = None
     energy: dict[str, Any] | None = None
     loan: dict[str, Any] | None = None
+    # data the contract still lacks (see smart.gaps)
+    gaps: list[dict[str, Any]] = []
 
 
 class CancelIn(BaseModel):
@@ -300,3 +302,7 @@ class PauseIn(BaseModel):
 
 class ConfirmIn(BaseModel):
     confirmed_on: date | None = None
+
+
+class InsightDismissIn(BaseModel):
+    key: str = Field(min_length=1, max_length=120)

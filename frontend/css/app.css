@@ -3970,3 +3970,134 @@ a.switch-banner:hover {
   font-size: 14px;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------------------ thinking along */
+
+.smart-card,
+.gaps-card {
+  margin-bottom: 20px;
+}
+.insights {
+  display: grid;
+  gap: 2px;
+}
+.insight {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.insight:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.insight-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--info-soft);
+  color: var(--primary);
+}
+.insight.warn .insight-icon {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.insight.good .insight-icon {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.insight-body p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.insight-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.gaps-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.gaps-line:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.gaps-line > .svg-icon {
+  color: var(--primary);
+  margin-top: 2px;
+}
+.gap-list {
+  display: grid;
+}
+.gap-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.gap-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.gap-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.flash {
+  border-radius: var(--radius-sm);
+  animation: flash 2s var(--ease-out);
+}
+@keyframes flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 4px var(--primary-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+@media (max-width: 640px) {
+  .insight {
+    grid-template-columns: auto 1fr;
+  }
+  .insight-actions {
+    grid-column: 2;
+  }
+  .gap-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+.issue-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.issue-list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.issue-list .svg-icon {
+  color: var(--warn);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.smart-hint .btn {
+  margin-top: 6px;
+}

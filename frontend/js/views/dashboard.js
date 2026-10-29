@@ -17,11 +17,12 @@ export async function renderDashboard(view) {
   const now = new Date();
   const end = new Date(now.getFullYear(), now.getMonth() + 6, 1);
   const start = new Date(now.getFullYear(), now.getMonth() - 11, 1);
-  const [summary, upcoming, series, profile] = await Promise.all([
+  const [summary, upcoming, series, profile, smart] = await Promise.all([
     api.summary(),
     api.upcoming({ horizon_days: 60 }),
     api.timeseries({ start: isoDate(start).slice(0, 7), end: isoDate(end).slice(0, 7), group: "category" }),
     state.profile ? Promise.resolve(state.profile) : api.profile(),
+    api.insights().catch(() => ({ insights: [], incomplete: [] })),
   ]);
   state.profile = profile;
   const firstName = (profile.name || "").trim().split(/\s+/)[0];
@@ -101,6 +102,8 @@ export async function renderDashboard(view) {
       </div>
     </div>
 
+    ${smartCard(smart)}
+
     <div class="card">
       <div class="card-head">
         <div><h2>Kostenverlauf</h2><p>Monatliche Kosten nach Bereich · helle Balken = Vorschau</p></div>
@@ -117,4 +120,44 @@ export async function renderDashboard(view) {
     { highlightFrom: series.months.find((m) => m > currentMonth) },
   );
   bindReminderActions(view.querySelector("#dash-reminders"), api, () => router());
+  view.querySelector("#smart")?.addEventListener("click", async (e) => {
+    const key = e.target.closest("[data-dismiss]")?.dataset.dismiss;
+    if (!key) return;
+    e.target.closest(".insight").remove();
+    await api.dismissInsight(key);
+    toast("Ausgeblendet – für ein Jahr");
+    if (!view.querySelector("#smart .insight, #smart .gaps-line")) view.querySelector("#smart").remove();
+  });
+}
+
+const TONE_ICON = { warn: "trendUp", good: "trendDown", info: "sparkles" };
+
+/** "Gut zu wissen": a few computed insights and the contracts that still lack data. */
+function smartCard({ insights, incomplete }) {
+  if (!insights.length && !incomplete.length) return "";
+  const shown = incomplete.slice(0, 4);
+  return `<div class="card smart-card" id="smart">
+      <div class="card-head"><div><h2>Gut zu wissen</h2><p>Von Contractly aus deinen Verträgen berechnet</p></div></div>
+      <div class="insights">
+        ${insights
+          .map(
+            (i) => `<div class="insight ${i.tone}">
+              <span class="insight-icon">${icon(TONE_ICON[i.tone] || "info")}</span>
+              <div class="insight-body"><b>${esc(i.title)}</b><p>${esc(i.text)}</p></div>
+              <div class="insight-actions">
+                <a class="btn btn-sm" href="${esc(i.link)}">${esc(i.action)}</a>
+                <button class="icon-btn" data-dismiss="${esc(i.key)}" title="Ausblenden" aria-label="Hinweis ausblenden">${icon("x")}</button>
+              </div></div>`,
+          )
+          .join("")}
+        ${
+          incomplete.length
+            ? `<div class="gaps-line">${icon("info")}<div><b>${incomplete.length === 1 ? "1 Vertrag" : `${incomplete.length} Verträge`} mit offenen Angaben:</b>
+                ${shown
+                  .map((c) => `<a href="#/contracts/${c.contract_id}" title="Fehlt: ${esc(c.gaps.map((g) => g.label).join(", "))}">${esc(c.name)}</a>`)
+                  .join(", ")}${incomplete.length > shown.length ? ` und ${incomplete.length - shown.length} weitere` : ""}</div></div>`
+            : ""
+        }
+      </div>
+    </div>`;
 }

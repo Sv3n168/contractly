@@ -40,6 +40,9 @@ jobs:
       - name: Install Playwright
         working-directory: e2e
         run: npm ci && npx playwright install --with-deps chromium
+      - name: Lint browser code
+        working-directory: e2e
+        run: npm run lint
       - name: UI tests (desktop & mobile)
         working-directory: e2e
         run: npx playwright test

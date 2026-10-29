@@ -18,7 +18,6 @@ export function parseDate(d) {
   return new Date(y, m - 1, day);
 }
 export const fmtDate = (d) => (d ? parseDate(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "–");
-export const fmtDateLong = (d) => (d ? parseDate(d).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" }) : "–");
 export const fmtMonth = (key) => {
   const [y, m] = key.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString("de-DE", { month: "short", year: "2-digit" });

@@ -328,12 +328,6 @@ export async function renderCosts(view) {
     drawHistory();
     drawProjection();
   };
-  const toggle = (set, key, btn) => {
-    if (set.has(key)) set.delete(key);
-    else set.add(key);
-    btn.classList.toggle("active", set.has(key));
-    redraw();
-  };
   // active filters as removable chips; the defaults show nothing
   const drawActive = () => {
     const chips = [

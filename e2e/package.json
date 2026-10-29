@@ -3,9 +3,13 @@
   "private": true,
   "description": "Browser tests for the Contractly UI",
   "scripts": {
-    "test": "playwright test"
+    "test": "playwright test",
+    "lint": "cd .. && eslint -c e2e/eslint.config.mjs frontend/js"
   },
   "devDependencies": {
-    "@playwright/test": "1.56.1"
+    "@eslint/js": "^9.17.0",
+    "@playwright/test": "1.56.1",
+    "eslint": "^9.17.0",
+    "globals": "^15.14.0"
   }
 }

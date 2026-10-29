@@ -46,7 +46,7 @@ export function extraModal(c, existing, done) {
       <p class="muted" style="margin-top:0">Für Monate, in denen die Rechnung höher war als üblich. Der Grundpreis bleibt unverändert,
         im Folgemonat gilt automatisch wieder der normale Preis.</p>
       <form id="xf" class="form-grid">
-        <label class="field"><span>Monat</span><input type="month" name="month" value="${ym}" max="${thisMonth}" placeholder="JJJJ-MM" pattern="\d{4}-\d{2}" required/></label>
+        <label class="field"><span>Monat</span><input type="month" name="month" value="${ym}" max="${thisMonth}" placeholder="JJJJ-MM" pattern="\\d{4}-\\d{2}" required/></label>
         <div class="field"><span class="field-label">Eingabe als</span>
           <div class="segmented" id="mode"><button type="button" data-m="extra" class="active">Mehrbetrag</button><button type="button" data-m="total">Rechnungsbetrag</button></div></div>
         <label class="field span-all"><span id="amount-label">Mehrbetrag</span><div class="input-group input-big">

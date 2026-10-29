@@ -86,7 +86,7 @@ export async function openLetter(c) {
       <div class="grid" style="grid-template-columns:minmax(0,1fr);gap:16px">
         ${
           missingProfile
-            ? `<details class="more" open><summary>${icon("user")} Deine Absenderdaten <span class="muted small" style="font-weight:500">– werden gespeichert</span>${icon("chevDown", "chev")}</summary>
+            ? `<details class="more" open><summary>${icon("user")} Deine Absenderdaten <span class="muted small fw-500">– werden gespeichert</span>${icon("chevDown", "chev")}</summary>
                <div class="body"><form id="lp" class="form-grid">
                  <label class="field"><span>Name</span><input name="name" value="${esc(p.name ?? "")}"/></label>
                  <label class="field"><span>Straße & Nr.</span><input name="street" value="${esc(p.street ?? "")}"/></label>
@@ -113,7 +113,7 @@ export async function openLetter(c) {
           ${c.attributes?.phone_number ? `<label class="check span-all"><input type="checkbox" name="port_number" ${defaults.port_number ? "checked" : ""}/> Rufnummernmitnahme ankündigen</label>` : ""}
         </form>
         <div class="letter" id="letter" contenteditable="true" spellcheck="false"></div>
-        <p class="small muted" style="margin:0">Der Text ist direkt bearbeitbar. Tipp: Per Einschreiben, Fax oder über das Kündigungsformular des Anbieters (§ 312k BGB „Kündigungsbutton“) versenden.</p>
+        <p class="small muted m-0">Der Text ist direkt bearbeitbar. Tipp: Per Einschreiben, Fax oder über das Kündigungsformular des Anbieters (§ 312k BGB „Kündigungsbutton“) versenden.</p>
       </div>`,
     foot: `<button class="btn" data-copy>${icon("copy")} Kopieren</button>
            <button class="btn" data-mail>${icon("mail")} E-Mail</button>

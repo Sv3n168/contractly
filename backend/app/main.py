@@ -8,8 +8,8 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from . import __version__, demo
 from . import db as database
-from . import demo
 from .backup import backup_loop
 from .config import settings
 from .models import Contract
@@ -123,7 +123,7 @@ async def lifespan(app: FastAPI):
 
 
 def create_app(background: bool = True) -> FastAPI:
-    app = FastAPI(title="Contractly", version="1.0.0", lifespan=lifespan)
+    app = FastAPI(title="Contractly", version=__version__, lifespan=lifespan)
     app.state.background = background
     vault.on_lock = _on_user_locked
 

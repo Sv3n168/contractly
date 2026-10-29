@@ -29,6 +29,10 @@ RUN if [ "$(uname -m)" != "x86_64" ]; then \
         apt-get purge -y gcc libc6-dev libssl-dev && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*; \
     fi
 
+# version label of this build (git tag or commit), shown under Einstellungen → Über Contractly
+ARG CONTRACTLY_BUILD=dev
+ENV CONTRACTLY_BUILD=$CONTRACTLY_BUILD
+
 COPY backend/app backend/app
 COPY frontend frontend
 

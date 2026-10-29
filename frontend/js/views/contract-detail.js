@@ -204,11 +204,11 @@ async function overviewTab(el, c, reload) {
         }</div></div>
       ${
         c.loan?.balance != null
-          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("trendDown")}</span>Restschuld</div>
+          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon tone-good">${icon("trendDown")}</span>Restschuld</div>
              <div class="kpi-value num">${money(c.loan.balance, true)}</div>
              <div class="kpi-sub">${c.loan.payoff_date ? `schuldenfrei ${new Date(c.loan.payoff_date).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}` : ""}</div></div>`
           : c.switch_savings != null
-          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("piggy")}</span>${c.switch_savings >= 0 ? "Gespart seit dem Wechsel" : "Mehrkosten seit dem Wechsel"}</div>
+          ? `<div class="card kpi"><div class="kpi-label"><span class="kpi-icon tone-good">${icon("piggy")}</span>${c.switch_savings >= 0 ? "Gespart seit dem Wechsel" : "Mehrkosten seit dem Wechsel"}</div>
              <div class="kpi-value num ${c.switch_savings >= 0 ? "better" : "worse"}">${money(Math.abs(c.switch_savings), true)}</div>
              <div class="kpi-sub">ggü. ${prev ? `<a href="#/contracts/${prev.id}">${esc(prev.name)}</a>` : "altem Vertrag"}</div></div>`
           : c.state === "cancelled" && c.end_date
@@ -225,7 +225,7 @@ async function overviewTab(el, c, reload) {
     ${budgetCard(c)}
     ${gapsCard(c)}
 
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head" style="align-items:flex-start"><div><h2>Kostenverlauf</h2>
         <p>${chain.length > 1 ? "Durchgehend über alle Wechsel" : "Monatliche Kosten"} · gestrichelt = Vorschau${hist.extras.some((v) => v) || hist.credits.some((v) => v) ? " · Punkte = Zusatzkosten oder Bonus" : ""}</p></div>
 </div>
@@ -254,9 +254,9 @@ async function overviewTab(el, c, reload) {
           ${
             facts.length
               ? `<div class="facts">${facts.map(([k, v]) => `<div class="fact"><div class="k">${esc(k)}</div><div class="v">${esc(v)}</div></div>`).join("")}</div>`
-              : `<p class="muted" style="margin:0">Noch keine Eckdaten hinterlegt. <a href="#/contracts/${c.id}/edit">Jetzt ergänzen</a> – oder ein Dokument hochladen und erkennen lassen.</p>`
+              : `<p class="muted m-0">Noch keine Eckdaten hinterlegt. <a href="#/contracts/${c.id}/edit">Jetzt ergänzen</a> – oder ein Dokument hochladen und erkennen lassen.</p>`
           }
-          <div class="facts" style="margin-top:10px">
+          <div class="facts mt-2">
             ${c.attributes?.managed_by ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.managed_by || "Verwaltet von")}</div><div class="v">${esc(c.attributes.managed_by)}</div></div>` : ""}
             ${c.customer_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.customer_number || "Kundennummer")}</div><div class="v">${esc(c.customer_number)}</div></div>` : ""}
             ${c.contract_number ? `<div class="fact"><div class="k">${esc(c.attributes?.field_labels?.contract_number || "Vertragsnummer")}</div><div class="v">${esc(c.contract_number)}</div></div>` : ""}
@@ -306,7 +306,7 @@ async function overviewTab(el, c, reload) {
                 ${c.cancelled_on ? `<div class="fact"><div class="k">Gekündigt am</div><div class="v">${fmtDate(c.cancelled_on)}</div></div>` : ""}
               </div>`
             : `
-        <div class="facts" style="margin-top:16px">
+        <div class="facts mt-3">
           <div class="fact"><div class="k">Beginn</div><div class="v">${fmtDate(c.start_date)}</div></div>
           <div class="fact"><div class="k">Mindestlaufzeit</div><div class="v">${c.min_term_months ? `${c.min_term_months} Monat${c.min_term_months === 1 ? "" : "e"}` : "keine"}</div></div>
           <div class="fact"><div class="k">Verlängerung</div><div class="v">${c.renewal_months ? `um ${c.renewal_months} Monat${c.renewal_months > 1 ? "e" : ""}` : "–"}</div></div>
@@ -406,7 +406,7 @@ function energyCard(c) {
   const f = e.forecast;
   if (!e.expected_yearly_cost) {
     return `<div class="card"><div class="card-head"><div><h2>${icon("gauge")} Verbrauch & Abrechnung</h2></div></div>
-      <p class="muted" style="margin:0">Trage Grundpreis und Arbeitspreis ein und erfasse Zählerstände (oder deinen Jahresverbrauch) –
+      <p class="muted m-0">Trage Grundpreis und Arbeitspreis ein und erfasse Zählerstände (oder deinen Jahresverbrauch) –
         dann sagt Contractly dir, ob dein Abschlag reicht.</p></div>`;
   }
   const s = e.settlement_estimate;
@@ -469,7 +469,7 @@ function pricesTab(el, c, reload) {
   // a row opens its dialog (edit, delete) – no pencil and trash can in every line
   const actions = () => `<td class="r row-go">${icon("chevRight")}</td>`;
   el.innerHTML = `
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head"><div><h2>Preishistorie</h2><p>Der reguläre Preis – jede Änderung gilt ab ihrem Datum bis zur nächsten.</p></div>
         <button class="btn btn-sm btn-primary" data-add="price">${icon("plus")} Preisänderung</button></div>
       ${
@@ -522,7 +522,7 @@ function pricesTab(el, c, reload) {
                     ${actions(p)}</tr>`;
                 })
                 .join("")}</tbody></table></div>`
-          : `<p class="muted" style="margin:0">Noch nichts erfasst. War eine Rechnung mal höher als sonst, gab es eine Gebühr oder einen Bonus? Oben auf „Erfassen“.</p>`
+          : `<p class="muted m-0">Noch nichts erfasst. War eine Rechnung mal höher als sonst, gab es eine Gebühr oder einen Bonus? Oben auf „Erfassen“.</p>`
       }
     </div>`;
   const done = () => reload("prices");
@@ -607,7 +607,7 @@ export function priceModal(c, existing, done) {
       }
       <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(p.note ?? "")}"/></label>
     </form>`,
-    foot: `${p.id ? `<button class="btn btn-ghost btn-danger" data-del style="margin-right:auto">${icon("trash")} Löschen</button>` : ""}
+    foot: `${p.id ? `<button class="btn btn-ghost btn-danger mr-auto" data-del>${icon("trash")} Löschen</button>` : ""}
       <button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
   $("#sign", m)?.addEventListener("click", (e) => {
@@ -675,7 +675,7 @@ export function bindDelete(m, c, p, done) {
 function pauseModal(c, done) {
   const m = modal({
     title: "Vertrag pausieren",
-    body: `<p style="margin-top:0">Für die Zeit der Pause (z. B. Krankheit, Elternzeit, Auslandsaufenthalt) fallen keine Kosten an. Danach gilt wieder der bisherige Preis.</p>
+    body: `<p class="mt-0">Für die Zeit der Pause (z. B. Krankheit, Elternzeit, Auslandsaufenthalt) fallen keine Kosten an. Danach gilt wieder der bisherige Preis.</p>
       <div class="form-grid">
         <label class="field"><span>Pause ab</span><input type="date" name="from_date" value="${today()}"/></label>
         <label class="field"><span>Pause bis</span><input type="date" name="until"/><small>Leer = unbestimmt</small></label>
@@ -708,14 +708,14 @@ function cancelModal(c, done) {
   const m = modal({
     title: "Vertrag kündigen",
     body: `
-      <p style="margin-top:0">Markiert <b>${esc(c.name)}</b> als gekündigt. Der Vertrag läuft bis zum Laufzeitende weiter und wird dann automatisch beendet.</p>
+      <p class="mt-0">Markiert <b>${esc(c.name)}</b> als gekündigt. Der Vertrag läuft bis zum Laufzeitende weiter und wird dann automatisch beendet.</p>
       <div class="form-grid">
         <label class="field"><span>Gekündigt am</span><input type="date" name="cancelled_on" value="${today()}"/></label>
         <label class="field"><span>Vertragsende</span><input type="date" name="end_date" value="${esc(c.next_term_end || "")}"/>
           <small>Berechnet aus Laufzeit & Frist</small></label>
       </div>
-      ${c.cancellation_deadline && c.cancellation_deadline < today() ? `<div class="callout warn" style="margin-top:12px">${icon("alert")}<div>Die Frist für das nächste Laufzeitende ist schon vorbei – das Ende wurde entsprechend berechnet.</div></div>` : ""}
-      <label class="check" style="margin-top:16px"><input type="checkbox" name="letter" checked/> Danach Kündigungsschreiben erstellen</label>`,
+      ${c.cancellation_deadline && c.cancellation_deadline < today() ? `<div class="callout warn mt-2">${icon("alert")}<div>Die Frist für das nächste Laufzeitende ist schon vorbei – das Ende wurde entsprechend berechnet.</div></div>` : ""}
+      <label class="check mt-3"><input type="checkbox" name="letter" checked/> Danach Kündigungsschreiben erstellen</label>`,
     foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-ok>${icon("ban")} Kündigung speichern</button>`,
   });
   $("[data-ok]", m).addEventListener("click", async (e) => {
@@ -765,7 +765,7 @@ function documentsTab(el, c, reload) {
       <div class="card">
         <label class="dropzone" id="drop">${icon("upload")}<b>Dokument hochladen</b>
           <span class="muted small">PDF oder Bild, max. Größe laut Server</span><input type="file" hidden/></label>
-        <label class="check small" style="margin-top:12px"><input type="checkbox" id="auto-ocr" ${ocrOk ? "checked" : "disabled"}/> Inhalt erkennen und Änderungen vorschlagen</label>
+        <label class="check small mt-2"><input type="checkbox" id="auto-ocr" ${ocrOk ? "checked" : "disabled"}/> Inhalt erkennen und Änderungen vorschlagen</label>
         ${ocrOk ? "" : `<p class="small muted">Texterkennung ist auf diesem Server nicht eingerichtet.</p>`}
       </div>
     </div>`;
@@ -936,7 +936,7 @@ function budgetCard(c) {
     const regular = b.regular_left
       ? `noch <b>${b.regular_left} × ${money(b.regular_amount)}</b> bis ${fmtDate(b.last_regular_date)}, `
       : "";
-    plan = `<p style="margin:0">Offen: <b>${money(b.left)}</b> – ${regular}${odd ? "dann als letzte Zahlung" : "die letzte"}
+    plan = `<p class="m-0">Offen: <b>${money(b.left)}</b> – ${regular}${odd ? "dann als letzte Zahlung" : "die letzte"}
       <b>${money(b.last_amount)}</b> am <b>${fmtDate(b.last_date)}</b>.</p>
       <div class="callout ${odd ? "warn" : ""}" style="margin-top:12px">${icon("info")}<div>${
         odd
@@ -944,15 +944,15 @@ function budgetCard(c) {
           : `Der Dauerauftrag kann nach dem ${fmtDate(b.last_date)} enden.`
       } Contractly erinnert dich vorher.</div></div>${
         b.projected_over
-          ? `<div class="callout bad" style="margin-top:12px">${icon("alert")}<div>Bis zum Vertragsende${end} würden <b>${money(b.projected_over)} zu viel</b> gezahlt.</div></div>`
+          ? `<div class="callout bad mt-2">${icon("alert")}<div>Bis zum Vertragsende${end} würden <b>${money(b.projected_over)} zu viel</b> gezahlt.</div></div>`
           : ""
       }`;
   } else {
-    plan = `<p style="margin:0">Offen: <b>${money(b.left)}</b>${
+    plan = `<p class="m-0">Offen: <b>${money(b.left)}</b>${
       b.short ? ` – bis zum Vertragsende${end} fehlen bei den eingetragenen Preisen noch ${money(b.short)}.` : "."
     }</p>`;
   }
-  return `<div class="card budget-card" style="margin-bottom:20px">
+  return `<div class="card budget-card mb-4">
     <div class="card-head"><div><h2>Gesamtsumme</h2>
       <p>${money(b.paid)} von ${money(b.total)} bezahlt · ${String(b.percent).replace(".", ",")} %</p></div></div>
     <div class="term-bar ${b.exceeded ? "over" : ""}"><div style="width:${b.percent}%"></div></div>
@@ -1052,7 +1052,7 @@ function installmentHint(c) {
   if (!isEnergy(c.category) || !inst || !price || c.state === "ended") return "";
   if (Math.abs(inst - price.monthly_equivalent) < 0.5) return "";
   const recurring = c.prices.filter((p) => p.interval !== "once");
-  return `<div class="callout warn" style="margin-bottom:16px">${icon("alert")}<div>
+  return `<div class="callout warn mb-3">${icon("alert")}<div>
       In den Eckdaten steht ein Abschlag von <b>${money(inst)}</b>, gerechnet wird mit <b>${money(price.monthly_equivalent)}</b> pro Monat.
       Welcher stimmt? Mit dem Abschlag rechnen „Pro Monat“, „Bisher bezahlt“, die Auswertung und die Prognose.
       <div class="callout-actions">

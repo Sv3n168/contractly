@@ -21,7 +21,7 @@ export async function renderSettings(view) {
 
   view.innerHTML = `
     <div class="page-head"><div><h1>Einstellungen</h1><p>Profil, Sicherheit, Benachrichtigungen${isAdmin() ? ", Benutzer und Datensicherung" : ""}.</p></div></div>
-    <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="grid grid-2 mb-4">
       ${[
         ["#/emergency", "shield", "Notfall-Mappe", "Alles Wichtige für Angehörige – drucken oder als verschlüsselte Datei"],
         ["#/import", "upload", "Verträge importieren", "Vertragsliste aus Excel oder CSV übernehmen"],
@@ -44,7 +44,7 @@ export async function renderSettings(view) {
               <div class="sub">${me.totp_enabled ? "Aktiv – beim Anmelden wird zusätzlich ein Code aus der Authenticator-App abgefragt." : "Zusätzlicher Code aus einer Authenticator-App (z. B. Aegis, Google Authenticator)."}</div></div>
             <button class="btn btn-sm ${me.totp_enabled ? "btn-ghost" : "btn-primary"}" id="totp">${me.totp_enabled ? "Ausschalten" : "Einrichten"}</button>
           </div>
-          <label class="field" style="margin-top:14px"><span>Automatisch abmelden</span>
+          <label class="field mt-3"><span>Automatisch abmelden</span>
             <select id="idle">${[
               [0, "Nie – nur über „Abmelden“"],
               [5, "nach 5 Minuten ohne Aktivität"],
@@ -125,8 +125,11 @@ export async function renderSettings(view) {
         ${isAdmin() ? usersCard(users, me) + backupCard(backups) : memberInfo()}
         <div class="card">
           <div class="card-head"><div><h2>${icon("info")} Über Contractly</h2></div></div>
-          <p class="small text-2" style="margin:0">Selbst gehostete Vertragsverwaltung. Deine Daten bleiben auf deinem Server – kein Vergleichsportal, keine Werbung, kein Tracking.
+          <p class="small text-2 m-0">Selbst gehostete Vertragsverwaltung. Deine Daten bleiben auf deinem Server – kein Vergleichsportal, keine Werbung, kein Tracking.
           Texterkennung (OCR): ${state.meta.ocr?.tesseract ? "verfügbar ✓" : "nicht verfügbar"}</p>
+          <p class="small muted mt-2 mb-1">Version ${esc(state.meta.version || "")}${
+            state.meta.build && state.meta.build !== "dev" ? ` · Build ${esc(state.meta.build)}` : ""
+          }</p>
         </div>
         <div class="card">
           <div class="card-head"><div><h2>${icon("trash")} Neu anfangen</h2>
@@ -213,7 +216,7 @@ export async function renderSettings(view) {
 
 function memberInfo() {
   return `<div class="card"><div class="card-head"><div><h2>${icon("users")} Mehrere Benutzer</h2></div></div>
-    <p class="small text-2" style="margin:0">Du hast einen eigenen, getrennt verschlüsselten Bereich. Benutzerverwaltung und Datensicherung übernimmt der Administrator.
+    <p class="small text-2 m-0">Du hast einen eigenen, getrennt verschlüsselten Bereich. Benutzerverwaltung und Datensicherung übernimmt der Administrator.
     Die Sicherungen enthalten deinen Bereich nur verschlüsselt – lesbar nur mit deinem Passwort.</p></div>`;
 }
 
@@ -222,7 +225,7 @@ function memberInfo() {
 function resetModal() {
   const m = modal({
     title: "Alle Daten löschen?",
-    body: `<p style="margin-top:0">Alle Verträge mit Preisen, Dokumenten und Zählerständen, alle Einnahmen, Erinnerungen und die Notfall-Hinweise
+    body: `<p class="mt-0">Alle Verträge mit Preisen, Dokumenten und Zählerständen, alle Einnahmen, Erinnerungen und die Notfall-Hinweise
       werden <b>endgültig</b> gelöscht. Das lässt sich nicht rückgängig machen – höchstens über ein vorher erstelltes Backup.</p>
       <label class="field"><span>Zur Bestätigung <b>LÖSCHEN</b> eingeben</span>
         <input name="confirm" autocomplete="off" autocapitalize="characters" spellcheck="false"/></label>`,
@@ -276,7 +279,7 @@ function changePasswordModal() {
 function recoveryKeyModal() {
   const m = modal({
     title: "Neuer Wiederherstellungsschlüssel",
-    body: `<p style="margin-top:0">Der bisherige Schlüssel wird ungültig. Bitte bestätige mit deinem Passwort.</p>
+    body: `<p class="mt-0">Der bisherige Schlüssel wird ungültig. Bitte bestätige mit deinem Passwort.</p>
       <label class="field"><span>Passwort</span><input type="password" id="rk-pw" autocomplete="current-password"/></label>
       <div id="rk-out"></div>`,
     foot: `<button class="btn" data-close>Schließen</button><button class="btn btn-primary" data-ok>${icon("key")} Erzeugen</button>`,
@@ -285,7 +288,7 @@ function recoveryKeyModal() {
     busy(e.currentTarget);
     try {
       const { recovery_key } = await api.newRecoveryKey($("#rk-pw", m).value);
-      $("#rk-out", m).innerHTML = `<div class="callout warn" style="margin-top:14px">${icon("alert")}<div>Nur jetzt sichtbar – sicher aufbewahren!</div></div>${recoveryKeyHtml(recovery_key)}`;
+      $("#rk-out", m).innerHTML = `<div class="callout warn mt-3">${icon("alert")}<div>Nur jetzt sichtbar – sicher aufbewahren!</div></div>${recoveryKeyHtml(recovery_key)}`;
       bindRecoveryKey($("#rk-out", m), recovery_key);
       e.currentTarget.remove();
     } catch (err) {
@@ -362,7 +365,7 @@ async function haTokenModal() {
   const m = modal({
     title: "Home Assistant verbinden",
     wide: true,
-    body: `<p style="margin-top:0">In die <code>configuration.yaml</code> von Home Assistant einfügen und neu starten. Der Token wird nur jetzt angezeigt.</p>
+    body: `<p class="mt-0">In die <code>configuration.yaml</code> von Home Assistant einfügen und neu starten. Der Token wird nur jetzt angezeigt.</p>
       <textarea class="input mono small" rows="13" readonly>${esc(yaml)}</textarea>`,
     foot: `<button class="btn" data-copy>${icon("copy")} Kopieren</button><button class="btn btn-primary" data-close>Fertig</button>`,
   });
@@ -402,7 +405,7 @@ function usersCard(users, me) {
         )
         .join("")}
     </div>
-    <form id="invite" class="form-grid" style="margin-top:14px">
+    <form id="invite" class="form-grid mt-3">
       <label class="field"><span>Neuer Benutzer</span><input name="username" required/></label>
       <label class="field"><span>Rolle</span><select name="role"><option value="member">Mitglied</option><option value="admin">Administrator</option></select></label>
       <div class="field span-all"><button class="btn btn-primary" type="submit">${icon("plus")} Einladen</button></div>
@@ -414,7 +417,7 @@ function showInviteCode(username, code) {
   const text = `Hallo ${username},\n\ndu wurdest zu Contractly eingeladen.\n1. ${location.origin} öffnen\n2. „Einladungscode einlösen“ wählen\n3. Benutzername: ${username}\n   Einladungscode: ${code}\n4. Eigenes Passwort festlegen.\n\nDer Code ist 7 Tage gültig.`;
   const m = modal({
     title: "Einladung erstellt",
-    body: `<p style="margin-top:0">Gib <b>${esc(username)}</b> diesen Code (7 Tage gültig). Damit legt die Person ihr eigenes Passwort fest – du erfährst es nicht und kannst ihre Daten nicht lesen.</p>
+    body: `<p class="mt-0">Gib <b>${esc(username)}</b> diesen Code (7 Tage gültig). Damit legt die Person ihr eigenes Passwort fest – du erfährst es nicht und kannst ihre Daten nicht lesen.</p>
       <div class="recovery-key mono">${esc(code)}</div>
       <textarea class="input mono small" rows="7" readonly id="inv-text">${esc(text)}</textarea>`,
     foot: `<button class="btn" data-copy>${icon("copy")} Nachricht kopieren</button><button class="btn btn-primary" data-close>Fertig</button>`,
@@ -486,7 +489,7 @@ function backupCard(backups) {
         <br><span class="small">Automatisch: <b>${{ off: "aus", daily: "täglich", weekly: "wöchentlich" }[backups.schedule] || backups.schedule}</b>${
           backups.schedule !== "off" ? ` · behält ${backups.keep}${backups.auto_encrypted ? " · mit Backup-Schlüssel 🔒" : ""}` : ""
         } – läuft auch, wenn niemand angemeldet ist.</span></div></div>
-      <div class="list" style="margin-top:12px" id="bk-list">
+      <div class="list mt-2" id="bk-list">
         ${
           backups.backups.length
             ? backups.backups

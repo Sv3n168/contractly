@@ -7,7 +7,7 @@ from fastapi.responses import Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from .. import calc, income, ocr, smart
+from .. import BUILD, __version__, calc, income, ocr, smart
 from ..categories import CATEGORIES, CATEGORY_MAP, INTERVALS, TAX_RELEVANT_DEFAULT, tax_relevant
 from ..config import settings
 from ..db import get_db
@@ -29,6 +29,8 @@ def meta():
         "today": today(),
         "ocr": ocr.available(),
         "smtp": bool(settings.smtp_host),
+        "version": __version__,
+        "build": BUILD,
     }
 
 

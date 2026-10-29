@@ -234,7 +234,7 @@ export function confirmDialog(text, { okLabel = "Löschen", danger = true, title
     let result = false;
     const m = modal({
       title,
-      body: `<p style="margin:0">${esc(text)}</p>`,
+      body: `<p class="m-0">${esc(text)}</p>`,
       foot: `<button class="btn" data-close>Abbrechen</button>
              <button class="btn ${danger ? "btn-primary" : "btn-primary"}" data-ok
                style="${danger ? "background:var(--bad);border-color:var(--bad);color:#fff" : ""}">${esc(okLabel)}</button>`,

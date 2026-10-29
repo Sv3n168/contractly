@@ -278,9 +278,11 @@ python -m venv .venv && . .venv/bin/activate
 pip install -r requirements-dev.txt
 CONTRACTLY_DATA_DIR=../data uvicorn app.main:app --reload   # http://localhost:8000
 python -m pytest                                            # Backend-Tests
+ruff check . && ruff format --check .                       # Python: Lint & Format
 
 cd ../e2e && npm ci && npx playwright install chromium
 PYTHON=../backend/.venv/bin/python npx playwright test      # Oberflächen-Tests (Desktop & Smartphone)
+npm run lint                                                # Browser-Code (ESLint)
 ```
 
 **Datenbank-Änderungen** laufen über Alembic-Migrationen (`backend/app/migrations/versions/`). Nach
@@ -306,6 +308,8 @@ Für OCR werden lokal `tesseract-ocr`, `tesseract-ocr-deu` und `poppler-utils` b
 - `e2e/`: Playwright-Tests der Oberfläche. Sie laufen in der CI, zusammen mit den Backend-Tests und
   einem Docker-Smoke-Test. Bei jedem Push auf `main` wird das Multi-Arch-Image veröffentlicht.
 - REST-API mit interaktiver Doku unter `/docs`.
+
+Änderungen je Version stehen im [CHANGELOG](CHANGELOG.md), Sicherheitshinweise in [SECURITY.md](SECURITY.md).
 
 ## Lizenz
 

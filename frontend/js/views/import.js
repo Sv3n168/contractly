@@ -27,7 +27,7 @@ function listStep(view) {
       <label class="dropzone" id="drop">${icon("upload")}<b>Excel- oder CSV-Datei auswählen</b>
         <span class="muted small">Spalten z. B. Bezeichnung, Anbieter, Kategorie, Preis, Zahlweise, Beginn</span>
         <input type="file" accept=".csv,.xlsx" hidden/></label>
-      <div id="list-result" style="margin-top:16px"></div>
+      <div id="list-result" class="mt-3"></div>
     </div>`;
   setupDrop(body, async (file) => {
     const out = $("#list-result", body);

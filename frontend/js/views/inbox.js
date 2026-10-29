@@ -46,7 +46,7 @@ export async function renderInbox(view) {
           </div>
         </form>
       </div>
-      <details class="more" style="margin-top:16px"><summary>${icon("info")} So kommen E-Mails am einfachsten hierher${icon("chevDown", "chev")}</summary>
+      <details class="more mt-3"><summary>${icon("info")} So kommen E-Mails am einfachsten hierher${icon("chevDown", "chev")}</summary>
         <div class="body small text-2"><ul style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:6px">
           <li><b>Handy:</b> Contractly zum Startbildschirm hinzufügen – dann in der Mail-App <i>Teilen → Contractly</i>.</li>
           <li><b>Gmail im Browser:</b> Mail öffnen → ⋮ → <i>Nachricht herunterladen</i> (.eml) und hier hineinziehen.</li>
@@ -59,13 +59,13 @@ export async function renderInbox(view) {
   const input = $("#inbox-input", view);
   const out = $("#inbox-result", view);
   const run = async (file, fields = {}) => {
-    out.innerHTML = `<div class="callout" style="margin-top:20px"><span class="spinner"></span><div>Lese ${file ? `<b>${esc(file.name)}</b>` : "die Nachricht"} … bei Fotos dauert die Texterkennung ein paar Sekunden.</div></div>`;
+    out.innerHTML = `<div class="callout mt-4"><span class="spinner"></span><div>Lese ${file ? `<b>${esc(file.name)}</b>` : "die Nachricht"} … bei Fotos dauert die Texterkennung ein paar Sekunden.</div></div>`;
     try {
       const res = await api.analyzeMessage(file, fields);
       input.classList.add("hidden");
       showResult(view, out, res);
     } catch (err) {
-      out.innerHTML = `<div class="callout bad" style="margin-top:20px">${icon("alert")}<div>${esc(err.message)}</div></div>`;
+      out.innerHTML = `<div class="callout bad mt-4">${icon("alert")}<div>${esc(err.message)}</div></div>`;
     }
   };
   setupDrop(input, (file) => run(file));
@@ -96,20 +96,20 @@ async function showResult(view, out, res) {
         <span class="kpi-icon">${icon(KIND_ICON[res.kind] || "mail")}</span>
         <div class="grow">
           <div class="small muted">Erkannt</div>
-          <h2 style="margin:0">${esc(res.kind_label)}</h2>
+          <h2 class="m-0">${esc(res.kind_label)}</h2>
           <div class="small muted">${[res.sender || res.provider, res.subject, f.letter_date && `vom ${fmtDate(f.letter_date)}`]
             .filter(Boolean)
             .map(esc)
             .join(" · ")}</div>
         </div>
       </div>
-      <label class="field" style="margin-top:16px"><span>Gehört zu</span>
+      <label class="field mt-3"><span>Gehört zu</span>
         <select class="input" id="contract"><option value="">➕ Neuer Vertrag (noch nicht erfasst)</option>${options}</select>
         <small id="why">${best ? `Erkannt über ${best.why.join(" und ")}` : res.contract_id ? "" : "Kein passender Vertrag gefunden – bitte auswählen oder neu anlegen."}</small></label>
-      <div id="actions" style="margin-top:16px"></div>
-      <details class="more" style="margin-top:16px"><summary>${icon("file")} Erkannter Text${icon("chevDown", "chev")}</summary>
+      <div id="actions" class="mt-3"></div>
+      <details class="more mt-3"><summary>${icon("file")} Erkannter Text${icon("chevDown", "chev")}</summary>
         <div class="body"><pre style="white-space:pre-wrap;font-size:12px;max-height:280px;overflow:auto;margin:0">${esc(res.text)}</pre></div></details>
-      <div class="form-actions" style="margin-top:16px">
+      <div class="form-actions mt-3">
         <button class="btn" id="again">${icon("back")} Andere Nachricht</button>
         <button class="btn btn-primary" id="apply">${icon("check")} Übernehmen</button>
       </div>
@@ -163,7 +163,7 @@ function drawActions(el, res) {
             : "";
       return `<label class="list-item" style="cursor:pointer;align-items:flex-start">
         <input type="checkbox" data-i="${i}" ${a.selected ? "checked" : ""} ${a.type === "attach" ? "checked disabled" : ""} style="width:18px;height:18px;margin-top:3px;accent-color:var(--primary)"/>
-        <div class="grow"><div style="font-weight:600">${esc(a.label)}</div>${editable}</div></label>`;
+        <div class="grow"><div class="fw-600">${esc(a.label)}</div>${editable}</div></label>`;
     })
     .join("")}</div>`;
   el.dataset.items = JSON.stringify(items);

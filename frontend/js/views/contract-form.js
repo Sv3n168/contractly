@@ -68,7 +68,7 @@ export async function renderContractForm(view, id, query = {}) {
       <div class="page-head"><div>${header}</div></div>
       <div class="wizard-steps"><div class="step active"><span class="n">1</span>Kategorie</div><div class="line"></div>
         <div class="step"><span class="n">2</span>Eckdaten</div></div>
-      <div class="card" style="margin-bottom:20px">
+      <div class="card mb-4">
         <div class="card-head"><div><h2>Was für ein Vertrag?</h2><p>Wähle eine Kategorie – passende Felder und Fristen werden vorbelegt.</p></div></div>
         <div class="cat-picker">
           ${state.meta.categories
@@ -82,9 +82,9 @@ export async function renderContractForm(view, id, query = {}) {
         <label class="dropzone" id="drop">${icon("scan")}<b>Datei auswählen oder hierher ziehen</b>
           <span class="muted small">PDF, JPG, PNG · wird dem Vertrag angehängt</span>
           <input type="file" accept=".pdf,image/*" hidden /></label>
-        <label class="btn btn-block camera-only" style="margin-top:10px">${icon("scan")} Vertrag mit der Kamera fotografieren
+        <label class="btn btn-block camera-only mt-2">${icon("scan")} Vertrag mit der Kamera fotografieren
           <input type="file" accept="image/*" capture="environment" hidden data-camera /></label>
-        <div id="ocr-status" style="margin-top:12px"></div>
+        <div id="ocr-status" class="mt-2"></div>
       </div>`;
     $$(".cat-tile", view).forEach((b) =>
       b.addEventListener("click", () => {
@@ -173,18 +173,18 @@ export async function renderContractForm(view, id, query = {}) {
           ${
             editing
               ? ""
-              : `<label class="check small" style="margin-top:14px"><input type="checkbox" name="withdrawal" checked/>
+              : `<label class="check small mt-3"><input type="checkbox" name="withdrawal" checked/>
                   Gerade erst abgeschlossen? An die 14-tägige Widerrufsfrist erinnern</label>
                 <label class="check small" style="margin-top:8px"><input type="checkbox" name="already_cancelled" id="already-cancelled"/>
                   Schon gekündigt – der Vertrag endet zu einem festen Datum</label>
-                <div class="form-grid" id="cancel-fields" hidden style="margin-top:10px">
+                <div class="form-grid mt-2" id="cancel-fields" hidden>
                   <label class="field"><span>Gekündigt zum</span><input type="date" name="cancel_end"/>
                     <small>Letzter Vertragstag – danach entstehen keine Kosten und keine Verlängerung mehr.</small></label>
                 </div>`
           }
           ${
             isEnergy(cat) && !editing
-              ? `<div class="callout" style="margin-top:16px">${icon("info")}<div>Bei Strom & Gas trägst du als Preis am einfachsten den <b>monatlichen Abschlag</b> ein. Grund- und Arbeitspreis für den Vergleich findest du unten bei den Eckdaten.</div></div>`
+              ? `<div class="callout mt-3">${icon("info")}<div>Bei Strom & Gas trägst du als Preis am einfachsten den <b>monatlichen Abschlag</b> ein. Grund- und Arbeitspreis für den Vergleich findest du unten bei den Eckdaten.</div></div>`
               : ""
           }
         </div>
@@ -192,7 +192,7 @@ export async function renderContractForm(view, id, query = {}) {
         ${
           (c.fields || []).length
             ? `<details class="more" ${editing || cat === "loan" ? "open" : ""}>
-                <summary>${icon("list")} Leistungen & Eckdaten <span class="muted small" style="font-weight:500">– optional, hilft beim Vergleichen</span>${icon("chevDown", "chev")}</summary>
+                <summary>${icon("list")} Leistungen & Eckdaten <span class="muted small fw-500">– optional, hilft beim Vergleichen</span>${icon("chevDown", "chev")}</summary>
                 <div class="body"><div class="form-grid">${
                   isEnergy(cat)
                     ? energyFactInputs(cat, src, pred, editing)
@@ -202,7 +202,7 @@ export async function renderContractForm(view, id, query = {}) {
         }
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small" style="font-weight:500">– Mindestlaufzeit, Frist, Erinnerung · vorbelegt</span>${icon("chevDown", "chev")}</summary>
+          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small fw-500">– Mindestlaufzeit, Frist, Erinnerung · vorbelegt</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <label class="field"><span>Mindestlaufzeit</span><div class="input-group">
               <input name="min_term_months" type="number" min="0" value="${esc(src.min_term_months ?? d.min_term_months ?? "")}" /><span class="addon">Monate</span></div></label>
@@ -232,7 +232,7 @@ export async function renderContractForm(view, id, query = {}) {
         </details>
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("file")} Anteil, Konto & Nummern <span class="muted small" style="font-weight:500">– Partneranteil, Bezahlt über, Verwaltet von, Kunden- & Vertragsnummer, Notizen</span>${icon("chevDown", "chev")}</summary>
+          <summary>${icon("file")} Anteil, Konto & Nummern <span class="muted small fw-500">– Partneranteil, Bezahlt über, Verwaltet von, Kunden- & Vertragsnummer, Notizen</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <div class="field share-field">
               <span>Mein Anteil</span>
@@ -410,7 +410,7 @@ export async function renderContractForm(view, id, query = {}) {
       if (guess && guess !== cat)
         parts.push(`Sieht nach <b>${esc(category(guess).label)}</b> aus. <button type="button" class="btn btn-sm" data-switch="${guess}">Zu ${esc(category(guess).label)} wechseln</button>`);
       hint.innerHTML = parts.length
-        ? `<div class="callout warn smart-hint" style="margin-top:14px">${icon("info")}<div>${parts.join("<br/>")}</div></div>`
+        ? `<div class="callout warn smart-hint mt-3">${icon("info")}<div>${parts.join("<br/>")}</div></div>`
         : "";
     };
     // a known provider: take over address, customer number and account (only into empty fields)

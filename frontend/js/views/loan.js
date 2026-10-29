@@ -11,7 +11,7 @@ export function loanCard(c) {
   if (!a) return "";
   if (a.missing?.length) {
     return `<div class="card"><div class="card-head"><div><h2>${icon("euro")} Kredit</h2></div></div>
-      <p class="muted" style="margin:0">Trag noch ${a.missing.join(", ")} ein (<a href="#/contracts/${c.id}/edit">Bearbeiten</a>) –
+      <p class="muted m-0">Trag noch ${a.missing.join(", ")} ein (<a href="#/contracts/${c.id}/edit">Bearbeiten</a>) –
         dann rechnet Contractly Restschuld, Zinsen und das Schuldenfrei-Datum aus.</p></div>`;
   }
   if (a.payment_too_low) {
@@ -31,7 +31,7 @@ export function loanCard(c) {
         <div class="small muted" style="margin-top:6px">${repaid} % getilgt${a.payoff_date ? ` · schuldenfrei im ${new Date(a.payoff_date).toLocaleDateString("de-DE", { month: "long", year: "numeric" })}` : ""}</div>
       </div>
     </div>
-    <div class="facts" style="margin-top:14px">
+    <div class="facts mt-3">
       <div class="fact"><div class="k">Rate</div><div class="v">${money(a.payment)} / Monat</div>
         <div class="small muted">davon ${money(a.current_interest)} Zinsen · ${money(a.current_principal)} Tilgung</div></div>
       <div class="fact"><div class="k">Zinsen bisher</div><div class="v">${money(a.interest_paid)}</div></div>
@@ -43,11 +43,11 @@ export function loanCard(c) {
           : ""
       }
     </div>
-    <div class="chart-box sm" style="margin-top:14px"><canvas id="loan-chart" aria-label="Restschuld im Zeitverlauf"></canvas></div>
+    <div class="chart-box sm mt-3"><canvas id="loan-chart" aria-label="Restschuld im Zeitverlauf"></canvas></div>
 
-    <details class="more" style="margin-top:14px"><summary>${icon("piggy")} Sondertilgungen${repayments.length ? ` (${repayments.length})` : ""}${icon("chevDown", "chev")}</summary>
+    <details class="more mt-3"><summary>${icon("piggy")} Sondertilgungen${repayments.length ? ` (${repayments.length})` : ""}${icon("chevDown", "chev")}</summary>
       <div class="body">
-        ${a.special_repayment_allowed ? `<p class="small muted" style="margin-top:0">Erlaubt: bis zu ${money(a.special_repayment_allowed, true)} pro Jahr.</p>` : ""}
+        ${a.special_repayment_allowed ? `<p class="small muted mt-0">Erlaubt: bis zu ${money(a.special_repayment_allowed, true)} pro Jahr.</p>` : ""}
         ${
           repayments.length
             ? `<div class="list">${repayments
@@ -58,14 +58,14 @@ export function loanCard(c) {
                 .join("")}</div>`
             : ""
         }
-        <form class="inline-edit" id="repayment-form" style="margin-top:10px">
+        <form class="inline-edit mt-2" id="repayment-form">
           <input type="date" class="input" name="on" value="${today()}" required aria-label="Datum"/>
           <input type="number" step="0.01" min="1" class="input" name="amount" placeholder="Betrag" required aria-label="Betrag"/><span>€</span>
           <button class="btn btn-sm" type="submit">${icon("plus")} Eintragen</button>
         </form>
       </div></details>
 
-    <details class="more" style="margin-top:10px"><summary>${icon("scale")} ${a.fixed_until ? "Anschlussfinanzierung oder Umschuldung prüfen" : "Umschuldung prüfen"}${icon("chevDown", "chev")}</summary>
+    <details class="more mt-2"><summary>${icon("scale")} ${a.fixed_until ? "Anschlussfinanzierung oder Umschuldung prüfen" : "Umschuldung prüfen"}${icon("chevDown", "chev")}</summary>
       <div class="body">
         <form class="form-grid" id="loan-compare">
           <label class="field"><span>Neuer Sollzins</span><div class="input-group"><input type="number" step="0.01" min="0" max="30" name="new_rate" required inputmode="decimal"/><span class="addon">%</span></div></label>
@@ -111,7 +111,7 @@ export function bindLoan(el, c, reload) {
       const r = await api.compareLoan(c.id, { new_rate: d.new_rate, from_date: d.from_date || null, fees: d.fees ?? null });
       out.innerHTML = compareResult(r);
     } catch (err) {
-      out.innerHTML = `<div class="callout bad" style="margin-top:12px">${icon("alert")}<div>${esc(err.message)}</div></div>`;
+      out.innerHTML = `<div class="callout bad mt-2">${icon("alert")}<div>${esc(err.message)}</div></div>`;
     } finally {
       busy(btn, false);
     }

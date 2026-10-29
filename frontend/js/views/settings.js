@@ -129,7 +129,8 @@ export async function renderSettings(view) {
           Texterkennung (OCR): ${state.meta.ocr?.tesseract ? "verfügbar ✓" : "nicht verfügbar"}</p>
           <p class="small muted mt-2 mb-1">Version ${esc(state.meta.version || "")}${
             state.meta.build && state.meta.build !== "dev" ? ` · Build ${esc(state.meta.build)}` : ""
-          }</p>
+          } · Freie Software unter der AGPL-3.0 ·
+            <a href="https://github.com/sv3n168/contractly" target="_blank" rel="noopener">Quellcode</a></p>
         </div>
         <div class="card">
           <div class="card-head"><div><h2>${icon("trash")} Neu anfangen</h2>

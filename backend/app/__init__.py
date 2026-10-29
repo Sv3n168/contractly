@@ -1,4 +1,7 @@
-"""Contractly – self-hosted contract manager."""
+"""Contractly – self-hosted contract manager.
+
+SPDX-License-Identifier: AGPL-3.0-only
+"""
 
 import os
 

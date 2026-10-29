@@ -313,4 +313,8 @@ Für OCR werden lokal `tesseract-ocr`, `tesseract-ocr-deu` und `poppler-utils` b
 
 ## Lizenz
 
+Contractly steht unter der [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0). Du darfst es
+nutzen, verändern und weitergeben. Wer eine veränderte Version für andere im Netz betreibt, muss ihnen
+den Quellcode dieser Version zugänglich machen.
+
 Chart.js steht unter der MIT-Lizenz (`frontend/vendor/chart.js.LICENSE.md`).

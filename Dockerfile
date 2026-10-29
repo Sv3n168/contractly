@@ -1,5 +1,7 @@
 # Contractly – self-hosted contract manager
 FROM python:3.12-slim
+LABEL org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.source="https://github.com/sv3n168/contractly"
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     HOME=/data \
@@ -35,6 +37,7 @@ ENV CONTRACTLY_BUILD=$CONTRACTLY_BUILD
 
 COPY backend/app backend/app
 COPY frontend frontend
+COPY LICENSE LICENSE
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN mkdir -p /data && chmod +x /usr/local/bin/docker-entrypoint.sh

@@ -15,7 +15,8 @@ Alle nennenswerten Änderungen an Contractly. Versionen folgen [Semantic Version
   monatlich bezahlte Versicherungen, seit Jahren unveränderte Tarife.
 - Beim Anlegen übernimmt ein **bekannter Anbieter** Anschrift, Kundennummer und Konto; passt der Name
   zu einer anderen Kategorie, schlägt Contractly sie vor.
-- Version und Build unter *Einstellungen → Über Contractly*.
+- Version und Build unter *Einstellungen → Über Contractly*, dazu Lizenz und Link zum Quellcode.
+- Lizenz: GNU AGPL-3.0.
 
 ### Verbessert
 

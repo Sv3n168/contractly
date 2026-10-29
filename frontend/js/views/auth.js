@@ -180,7 +180,7 @@ function bind(mode, call, withNewPassword = false) {
 export function recoveryKeyHtml(key) {
   return `
     <div class="recovery-key mono" id="rk">${esc(key)}</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div class="row-wrap">
       <button type="button" class="btn btn-sm" data-copy-rk>${icon("copy")} Kopieren</button>
       <button type="button" class="btn btn-sm" data-download-rk>${icon("download")} Als Datei speichern</button>
       <button type="button" class="btn btn-sm" data-print-rk>${icon("printer")} Drucken</button>
@@ -218,9 +218,9 @@ function showRecoveryKey(key, mode) {
     <p class="muted">Falls du dein Passwort vergisst, ist dieser Schlüssel der <b>einzige Weg</b> zurück an deine Daten.
       Er wird nur jetzt angezeigt.</p>
     ${recoveryKeyHtml(key)}
-    <div class="callout warn" style="margin-top:16px">${icon("alert")}<div>Bewahre ihn getrennt vom Passwort auf – z. B. ausgedruckt im Vertragsordner oder im Passwort-Manager.</div></div>
-    <label class="check" style="margin-top:16px"><input type="checkbox" id="ack"/> Ich habe den Schlüssel sicher aufbewahrt</label>
-    <button class="btn btn-primary btn-block" id="go" style="margin-top:16px" disabled>${mode === "setup" ? "Los geht's" : "Weiter"} ${icon("chevRight")}</button>`);
+    <div class="callout warn mt-3">${icon("alert")}<div>Bewahre ihn getrennt vom Passwort auf – z. B. ausgedruckt im Vertragsordner oder im Passwort-Manager.</div></div>
+    <label class="check mt-3"><input type="checkbox" id="ack"/> Ich habe den Schlüssel sicher aufbewahrt</label>
+    <button class="btn btn-primary btn-block mt-3" id="go" disabled>${mode === "setup" ? "Los geht's" : "Weiter"} ${icon("chevRight")}</button>`);
   bindRecoveryKey(root, key);
   $("#ack", root).addEventListener("change", (e) => ($("#go", root).disabled = !e.target.checked));
   $("#go", root).addEventListener("click", finish);

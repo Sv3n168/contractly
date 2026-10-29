@@ -29,9 +29,9 @@ export async function renderTimeline(view) {
         </div>
       </div>
     </div>
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head">
-        <div class="legend" style="margin:0">
+        <div class="legend m-0">
           <span><span class="sw" style="background:var(--primary);width:16px"></span>Vertragslaufzeit</span>
           <span><span class="sw" style="background:var(--bad);width:3px;height:14px;border-radius:1px"></span>Kündigungsfrist</span>
           <span><span class="sw" style="border-left:2px dashed var(--primary);width:2px;height:14px;border-radius:0"></span>Heute</span>
@@ -119,7 +119,7 @@ function drawTimeline(view, contracts) {
       return `<div class="tl-row">
         <a class="tl-label" href="#/contracts/${head.id}">
           <span class="cat-icon sm" style="--c:${catColorVar(head.category)}">${esc(contractIcon(head))}</span>
-          <span style="min-width:0"><div class="t">${esc(head.name)}</div>
+          <span class="min-w-0"><div class="t">${esc(head.name)}</div>
             <div class="s">${chain.length > 1 ? `${chain.length - 1}× gewechselt` : esc(head.provider || catLabel(head.category))}</div></span>
         </a>
         <div class="tl-track">${bars}${marker}</div>
@@ -155,6 +155,6 @@ function drawEvents(el, contracts) {
       <div class="grow"><div class="title">${esc(e.text)}</div><div class="sub">${esc(e.c.provider || catLabel(e.c.category))}</div></div>
       <div class="end small muted num">${fmtDate(e.date)}</div></a>`;
   el.innerHTML = `
-    ${future.length ? `<div class="nav-section" style="margin:0 0 4px">Demnächst</div>${future.map(item).join("")}` : ""}
+    ${future.length ? `<div class="nav-section m-0 mb-1">Demnächst</div>${future.map(item).join("")}` : ""}
     <div class="nav-section" style="margin:14px 0 4px">Bisher</div>${past.map(item).join("")}`;
 }

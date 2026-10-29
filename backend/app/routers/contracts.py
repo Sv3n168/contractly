@@ -22,6 +22,7 @@ from ..schemas import (
     PriceOut,
 )
 from ..services import contract_detail, contract_summary, load_contracts, price_out, today
+from ..smart import IGNORED_GAPS
 
 router = APIRouter(prefix="/api/contracts", tags=["contracts"])
 
@@ -357,6 +358,30 @@ def still_used(contract_id: int, data: CheckedIn | None = None, db: Session = De
     date of the last check directly (undo: back to the previous one)."""
     c = get_contract(db, contract_id)
     c.last_checked_on = data.last_checked_on if data else today()
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)
+
+
+@router.post("/{contract_id}/gaps/{key}/ignore", response_model=ContractOut)
+def ignore_gap(contract_id: int, key: str, db: Session = Depends(get_db)):
+    """ "Brauche ich nicht": stop asking for this piece of data on this contract."""
+    c = get_contract(db, contract_id)
+    ignored = [k for k in (c.attributes or {}).get(IGNORED_GAPS, []) if k != key]
+    c.attributes = {**(c.attributes or {}), IGNORED_GAPS: [*ignored, key[:40]]}
+    db.commit()
+    db.refresh(c)
+    return contract_detail(c)
+
+
+@router.delete("/{contract_id}/gaps/{key}/ignore", response_model=ContractOut)
+def unignore_gap(contract_id: int, key: str, db: Session = Depends(get_db)):
+    c = get_contract(db, contract_id)
+    attrs = dict(c.attributes or {})
+    attrs[IGNORED_GAPS] = [k for k in attrs.get(IGNORED_GAPS, []) if k != key]
+    if not attrs[IGNORED_GAPS]:
+        del attrs[IGNORED_GAPS]
+    c.attributes = attrs
     db.commit()
     db.refresh(c)
     return contract_detail(c)

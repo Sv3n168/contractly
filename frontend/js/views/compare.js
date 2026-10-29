@@ -38,11 +38,11 @@ export async function renderCompare(el, c, reload) {
   );
 
   el.innerHTML = `
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head">
         <div><h2>${icon("scale")} Lohnt sich ein Wechsel?</h2>
           <p>Angebote eintragen, Contractly rechnet Einmalkosten, Boni und Laufzeit gegen deinen aktuellen Vertrag.</p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="row-wrap">
           <div class="segmented" id="bonus-toggle" title="Wechselboni einrechnen?">
             <button class="${withBonus ? "active" : ""}" data-b="1">Mit Boni</button><button class="${withBonus ? "" : "active"}" data-b="0">Ohne Boni</button>
           </div>
@@ -53,7 +53,7 @@ export async function renderCompare(el, c, reload) {
       </div>
       ${
         evaluation.earliest_switch
-          ? `<div class="callout" style="margin-bottom:16px">${icon("calendar")}<div>Frühester regulärer Wechsel: <b>${fmtDate(evaluation.earliest_switch)}</b>${
+          ? `<div class="callout mb-3">${icon("calendar")}<div>Frühester regulärer Wechsel: <b>${fmtDate(evaluation.earliest_switch)}</b>${
               evaluation.cancellation_deadline ? ` – dafür bis <b>${fmtDate(evaluation.cancellation_deadline)}</b> kündigen` : ""
             }.${energy ? " Bei Preiserhöhungen hast du ein Sonderkündigungsrecht." : ""}</div></div>`
           : ""
@@ -65,13 +65,13 @@ export async function renderCompare(el, c, reload) {
       results.length
         ? `${
             best
-              ? `<div class="callout good" style="margin-bottom:20px">${icon("sparkles")}<div>Bestes Angebot: <b>${esc(byId[best.offer_id].name)}</b> spart dir
+              ? `<div class="callout good mb-4">${icon("sparkles")}<div>Bestes Angebot: <b>${esc(byId[best.offer_id].name)}</b> spart dir
                  <b>${money(best.savings_year)} pro Jahr</b> (${money(best.savings_total)} in ${horizon} Monaten)${
                    best.bonus_dependent ? " – allerdings nur dank Bonus" : ""
                  }.</div></div>`
-              : `<div class="callout warn" style="margin-bottom:20px">${icon("info")}<div>Kein Angebot ist spürbar günstiger – dein aktueller Vertrag ist gut aufgestellt. 👍</div></div>`
+              : `<div class="callout warn mb-4">${icon("info")}<div>Kein Angebot ist spürbar günstiger – dein aktueller Vertrag ist gut aufgestellt. 👍</div></div>`
           }
-          <div class="offer-results" style="margin-bottom:20px">
+          <div class="offer-results mb-4">
             ${currentCard(c, evaluation)}
             ${results.map((r, i) => offerCard(byId[r.offer_id], r, i === 0 && r.verdict === "worth_it")).join("")}
           </div>
@@ -218,7 +218,7 @@ function quickForm(c, energy, o = null, id = "offer-form") {
       </div>
       ${
         keyFields.length
-          ? `<details class="more" style="margin-top:14px"><summary>${icon("list")} Leistungen des Angebots <span class="muted small" style="font-weight:500">– optional, für den Leistungsvergleich</span>${icon("chevDown", "chev")}</summary>
+          ? `<details class="more mt-3"><summary>${icon("list")} Leistungen des Angebots <span class="muted small fw-500">– optional, für den Leistungsvergleich</span>${icon("chevDown", "chev")}</summary>
               <div class="body"><div class="form-grid">${attributeInputs(c.category, o?.attributes || {}, "oattr_", keyFields)}</div></div></details>`
           : ""
       }
@@ -290,12 +290,12 @@ function currentCard(c, ev) {
     </dl>
     ${
       c.partner_amount
-        ? `<p class="small muted" style="margin:0">Verglichen werden die vollen Preise – Partner:in übernimmt ${money(c.partner_amount)} im Monat.</p>`
+        ? `<p class="small muted m-0">Verglichen werden die vollen Preise – Partner:in übernimmt ${money(c.partner_amount)} im Monat.</p>`
         : c.share_percent != null && c.share_percent !== 100
-          ? `<p class="small muted" style="margin:0">Verglichen werden die vollen Preise – dein Anteil sind ${c.share_percent} %.</p>`
+          ? `<p class="small muted m-0">Verglichen werden die vollen Preise – dein Anteil sind ${c.share_percent} %.</p>`
           : ""
     }
-    ${c.extras_12m ? `<p class="small muted" style="margin:0">Zusatzkosten (z. B. Ausland) sind im Vergleich nicht eingerechnet – prüfe, ob das neue Angebot sie abdeckt.</p>` : ""}
+    ${c.extras_12m ? `<p class="small muted m-0">Zusatzkosten (z. B. Ausland) sind im Vergleich nicht eingerechnet – prüfe, ob das neue Angebot sie abdeckt.</p>` : ""}
   </div>`;
 }
 
@@ -307,7 +307,7 @@ function offerCard(o, r, isBest) {
   return `<div class="card offer-card ${isBest ? "best" : ""}">
     ${isBest ? `<span class="ribbon badge good">${icon("sparkles")} Bestes Angebot</span>` : ""}
     <div style="display:flex;justify-content:space-between;gap:4px">
-      <div style="min-width:0"><h3>${esc(o.name)}</h3><div class="small muted">${esc(o.provider || "")}</div></div>
+      <div class="min-w-0"><h3>${esc(o.name)}</h3><div class="small muted">${esc(o.provider || "")}</div></div>
       <div style="display:flex;flex:none">
         <button class="btn btn-ghost btn-sm" data-edit-offer="${o.id}" aria-label="Bearbeiten">${icon("edit")}</button>
         <button class="btn btn-ghost btn-sm btn-danger" data-del-offer="${o.id}" aria-label="Entfernen">${icon("trash")}</button>
@@ -341,11 +341,11 @@ function offerCard(o, r, isBest) {
     </dl>
     ${
       r.bonus_outside_horizon
-        ? `<p class="small muted" style="margin:0">${icon("info", "inline")} ${money(r.bonus_outside_horizon)} Bonus werden erst nach ${r.horizon_months} Monaten ausgezahlt und sind nicht eingerechnet.</p>`
+        ? `<p class="small muted m-0">${icon("info", "inline")} ${money(r.bonus_outside_horizon)} Bonus werden erst nach ${r.horizon_months} Monaten ausgezahlt und sind nicht eingerechnet.</p>`
         : ""
     }
     <div class="savings ${v.cls}">
-      <div class="small" style="font-weight:650">${icon(v.icon)} ${v.label}</div>
+      <div class="small fw-600">${icon(v.icon)} ${v.label}</div>
       <div class="amount num">${r.savings_total >= 0 ? "" : "−"}${money(Math.abs(r.savings_total))}</div>
       <div class="small">${r.savings_total >= 0 ? "Ersparnis" : "Mehrkosten"} in ${r.horizon_months} Monaten · ${money(Math.abs(r.savings_year))}/Jahr</div>
       ${
@@ -397,7 +397,7 @@ function switchModal(c, offer, ev) {
   const m = modal({
     title: "Vertrag wechseln",
     body: `
-      <p style="margin-top:0">Aus <b>${esc(c.name)}</b> wird <b>${esc(offer.name)}</b>. Der alte Vertrag endet am Vortag, der neue übernimmt
+      <p class="mt-0">Aus <b>${esc(c.name)}</b> wird <b>${esc(offer.name)}</b>. Der alte Vertrag endet am Vortag, der neue übernimmt
       – im Kostenverlauf siehst du beide nahtlos hintereinander.</p>
       <div class="form-grid">
         <label class="field"><span>Wechsel zum</span><input type="date" name="switch_date" value="${defaultDate}"/>
@@ -406,12 +406,12 @@ function switchModal(c, offer, ev) {
       </div>
       ${
         offer.bonuses?.length || offer.bonus || offer.promo_price != null
-          ? `<div class="callout good" style="margin-top:14px">${icon("piggy")}<div>Boni werden im Auszahlungsmonat als Gutschrift eingetragen${
+          ? `<div class="callout good mt-3">${icon("piggy")}<div>Boni werden im Auszahlungsmonat als Gutschrift eingetragen${
               offer.promo_price != null ? ", der Aktionspreis bis zum Ende der Aktion" : ""
             }. Du bekommst Erinnerungen, um die Auszahlung zu prüfen${offer.promo_price != null ? " und vor Ende des Aktionspreises neu zu vergleichen" : ""}.</div></div>`
           : ""
       }
-      <div class="callout" style="margin-top:14px">${icon("info")}<div>Nicht vergessen: beim alten Anbieter kündigen (oder den neuen Anbieter kündigen lassen).
+      <div class="callout mt-3">${icon("info")}<div>Nicht vergessen: beim alten Anbieter kündigen (oder den neuen Anbieter kündigen lassen).
         Unter „Mehr → Kündigungsschreiben“ erstellst du den Brief mit einem Klick.</div></div>`,
     foot: `<button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-ok>${icon("swap")} Wechsel durchführen</button>`,
   });

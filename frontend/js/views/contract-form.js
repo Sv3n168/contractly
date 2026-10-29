@@ -3,11 +3,10 @@
 
 import { api } from "../api.js";
 import { catColorVar, category, catIcon, isEnergy, state } from "../store.js";
-import { $, $$, busy, esc, formData, icon, money, today, toast } from "../ui.js";
+import { $, $$, busy, esc, formData, icon, modal, money, today, toast } from "../ui.js";
+import { plausibilityIssues } from "../plausibility.js";
 import { PERIOD_FIELDS, bindIconPicker, iconPicker, periodPriceInput, readPeriodPrice } from "./components.js";
 import { applySuggestionsToForm } from "./ocr.js";
-
-const form_q = (root, sel) => root.querySelector(sel);
 
 export function attributeInputs(cat, values = {}, prefix = "attr_", fields = null) {
   return (fields || category(cat).fields || [])
@@ -69,7 +68,7 @@ export async function renderContractForm(view, id, query = {}) {
       <div class="page-head"><div>${header}</div></div>
       <div class="wizard-steps"><div class="step active"><span class="n">1</span>Kategorie</div><div class="line"></div>
         <div class="step"><span class="n">2</span>Eckdaten</div></div>
-      <div class="card" style="margin-bottom:20px">
+      <div class="card mb-4">
         <div class="card-head"><div><h2>Was für ein Vertrag?</h2><p>Wähle eine Kategorie – passende Felder und Fristen werden vorbelegt.</p></div></div>
         <div class="cat-picker">
           ${state.meta.categories
@@ -83,9 +82,9 @@ export async function renderContractForm(view, id, query = {}) {
         <label class="dropzone" id="drop">${icon("scan")}<b>Datei auswählen oder hierher ziehen</b>
           <span class="muted small">PDF, JPG, PNG · wird dem Vertrag angehängt</span>
           <input type="file" accept=".pdf,image/*" hidden /></label>
-        <label class="btn btn-block camera-only" style="margin-top:10px">${icon("scan")} Vertrag mit der Kamera fotografieren
+        <label class="btn btn-block camera-only mt-2">${icon("scan")} Vertrag mit der Kamera fotografieren
           <input type="file" accept="image/*" capture="environment" hidden data-camera /></label>
-        <div id="ocr-status" style="margin-top:12px"></div>
+        <div id="ocr-status" class="mt-2"></div>
       </div>`;
     $$(".cat-tile", view).forEach((b) =>
       b.addEventListener("click", () => {
@@ -119,6 +118,8 @@ export async function renderContractForm(view, id, query = {}) {
   };
 
   let pendingSuggestions = null;
+  let known = []; // the other contracts: providers, accounts, prices to compare with
+  let carry = null; // typed values kept when the category changes
 
   const drawForm = () => {
     const c = category(cat);
@@ -172,18 +173,18 @@ export async function renderContractForm(view, id, query = {}) {
           ${
             editing
               ? ""
-              : `<label class="check small" style="margin-top:14px"><input type="checkbox" name="withdrawal" checked/>
+              : `<label class="check small mt-3"><input type="checkbox" name="withdrawal" checked/>
                   Gerade erst abgeschlossen? An die 14-tägige Widerrufsfrist erinnern</label>
                 <label class="check small" style="margin-top:8px"><input type="checkbox" name="already_cancelled" id="already-cancelled"/>
                   Schon gekündigt – der Vertrag endet zu einem festen Datum</label>
-                <div class="form-grid" id="cancel-fields" hidden style="margin-top:10px">
+                <div class="form-grid mt-2" id="cancel-fields" hidden>
                   <label class="field"><span>Gekündigt zum</span><input type="date" name="cancel_end"/>
                     <small>Letzter Vertragstag – danach entstehen keine Kosten und keine Verlängerung mehr.</small></label>
                 </div>`
           }
           ${
             isEnergy(cat) && !editing
-              ? `<div class="callout" style="margin-top:16px">${icon("info")}<div>Bei Strom & Gas trägst du als Preis am einfachsten den <b>monatlichen Abschlag</b> ein. Grund- und Arbeitspreis für den Vergleich findest du unten bei den Eckdaten.</div></div>`
+              ? `<div class="callout mt-3">${icon("info")}<div>Bei Strom & Gas trägst du als Preis am einfachsten den <b>monatlichen Abschlag</b> ein. Grund- und Arbeitspreis für den Vergleich findest du unten bei den Eckdaten.</div></div>`
               : ""
           }
         </div>
@@ -191,7 +192,7 @@ export async function renderContractForm(view, id, query = {}) {
         ${
           (c.fields || []).length
             ? `<details class="more" ${editing || cat === "loan" ? "open" : ""}>
-                <summary>${icon("list")} Leistungen & Eckdaten <span class="muted small" style="font-weight:500">– optional, hilft beim Vergleichen</span>${icon("chevDown", "chev")}</summary>
+                <summary>${icon("list")} Leistungen & Eckdaten <span class="muted small fw-500">– optional, hilft beim Vergleichen</span>${icon("chevDown", "chev")}</summary>
                 <div class="body"><div class="form-grid">${
                   isEnergy(cat)
                     ? energyFactInputs(cat, src, pred, editing)
@@ -201,7 +202,7 @@ export async function renderContractForm(view, id, query = {}) {
         }
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small" style="font-weight:500">– Mindestlaufzeit, Frist, Erinnerung · vorbelegt</span>${icon("chevDown", "chev")}</summary>
+          <summary>${icon("clock")} Laufzeit, Kündigung & Erinnerung <span class="muted small fw-500">– Mindestlaufzeit, Frist, Erinnerung · vorbelegt</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <label class="field"><span>Mindestlaufzeit</span><div class="input-group">
               <input name="min_term_months" type="number" min="0" value="${esc(src.min_term_months ?? d.min_term_months ?? "")}" /><span class="addon">Monate</span></div></label>
@@ -231,7 +232,7 @@ export async function renderContractForm(view, id, query = {}) {
         </details>
 
         <details class="more" ${editing ? "open" : ""}>
-          <summary>${icon("file")} Anteil, Konto & Nummern <span class="muted small" style="font-weight:500">– Partneranteil, Bezahlt über, Verwaltet von, Kunden- & Vertragsnummer, Notizen</span>${icon("chevDown", "chev")}</summary>
+          <summary>${icon("file")} Anteil, Konto & Nummern <span class="muted small fw-500">– Partneranteil, Bezahlt über, Verwaltet von, Kunden- & Vertragsnummer, Notizen</span>${icon("chevDown", "chev")}</summary>
           <div class="body"><div class="form-grid">
             <div class="field share-field">
               <span>Mein Anteil</span>
@@ -274,23 +275,13 @@ export async function renderContractForm(view, id, query = {}) {
       <datalist id="accounts"></datalist>`;
 
     $("#change-cat", view)?.addEventListener("click", drawCategoryStep);
-    fillProviderList();
-    if (!editing && !predecessor) {
-      // Gentle hint when the same contract seems to exist already.
-      const providerInput = form_q(view, "[name=provider]");
-      providerInput.addEventListener("change", async () => {
-        const p = providerInput.value.trim().toLowerCase();
-        const hint = $("#dup-hint", view);
-        if (!p) return (hint.innerHTML = "");
-        const list = await api.contracts({ include_ended: false });
-        const dup = list.find((c) => c.category === cat && (c.provider || "").toLowerCase() === p);
-        hint.innerHTML = dup
-          ? `<div class="callout warn" style="margin-top:14px">${icon("info")}<div>Du hast schon <a href="#/contracts/${dup.id}">${esc(dup.name)}</a> bei ${esc(dup.provider)}.
-              Neuer Tarif beim selben Anbieter? Dann besser dort „Durch neuen Vertrag ersetzen“ – so bleibt der Kostenverlauf durchgehend.</div></div>`
-          : "";
-      });
-    }
+    fillProviderList().then((list) => (known = list));
     const form = $("#form", view);
+    if (carry) {
+      for (const [k, v] of Object.entries(carry)) if (form.elements[k] && v != null) form.elements[k].value = v;
+      carry = null;
+    }
+    if (!editing && !predecessor) bindProviderSmarts(form);
     bindIconPicker(form);
     bindAlreadyCancelled(form);
     bindShareMode(form);
@@ -307,6 +298,7 @@ export async function renderContractForm(view, id, query = {}) {
       toast("Erkannte Daten übernommen – bitte kurz prüfen");
       pendingSuggestions = null;
     }
+    if (query.focus) focusField(form, query.focus);
     form.addEventListener("submit", async (e) => {
       e.preventDefault();
       const data = formData(form);
@@ -346,6 +338,8 @@ export async function renderContractForm(view, id, query = {}) {
       if (editing) {
         for (const f of category(cat).fields || []) if (!(f.key in collectAttributes(data))) delete payload.attributes[f.key];
       }
+      const issues = checkPlausibility(data, payload);
+      if (issues.length && !(await reviewIssues(form, issues))) return;
       const btn = $("#save", view);
       busy(btn);
       try {
@@ -398,6 +392,110 @@ export async function renderContractForm(view, id, query = {}) {
     });
   };
 
+  /** Thinking along while typing: a known provider brings its data, the name may suggest the category. */
+  const bindProviderSmarts = (form) => {
+    const hint = $("#dup-hint", view);
+    const provider = form.elements.provider;
+    const update = () => {
+      const p = provider.value.trim().toLowerCase();
+      const same = p ? known.filter((c) => (c.provider || "").trim().toLowerCase() === p) : [];
+      const parts = [];
+      // 1. the same contract again? Then a switch keeps the cost history in one line.
+      const dup = same.find((c) => c.category === cat && ["active", "cancelled"].includes(c.state));
+      if (dup)
+        parts.push(`Du hast schon <a href="#/contracts/${dup.id}">${esc(dup.name)}</a> bei ${esc(dup.provider)}.
+          Neuer Tarif beim selben Anbieter? Dann besser dort „Anbieter oder Tarif wechseln“ – so bleibt der Kostenverlauf durchgehend.`);
+      // 2. provider or name point to a different category (e.g. "Netflix" under "Sonstiges")
+      const guess = guessCategory(`${provider.value} ${form.elements.name.value}`);
+      if (guess && guess !== cat)
+        parts.push(`Sieht nach <b>${esc(category(guess).label)}</b> aus. <button type="button" class="btn btn-sm" data-switch="${guess}">Zu ${esc(category(guess).label)} wechseln</button>`);
+      hint.innerHTML = parts.length
+        ? `<div class="callout warn smart-hint mt-3">${icon("info")}<div>${parts.join("<br/>")}</div></div>`
+        : "";
+    };
+    // a known provider: take over address, customer number and account (only into empty fields)
+    const takeOver = async () => {
+      if (!known.length) known = await fillProviderList();
+      const p = provider.value.trim().toLowerCase();
+      const same = known.filter((c) => (c.provider || "").trim().toLowerCase() === p);
+      if (!same.length) return update();
+      const pick = same.find((c) => c.category === cat) || same[0];
+      const source = await api.contract(pick.id);
+      const taken = [];
+      const fill = (name, value, label) => {
+        const el = form.elements[name];
+        if (el && !el.value && value) {
+          el.value = value;
+          taken.push(label);
+        }
+      };
+      fill("provider_address", source.provider_address, "Anschrift");
+      fill("customer_number", source.customer_number, "Kundennummer");
+      fill("account", source.account, "Konto");
+      fill("managed_by", source.attributes?.managed_by, "Verwaltet von");
+      update();
+      if (taken.length) toast(`Von „${source.name}“ übernommen: ${taken.join(", ")}`);
+    };
+    provider.addEventListener("change", takeOver);
+    form.elements.name.addEventListener("change", update);
+    hint.addEventListener("click", (e) => {
+      const next = e.target.closest("[data-switch]")?.dataset.switch;
+      if (!next) return;
+      const d = formData(form);
+      carry = { provider: d.provider, name: d.name, price_amount: d.price_amount, start_date: d.start_date };
+      cat = next;
+      drawForm();
+    });
+  };
+
+  const monthsOf = (interval) => state.meta.intervals[interval]?.months || 1;
+  /** Likely typos and contradictions; when editing only the ones this edit brings in. */
+  const checkPlausibility = (data, payload) => {
+    const base = { category: cat, label: category(cat).label, editing: Boolean(editing) };
+    const others = known.filter((k) => k.id !== editing?.id);
+    const current = editing?.current_price;
+    const previousMonthly = current && current.interval !== "once" ? current.monthly_equivalent : null;
+    const issues = plausibilityIssues(
+      {
+        ...base,
+        price: editing ? current?.amount ?? null : data.price_amount,
+        months: monthsOf(editing ? current?.interval : data.price_interval),
+        start: payload.start_date,
+        minTerm: Number(payload.min_term_months) || 0,
+        renewal: Number(payload.renewal_months) || 0,
+        noticeValue: Number(payload.notice_value) || 0,
+        noticeUnit: payload.notice_unit,
+        endDate: editing ? data.end_date : data.already_cancelled ? data.cancel_end : null,
+        maxTotal: payload.max_total,
+        attrs: payload.attributes,
+        previousMonthly,
+        newMonthly: editing && isEnergy(cat) ? payload.attributes.installment ?? null : null,
+      },
+      others,
+    );
+    if (!editing) return issues;
+    const before = plausibilityIssues(
+      {
+        ...base,
+        price: current?.amount ?? null,
+        months: monthsOf(current?.interval),
+        start: editing.start_date,
+        minTerm: editing.min_term_months || 0,
+        renewal: editing.renewal_months || 0,
+        noticeValue: editing.notice_value || 0,
+        noticeUnit: editing.notice_unit,
+        endDate: editing.end_date,
+        maxTotal: editing.max_total,
+        attrs: editing.attributes,
+        previousMonthly,
+        newMonthly: isEnergy(cat) ? previousMonthly : null,
+      },
+      others,
+    );
+    const already = new Set(before.map((i) => i.text));
+    return issues.filter((i) => !already.has(i.text));
+  };
+
   if (query.document) {
     // From "Post & Mails": an already stored letter/e-mail for a contract that isn't recorded yet.
     try {
@@ -413,11 +511,47 @@ export async function renderContractForm(view, id, query = {}) {
   else drawCategoryStep();
 }
 
+/** Jump to one field (e.g. from "Noch offen" on the contract): open its section and highlight it. */
+function focusField(form, name) {
+  const el = form.elements[name];
+  if (!el?.focus) return;
+  el.closest("details")?.setAttribute("open", "");
+  const box = el.closest(".field, .own-field") || el;
+  box.scrollIntoView({ block: "center" });
+  el.focus({ preventScroll: true });
+  box.classList.add("flash");
+  setTimeout(() => box.classList.remove("flash"), 2000);
+}
+
 function energyDetails(attrs) {
   const d = {};
   if (attrs.base_price_month != null) d.base_price_month = attrs.base_price_month;
   if (attrs.unit_price_ct != null) d.unit_price_ct = attrs.unit_price_ct;
   return d;
+}
+
+/** Ask before saving values that look wrong. Resolves true to save anyway. */
+function reviewIssues(form, issues) {
+  return new Promise((resolve) => {
+    let save = false;
+    const m = modal({
+      title: "Bitte kurz prüfen",
+      body: `<ul class="issue-list">${issues.map((i) => `<li>${icon("alert")}<span>${esc(i.text)}</span></li>`).join("")}</ul>`,
+      foot: `<button class="btn" data-save>Trotzdem speichern</button>
+             <button class="btn btn-primary" data-close data-fix>Korrigieren</button>`,
+    });
+    $("[data-save]", m).addEventListener("click", () => {
+      save = true;
+      m.close();
+    });
+    $("[data-fix]", m).addEventListener("click", () => setTimeout(() => focusField(form, issues[0].field), 280));
+    new MutationObserver((_, obs) => {
+      if (!document.body.contains(m)) {
+        obs.disconnect();
+        resolve(save);
+      }
+    }).observe(document.body, { childList: true });
+  });
 }
 
 async function fillProviderList() {
@@ -429,8 +563,9 @@ async function fillProviderList() {
     const accounts = ["Gemeinschaftskonto", ...list.map((c) => c.account).filter(Boolean)];
     const al = document.getElementById("accounts");
     if (al) al.innerHTML = [...new Set(accounts)].map((n) => `<option value="${esc(n)}">`).join("");
+    return list;
   } catch {
-    /* optional */
+    return []; // optional
   }
 }
 

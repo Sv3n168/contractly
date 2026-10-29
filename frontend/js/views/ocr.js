@@ -38,14 +38,14 @@ export function suggestionPicker(contract, result, onApplied) {
   };
   const usable = result.suggestions.filter((s) => s.target !== "attribute" || fields[s.key] || s.key === "iban");
   const body = usable.length
-    ? `<p class="muted" style="margin-top:0">Wähle aus, was übernommen werden soll. Bestehende Werte werden überschrieben.</p>
+    ? `<p class="muted mt-0">Wähle aus, was übernommen werden soll. Bestehende Werte werden überschrieben.</p>
        <div class="list">${usable
          .map((s, i) => {
            const cur = current(s);
            const same = String(cur) === String(s.key === "price" ? "" : s.value);
            return `<label class="list-item" style="cursor:pointer;align-items:flex-start">
              <input type="checkbox" data-i="${i}" ${!cur && !same ? "checked" : ""} style="width:18px;height:18px;margin-top:3px;accent-color:var(--primary)" />
-             <div class="grow"><div class="sub">${esc(s.label)}</div><div style="font-weight:650">${display(s)}</div>
+             <div class="grow"><div class="sub">${esc(s.label)}</div><div class="fw-600">${display(s)}</div>
                ${cur ? `<div class="sub">bisher: ${esc(String(cur)).replace(/\n/g, ", ")}</div>` : ""}
                ${s.source ? `<div class="sub" style="font-style:italic">„${esc(s.source)}“</div>` : ""}</div></label>`;
          })
@@ -55,7 +55,7 @@ export function suggestionPicker(contract, result, onApplied) {
     title: "Erkannte Daten",
     wide: true,
     body: `${body}
-      <details class="more" style="margin-top:16px"><summary>${icon("file")} Erkannter Text (${result.characters ?? result.text.length} Zeichen)${icon("chevDown", "chev")}</summary>
+      <details class="more mt-3"><summary>${icon("file")} Erkannter Text (${result.characters ?? result.text.length} Zeichen)${icon("chevDown", "chev")}</summary>
         <div class="body"><pre style="white-space:pre-wrap;font-size:12px;max-height:300px;overflow:auto;margin:0">${esc(result.text)}</pre></div></details>`,
     foot: `<button class="btn" data-close>Abbrechen</button>${
       usable.length ? `<button class="btn btn-primary" data-apply>${icon("check")} Übernehmen</button>` : ""

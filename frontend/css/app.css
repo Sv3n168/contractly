@@ -2983,12 +2983,18 @@ body:not(.is-admin) .admin-only {
 }
 
 
+/* a page's own element (see app.js sectionShell); takes no part in the layout */
+.view-page {
+  display: contents;
+}
+
 /* ------------------------------------------------------------------ motion
  * iOS-like: content rises in with a spring and a short stagger, touch targets give
  * way slightly when pressed, sheets slide up from the bottom on phones.
  */
 
 #view.entering > *,
+#view.entering > .view-page > *,
 #view.entering .kpis > *,
 #view.entering .grid > *,
 #view.entering .contract-grid > *,
@@ -2996,21 +3002,25 @@ body:not(.is-admin) .admin-only {
   animation: rise var(--dur-slow) var(--spring) both;
 }
 #view.entering > :nth-child(2),
+#view.entering > .view-page > :nth-child(2),
 #view.entering .kpis > :nth-child(2),
 #view.entering .grid > :nth-child(2) {
   animation-delay: 40ms;
 }
 #view.entering > :nth-child(3),
+#view.entering > .view-page > :nth-child(3),
 #view.entering .kpis > :nth-child(3),
 #view.entering .grid > :nth-child(3) {
   animation-delay: 80ms;
 }
 #view.entering > :nth-child(4),
+#view.entering > .view-page > :nth-child(4),
 #view.entering .kpis > :nth-child(4),
 #view.entering .grid > :nth-child(4) {
   animation-delay: 120ms;
 }
-#view.entering > :nth-child(n + 5) {
+#view.entering > :nth-child(n + 5),
+#view.entering > .view-page > :nth-child(n + 5) {
   animation-delay: 160ms;
 }
 @keyframes rise {
@@ -3122,38 +3132,8 @@ details.more[open] > .body {
   }
 }
 
-/* ------------------------------------------------------------------ filters (costs) */
+/* ------------------------------------------------------------------ cost analysis */
 
-.filter-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 0 18px;
-  margin-bottom: 4px;
-  border-top: 1px solid var(--border);
-}
-.filter-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.filter-label {
-  width: 86px;
-  flex: none;
-  font-size: 12px;
-  font-weight: 650;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.filter-row .chips {
-  flex: 1;
-  min-width: 0;
-}
-.label-short {
-  display: none;
-}
 .chip .dot {
   width: 8px;
   height: 8px;
@@ -3161,41 +3141,6 @@ details.more[open] > .body {
 }
 .selection-kpis {
   grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-@media (max-width: 720px) {
-  /* phones: one swipeable line of chips per filter */
-  .filter-bar {
-    gap: 8px;
-  }
-  .filter-row {
-    flex-wrap: nowrap;
-    gap: 8px;
-  }
-  .filter-label {
-    width: 78px;
-    font-size: 11px;
-    letter-spacing: 0.02em;
-  }
-  .filter-row .label-long {
-    display: none;
-  }
-  .filter-row .label-short {
-    display: inline;
-  }
-  .filter-row .chips {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .filter-row .chips::-webkit-scrollbar {
-    display: none;
-  }
-  .filter-row .segmented {
-    flex-wrap: nowrap;
-  }
-  .filter-row .segmented button {
-    white-space: nowrap;
-  }
 }
 
 /* ------------------------------------------------------------------ explorable charts */
@@ -3807,6 +3752,13 @@ a.switch-banner:hover {
 .total-field {
   margin-top: 10px;
 }
+.total-field .btn {
+  /* the hint wraps on phones instead of widening the page */
+  white-space: normal;
+  text-align: left;
+  height: auto;
+  min-height: 34px;
+}
 .total-field .btn .muted {
   font-weight: 450;
 }
@@ -4035,3 +3987,167 @@ a.switch-banner:hover {
   font-size: 14px;
   cursor: pointer;
 }
+
+/* ------------------------------------------------------------------ thinking along */
+
+.smart-card,
+.gaps-card {
+  margin-bottom: 20px;
+}
+.insights {
+  display: grid;
+  gap: 2px;
+}
+.insight {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+.insight:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.insight-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--info-soft);
+  color: var(--primary);
+}
+.insight.warn .insight-icon {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.insight.good .insight-icon {
+  background: var(--good-soft);
+  color: var(--good);
+}
+.insight-body p {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.insight-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.gaps-line {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--border);
+  font-size: 14px;
+}
+.gaps-line:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.gaps-text {
+  flex: 1;
+}
+.gaps-line > .btn {
+  flex-shrink: 0;
+}
+.gaps-line > .svg-icon {
+  color: var(--primary);
+  margin-top: 2px;
+}
+.gap-list {
+  display: grid;
+}
+.gap-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.gap-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.gap-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.flash {
+  border-radius: var(--radius-sm);
+  animation: flash 2s var(--ease-out);
+}
+@keyframes flash {
+  0%,
+  40% {
+    box-shadow: 0 0 0 4px var(--primary-soft);
+  }
+  100% {
+    box-shadow: 0 0 0 4px transparent;
+  }
+}
+@media (max-width: 640px) {
+  .insight {
+    grid-template-columns: auto 1fr;
+  }
+  .insight-actions {
+    grid-column: 2;
+  }
+  .gap-row,
+  .gaps-line {
+    flex-wrap: wrap;
+  }
+  .gap-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .gaps-line > .btn {
+    margin-left: 26px;
+  }
+}
+.issue-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.issue-list li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.issue-list .svg-icon {
+  color: var(--warn);
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.smart-hint .btn {
+  margin-top: 6px;
+}
+
+/* ------------------------------------------------------------------ utilities */
+/* One spacing scale for the whole app: 4 · 8 · 12 · 16 · 20 px. Utilities win over component rules,
+   as the inline styles they replace did. */
+
+.m-0 { margin: 0 !important; }
+.mt-0 { margin-top: 0 !important; }
+.mt-2 { margin-top: 12px !important; }
+.mt-3 { margin-top: 16px !important; }
+.mt-4 { margin-top: 20px !important; }
+.mb-1 { margin-bottom: 4px !important; }
+.mb-3 { margin-bottom: 16px !important; }
+.mb-4 { margin-bottom: 20px !important; }
+.mr-auto { margin-right: auto !important; }
+.fw-500 { font-weight: 500 !important; }
+.fw-600 { font-weight: 600 !important; }
+.min-w-0 { min-width: 0 !important; }
+.c-inherit { color: inherit !important; }
+.row-wrap { display: flex; flex-wrap: wrap; gap: 8px; }
+.tone-good { background: var(--good-soft) !important; color: var(--good) !important; }

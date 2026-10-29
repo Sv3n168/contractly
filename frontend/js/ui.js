@@ -18,7 +18,6 @@ export function parseDate(d) {
   return new Date(y, m - 1, day);
 }
 export const fmtDate = (d) => (d ? parseDate(d).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" }) : "–");
-export const fmtDateLong = (d) => (d ? parseDate(d).toLocaleDateString("de-DE", { day: "numeric", month: "long", year: "numeric" }) : "–");
 export const fmtMonth = (key) => {
   const [y, m] = key.split("-").map(Number);
   return new Date(y, m - 1, 1).toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
@@ -235,7 +234,7 @@ export function confirmDialog(text, { okLabel = "Löschen", danger = true, title
     let result = false;
     const m = modal({
       title,
-      body: `<p style="margin:0">${esc(text)}</p>`,
+      body: `<p class="m-0">${esc(text)}</p>`,
       foot: `<button class="btn" data-close>Abbrechen</button>
              <button class="btn ${danger ? "btn-primary" : "btn-primary"}" data-ok
                style="${danger ? "background:var(--bad);border-color:var(--bad);color:#fff" : ""}">${esc(okLabel)}</button>`,

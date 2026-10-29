@@ -5,6 +5,7 @@ import { chartHint, incomeChart, legendHtml, showLast } from "../charts.js";
 import { cssVar } from "../store.js";
 import { $, busy, confirmDialog, esc, fmtDate, formData, icon, modal, money, signedMoney, toast, today } from "../ui.js";
 import { bindIconPicker, iconPicker } from "./components.js";
+import { router } from "../app.js";
 
 const pct = (v) => `${(v * 100).toLocaleString("de-DE", { maximumFractionDigits: 0 })} %`;
 
@@ -19,10 +20,10 @@ export async function renderIncome(view) {
     </div>
 
     <div class="kpis">
-      <div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("euro")}</span>Netto pro Monat</div>
+      <div class="card kpi"><div class="kpi-label"><span class="kpi-icon tone-good">${icon("euro")}</span>Netto pro Monat</div>
         <div class="kpi-value num money" data-count="${d.monthly_net}" data-format="money">${money(d.monthly_net)}</div>
         <div class="kpi-sub">${d.monthly_gross ? `${money(d.monthly_gross)} brutto` : "regelmäßige Einnahmen"}</div></div>
-      <div class="card kpi"><div class="kpi-label"><span class="kpi-icon" style="background:var(--good-soft);color:var(--good)">${icon("sparkles")}</span>Boni & Sonderzahlungen</div>
+      <div class="card kpi"><div class="kpi-label"><span class="kpi-icon tone-good">${icon("sparkles")}</span>Boni & Sonderzahlungen</div>
         <div class="kpi-value num" data-count="${d.bonus_12m}" data-format="money0">${money(d.bonus_12m, true)}</div>
         <div class="kpi-sub">in den letzten 12 Monaten</div></div>
       <div class="card kpi"><div class="kpi-label"><span class="kpi-icon">${icon("calendar")}</span>Netto in 12 Monaten</div>
@@ -33,7 +34,7 @@ export async function renderIncome(view) {
         <div class="kpi-sub">${d.free_monthly != null ? `${money(d.free_monthly)} bleiben im Schnitt pro Monat` : ""}</div></div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head"><div><h2>Einnahmen & Fixkosten</h2><p>Netto pro Monat · die Linie zeigt deine Fixkosten</p></div>
         <div class="segmented" id="income-range">${[12, 24, 60, 0]
           .map((r) => `<button data-r="${r}" class="${r === 24 ? "active" : ""}">${r ? (r < 24 ? r + " M" : r / 12 + " J") : "Alles"}</button>`)
@@ -115,7 +116,7 @@ function sourceCard(s) {
       <div><div class="small muted">Netto pro Monat</div><div class="big num money">${money(s.current_net)}</div></div>
       ${s.current_gross ? `<div><div class="small muted">Brutto pro Monat</div><div class="big num">${money(s.current_gross)}</div></div>` : ""}
     </div>
-    <div class="list" style="margin-top:12px">${s.entries
+    <div class="list mt-2">${s.entries
       .map(
         (e) => `<div class="list-item">
           <span class="kpi-icon" ${e.interval === "once" ? 'style="background:var(--good-soft);color:var(--good)"' : ""}>${icon(e.interval === "once" ? "sparkles" : "trendUp")}</span>
@@ -125,7 +126,7 @@ function sourceCard(s) {
           <button class="btn btn-ghost btn-sm btn-danger" data-del-entry="${s.id}:${e.id}" aria-label="Löschen">${icon("trash")}</button></div>`,
       )
       .join("")}</div>
-    <div class="form-actions" style="margin-top:12px">
+    <div class="form-actions mt-2">
       <button class="btn btn-sm" data-bonus="${s.id}">${icon("sparkles")} Bonus / Sonderzahlung</button>
       <button class="btn btn-sm btn-primary" data-raise="${s.id}">${icon("trendUp")} Neuer Betrag</button>
     </div>
@@ -194,7 +195,7 @@ function sourceModal(kinds, s = null) {
       else await api.createIncomeSource(payload);
       m.close();
       toast("Gespeichert");
-      renderIncome($("#view"));
+      router();
     } catch (err) {
       busy(e.currentTarget, false);
       toast(err.message, "error");
@@ -204,7 +205,7 @@ function sourceModal(kinds, s = null) {
     if (!(await confirmDialog(`„${s.name}“ mit allen Einträgen löschen?`))) return;
     await api.deleteIncomeSource(s.id);
     m.close();
-    renderIncome($("#view"));
+    router();
   });
 }
 
@@ -235,7 +236,7 @@ function entryModal(sourceId, mode) {
       });
       m.close();
       toast(bonus ? "Sonderzahlung eingetragen 🎉" : "Neuer Betrag eingetragen");
-      renderIncome($("#view"));
+      router();
     } catch (err) {
       busy(e.currentTarget, false);
       toast(err.message, "error");

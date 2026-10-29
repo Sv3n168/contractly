@@ -43,10 +43,10 @@ export function extraModal(c, existing, done) {
   const m = modal({
     title: p.id ? "Zusatzkosten bearbeiten" : "Zusatzkosten erfassen",
     body: `
-      <p class="muted" style="margin-top:0">Für Monate, in denen die Rechnung höher war als üblich. Der Grundpreis bleibt unverändert,
+      <p class="muted mt-0">Für Monate, in denen die Rechnung höher war als üblich. Der Grundpreis bleibt unverändert,
         im Folgemonat gilt automatisch wieder der normale Preis.</p>
       <form id="xf" class="form-grid">
-        <label class="field"><span>Monat</span><input type="month" name="month" value="${ym}" max="${thisMonth}" placeholder="JJJJ-MM" pattern="\d{4}-\d{2}" required/></label>
+        <label class="field"><span>Monat</span><input type="month" name="month" value="${ym}" max="${thisMonth}" placeholder="JJJJ-MM" pattern="\\d{4}-\\d{2}" required/></label>
         <div class="field"><span class="field-label">Eingabe als</span>
           <div class="segmented" id="mode"><button type="button" data-m="extra" class="active">Mehrbetrag</button><button type="button" data-m="total">Rechnungsbetrag</button></div></div>
         <label class="field span-all"><span id="amount-label">Mehrbetrag</span><div class="input-group input-big">
@@ -55,7 +55,7 @@ export function extraModal(c, existing, done) {
         <label class="field span-all"><span>Grund</span><input name="note" value="${esc(p.note ?? "")}"/></label>
         <div class="chips span-all" id="presets">${presets.map((t) => `<button type="button" class="chip" data-t="${esc(t)}">${esc(t)}</button>`).join("")}</div>
       </form>`,
-    foot: `${p.id ? `<button class="btn btn-ghost btn-danger" data-del style="margin-right:auto">${icon("trash")} Löschen</button>` : ""}
+    foot: `${p.id ? `<button class="btn btn-ghost btn-danger mr-auto" data-del>${icon("trash")} Löschen</button>` : ""}
       <button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
   bindDelete(m, c, p, () => done?.());

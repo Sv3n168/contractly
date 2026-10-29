@@ -5,6 +5,8 @@ for (const [name, hash] of [
   ["dashboard", "/"],
   ["contracts", "/contracts"],
   ["contract detail", "/contracts/1"],
+  ["new contract", "/contracts/new?category=mobile"],
+  ["edit contract", "/contracts/1/edit"],
   ["compare", "/contracts/1?tab=compare"],
   ["import", "/import"],
   ["reminders", "/reminders"],

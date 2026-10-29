@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 import pytest
 
+import app
 from app.calc import add_months
 
 
@@ -201,6 +202,7 @@ def test_meta(client):
     meta = client.get("/api/meta").json()
     assert {c["key"] for c in meta["categories"]} >= {"mobile", "electricity", "fitness"}
     assert "smtp" in meta and "ocr" in meta
+    assert meta["version"] == app.__version__ and meta["build"] == "dev"
 
 
 def _kinds(client):

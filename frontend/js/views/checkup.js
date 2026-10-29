@@ -62,9 +62,9 @@ function card(view, ov, item) {
         </ul>
         ${
           item.cancellation_deadline && !item.flexible
-            ? `<p class="small muted" style="margin:0 0 4px">Nächste Kündigung möglich bis ${fmtDate(item.cancellation_deadline)} zum ${fmtDate(item.next_term_end)}.</p>`
+            ? `<p class="small muted m-0 mb-1">Nächste Kündigung möglich bis ${fmtDate(item.cancellation_deadline)} zum ${fmtDate(item.next_term_end)}.</p>`
             : item.flexible
-              ? `<p class="small muted" style="margin:0 0 4px">Monatlich kündbar.</p>`
+              ? `<p class="small muted m-0 mb-1">Monatlich kündbar.</p>`
               : ""
         }
         <div class="checkup-actions">

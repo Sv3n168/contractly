@@ -27,7 +27,7 @@ export async function reminderForm(existing = {}, done) {
         ${contracts.map((c) => `<option value="${c.id}" ${Number(r.contract_id) === c.id ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select></label>
       <label class="field span-all"><span>Notiz</span><input name="note" value="${esc(r.note ?? "")}"/></label>
     </form>`,
-    foot: `${r.id ? `<button class="btn btn-ghost btn-danger" data-del style="margin-right:auto">${icon("trash")} Löschen</button>` : ""}
+    foot: `${r.id ? `<button class="btn btn-ghost btn-danger mr-auto" data-del>${icon("trash")} Löschen</button>` : ""}
       <button class="btn" data-close>Abbrechen</button><button class="btn btn-primary" data-save>${icon("check")} Speichern</button>`,
   });
   $("#presets", m).addEventListener("click", (e) => {

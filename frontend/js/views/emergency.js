@@ -18,7 +18,7 @@ export async function renderEmergency(view) {
         <div class="card-head"><div><h2>${icon("edit")} Hinweise für Angehörige</h2>
           <p>Wo liegen Passwörter, Unterlagen, das Testament? Wen sollen sie anrufen?</p></div></div>
         <textarea class="input" name="note" rows="6" maxlength="5000">${esc(f.note || "")}</textarea>
-        <div class="form-actions" style="margin-top:10px"><button class="btn" type="submit">${icon("check")} Speichern</button></div>
+        <div class="form-actions mt-2"><button class="btn" type="submit">${icon("check")} Speichern</button></div>
       </form>
       <form class="card" id="export-form">
         <div class="card-head"><div><h2>${icon("lock")} Verschlüsselt weitergeben</h2>
@@ -77,7 +77,7 @@ function folderHtml(f) {
   return `
     <div class="card emergency-head">
       <h2>Notfall-Mappe${o.name ? ` von ${esc(o.name)}` : ""}</h2>
-      <p class="muted" style="margin:0">Stand ${fmtDate(f.generated_on)} · ${f.contracts.length} laufende Verträge · zusammen ${money(f.monthly_total)} pro Monat</p>
+      <p class="muted m-0">Stand ${fmtDate(f.generated_on)} · ${f.contracts.length} laufende Verträge · zusammen ${money(f.monthly_total)} pro Monat</p>
       ${o.name ? "" : `<p class="small no-print" style="margin:8px 0 0">${icon("info", "inline")} Tipp: Trag unter <a href="#/settings">Einstellungen → Profil</a> deinen Namen ein – er steht dann auch in den Kündigungsschreiben.</p>`}
     </div>
     ${f.note ? `<div class="card"><h2>Persönliche Hinweise</h2><p style="white-space:pre-wrap;margin:0">${esc(f.note)}</p></div>` : ""}
@@ -107,7 +107,7 @@ function folderHtml(f) {
           ${row("Unterlagen", c.documents.map((d) => d.name + (d.description ? ` – ${d.description}` : "")).join("\n"))}
         </dl>
         <div class="callout warn">${icon("info")}<div><b>Im Todesfall:</b> ${esc(c.death_hint)}</div></div>
-        <details class="more" style="margin-top:12px"><summary>${icon("mail")} Vorbereitetes Kündigungsschreiben${icon("chevDown", "chev")}</summary>
+        <details class="more mt-2"><summary>${icon("mail")} Vorbereitetes Kündigungsschreiben${icon("chevDown", "chev")}</summary>
           <div class="body"><pre class="emergency-letter">${esc(c.letter)}</pre></div></details>
       </div>`,
       )

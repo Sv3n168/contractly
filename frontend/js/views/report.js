@@ -41,12 +41,12 @@ export async function renderReport(view, _m, query = {}) {
         <div class="kpi-sub">${r.price_changes.length} Preisänderungen</div></div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head"><div><h2>Monat für Monat</h2></div></div>
       <div class="chart-box sm"><canvas id="report-chart"></canvas></div>
     </div>
 
-    <div class="grid grid-2" style="margin-bottom:20px">
+    <div class="grid grid-2 mb-4">
       <div class="card">
         <div class="card-head"><div><h2>Nach Kategorie</h2></div></div>
         <div class="bar-list">${r.by_category

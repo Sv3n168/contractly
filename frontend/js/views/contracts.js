@@ -98,7 +98,7 @@ export async function renderContracts(view) {
           </div></div>
           <label class="check"><input type="checkbox" id="ended" ${prefs.showEnded ? "checked" : ""}/> Beendete Verträge zeigen</label>
         </div>`,
-      foot: `<button class="btn btn-ghost" data-reset style="margin-right:auto">Zurücksetzen</button><button class="btn btn-primary" data-close>Fertig</button>`,
+      foot: `<button class="btn btn-ghost mr-auto" data-reset>Zurücksetzen</button><button class="btn btn-primary" data-close>Fertig</button>`,
     });
     m.addEventListener("click", (e) => {
       const chip = e.target.closest("[data-set] [data-v]");

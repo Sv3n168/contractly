@@ -52,7 +52,7 @@ test("agreed total: last payment is smaller, so the total comes out exactly", as
   const d = new Date();
   const start = new Date(Date.UTC(d.getFullYear(), d.getMonth() - 13, 1)).toISOString().slice(0, 10);
   await page.goto("/#/contracts/new");
-  await page.locator(".cat-tile", { hasText: "Streaming" }).click();
+  await page.locator(".cat-tile", { hasText: "Bildung" }).click();
   await page.fill("[name=name]", "Master");
   await page.fill("[name=price_amount]", "1105");
   await page.fill("[name=start_date]", start);
@@ -404,3 +404,21 @@ test("electricity: a new Abschlag in the form becomes a price change from a date
   check();
 });
 
+
+test("a slow page of an earlier route never draws over the current one", async ({ page }) => {
+  const check = watchErrors(page);
+  await page.goto("/#/contracts");
+  await expect(page.locator(".contract-row").first()).toBeVisible();
+  // the contract's cost history loads slowly, so the dashboard finishes in between
+  await page.route("**/api/contracts/1/history*", async (route) => {
+    await new Promise((r) => setTimeout(r, 1500));
+    await route.continue();
+  });
+  await page.evaluate(() => (location.hash = "#/"));
+  await page.evaluate(() => (location.hash = "#/contracts/1"));
+  await expect(page.locator(".detail-head h1")).toBeVisible();
+  await page.waitForTimeout(2000);
+  await expect(page.locator(".detail-head h1")).toBeVisible();
+  await expect(page.locator("#smart")).toHaveCount(0);
+  check();
+});

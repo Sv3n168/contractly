@@ -75,13 +75,13 @@ export async function renderCosts(view) {
       <div class="chips active-filters" id="active"></div>
       <button class="btn" id="filter-btn">${icon("layers")}<span class="label">Filter</span><span class="count" id="filter-count"></span></button>
     </div>
-    <div class="card where-card" id="where" style="margin-bottom:20px"></div>
+    <div class="card where-card mb-4" id="where"></div>
     <div id="selection"></div>
 
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head">
         <div><h2>Kostenverlauf</h2><p id="hist-sub"></p></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <div class="row-wrap">
           <div class="segmented" id="range">${[12, 24, 60, 0].map((r) => `<button data-r="${r}">${r ? (r < 24 ? r + " M" : r / 12 + " J") : "Alles"}</button>`).join("")}</div>
         </div>
       </div>
@@ -90,7 +90,7 @@ export async function renderCosts(view) {
       <div id="hist-legend"></div>
     </div>
 
-    <div class="card" style="margin-bottom:20px">
+    <div class="card mb-4">
       <div class="card-head"><div><h2>${icon("trendUp")} Hochrechnung</h2><p>Basierend auf aktuellen Preisen, bekannten Vertragsenden und einer angenommenen Preissteigerung.</p></div></div>
       <details class="assumptions">
         <summary>${icon("settings")} <span id="assume-text"></span>${icon("chevDown", "chev")}</summary>
@@ -138,7 +138,7 @@ export async function renderCosts(view) {
     const picked = running.filter(matches);
     const total = picked.reduce((s, c) => s + c.monthly_cost, 0);
     if (!picked.length || total <= 0) {
-      box.innerHTML = `<div class="card-head"><div><h2>Wohin dein Geld geht</h2></div></div><p class="muted" style="margin:0">Keine laufenden Kosten für diese Auswahl.</p>`;
+      box.innerHTML = `<div class="card-head"><div><h2>Wohin dein Geld geht</h2></div></div><p class="muted m-0">Keine laufenden Kosten für diese Auswahl.</p>`;
       return;
     }
     const areas = GROUPS.map((g) => {
@@ -215,7 +215,7 @@ export async function renderCosts(view) {
       </div>
       ${
         picked.length
-          ? `<div class="card" style="margin-bottom:20px"><div class="card-head"><div><h2>Auswahl</h2><p>Sortiert nach der nächsten Fälligkeit</p></div></div>
+          ? `<div class="card mb-4"><div class="card-head"><div><h2>Auswahl</h2><p>Sortiert nach der nächsten Fälligkeit</p></div></div>
               <div class="list">${picked
                 .map((c) => {
                   const p = c.current_price;
@@ -328,12 +328,6 @@ export async function renderCosts(view) {
     drawHistory();
     drawProjection();
   };
-  const toggle = (set, key, btn) => {
-    if (set.has(key)) set.delete(key);
-    else set.add(key);
-    btn.classList.toggle("active", set.has(key));
-    redraw();
-  };
   // active filters as removable chips; the defaults show nothing
   const drawActive = () => {
     const chips = [
@@ -377,7 +371,7 @@ export async function renderCosts(view) {
             ${chip(`data-g="category"`, prefs.group === "category", "Bereichen")}
             ${chip(`data-g="contract"`, prefs.group === "contract", "Verträgen")}</div></div>
         </div>`,
-      foot: `<button class="btn btn-ghost" id="f-reset" style="margin-right:auto">Zurücksetzen</button><button class="btn btn-primary" data-close>Fertig</button>`,
+      foot: `<button class="btn btn-ghost mr-auto" id="f-reset">Zurücksetzen</button><button class="btn btn-primary" data-close>Fertig</button>`,
     });
     m.addEventListener("click", (e) => {
       const b = e.target.closest("[data-int],[data-grp],[data-mode],[data-g]");

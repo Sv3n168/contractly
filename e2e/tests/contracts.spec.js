@@ -345,3 +345,21 @@ test("electricity base price can be entered per year", async ({ page }) => {
   await expect(page.locator("[name=attr_base_price_month__period]")).toHaveValue("year");
   check();
 });
+
+test("Abschlag and price differ: the contract page offers to take the Abschlag over", async ({ page }) => {
+  const check = watchErrors(page);
+  // Ökostrom Flex: price 74 €; set the Abschlag in the facts to 80 €
+  await page.goto("/#/contracts/4/edit");
+  await page.fill("[name=attr_installment]", "80");
+  await page.click("#save");
+  const hint = page.locator(".callout", { hasText: "Abschlag laut Eckdaten" });
+  await expect(hint).toContainText("80,00");
+  await hint.locator("#sync-from").click();
+  await expect(page.locator(".modal [name=amount]")).toHaveValue("80");
+  await page.click(".modal [data-save]");
+  await expect(page.locator(".toast", { hasText: "Preis gespeichert" })).toBeVisible();
+  await page.goto("/#/contracts/4");
+  await expect(page.locator(".kpi.hero")).toContainText("80,00");
+  await expect(page.locator(".callout", { hasText: "Abschlag laut Eckdaten" })).toHaveCount(0);
+  check();
+});

@@ -219,6 +219,7 @@ async function overviewTab(el, c, reload) {
       }
     </div>`}
 
+    ${installmentHint(c)}
     ${budgetCard(c)}
 
     <div class="card" style="margin-bottom:20px">
@@ -313,6 +314,13 @@ async function overviewTab(el, c, reload) {
       </div>
     </div>`;
 
+  // Abschlag in the facts and the price differ: take it over from a date, or for the whole time
+  const inst = Number(c.attributes?.installment);
+  $("#sync-from", el)?.addEventListener("click", () => priceModal(c, { amount: inst, interval: "monthly" }, () => reload("prices")));
+  $("#sync-all", el)?.addEventListener("click", () => {
+    const row = c.prices.find((p) => p.id === c.current_price?.id);
+    priceModal(c, { ...row, amount: inst, interval: "monthly" }, () => reload());
+  });
   chainLine($("#hist", el), hist.months, hist.series, colors, {
     currentMonth: hist.current_month,
     extras: hist.extras,
@@ -1002,4 +1010,20 @@ function oneOffKpis(c) {
         <div class="kpi-value num">${money(c.total_paid, true)}</div>
         <div class="kpi-sub">${c.payments?.count ? `${c.payments.count} ${c.payments.count === 1 ? "Buchung" : "Buchungen"}` : ""}</div></div>
     </div>`;
+}
+
+/** Electricity/gas: the Abschlag in the facts is what leaves the account – it should be the price. */
+function installmentHint(c) {
+  const inst = Number(c.attributes?.installment);
+  const price = c.current_price;
+  if (!isEnergy(c.category) || !inst || !price || c.state === "ended") return "";
+  if (Math.abs(inst - price.monthly_equivalent) < 0.5) return "";
+  const recurring = c.prices.filter((p) => p.interval !== "once");
+  return `<div class="callout warn" style="margin-bottom:16px">${icon("alert")}<div>
+      Dein Abschlag laut Eckdaten ist <b>${money(inst)}</b>, als Preis ist aber <b>${money(price.monthly_equivalent)}</b> pro Monat hinterlegt –
+      mit dem Preis rechnen „Pro Monat“, „Bisher bezahlt“ und die Auswertung.
+      <div class="callout-actions">
+        <button class="btn btn-sm" id="sync-from">${icon("euro")} Ab einem Datum ${money(inst)}</button>
+        ${recurring.length === 1 ? `<button class="btn btn-sm btn-ghost" id="sync-all">Galt schon immer – Preis korrigieren</button>` : ""}
+      </div></div></div>`;
 }

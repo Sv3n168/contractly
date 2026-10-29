@@ -155,7 +155,7 @@ function smartCard({ insights, incomplete }) {
               <div class="insight-body"><b>${esc(i.title)}</b><p>${esc(i.text)}</p></div>
               <div class="insight-actions">
                 <a class="btn btn-sm" href="${esc(i.link)}">${esc(i.action)}</a>
-                <button class="icon-btn" data-dismiss="${esc(i.key)}" title="Ausblenden" aria-label="Hinweis ausblenden">${icon("x")}</button>
+                <button class="btn btn-sm btn-ghost btn-icon" data-dismiss="${esc(i.key)}" title="Ausblenden" aria-label="Hinweis ausblenden">${icon("x")}</button>
               </div></div>`,
           )
           .join("")}

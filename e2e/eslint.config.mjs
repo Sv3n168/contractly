@@ -1,4 +1,4 @@
-// Lint for the browser app (frontend/js): plain ES modules, no build step.
+// Lint for the browser app (frontend/js, plain ES modules, no build step) and its service worker.
 import js from "@eslint/js";
 import globals from "globals";
 
@@ -15,5 +15,10 @@ export default [
       ...js.configs.recommended.rules,
       "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }],
     },
+  },
+  {
+    files: ["frontend/sw.js"],
+    ...js.configs.recommended,
+    languageOptions: { ecmaVersion: 2023, sourceType: "script", globals: { ...globals.serviceworker } },
   },
 ];

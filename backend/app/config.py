@@ -4,6 +4,10 @@ import os
 from pathlib import Path
 
 
+def _split(value: str) -> list[str]:
+    return [v.strip() for v in value.split(",") if v.strip()]
+
+
 class Settings:
     def __init__(self) -> None:
         self.data_dir = Path(os.environ.get("CONTRACTLY_DATA_DIR", "/data"))
@@ -41,6 +45,14 @@ class Settings:
         self.backup_passphrase = os.environ.get("CONTRACTLY_BACKUP_PASSPHRASE", "")
         # rclone remote, e.g. "onedrive:Backups/Contractly" or "gdrive:Contractly"
         self.backup_remote = os.environ.get("CONTRACTLY_BACKUP_REMOTE", "")
+
+        # Optional: only requests that came through Cloudflare Access (see access_jwt.py). Off by
+        # default; team domain and AUD tag only from the environment.
+        self.access_required = os.environ.get("CONTRACTLY_ACCESS_REQUIRED", "").lower() in ("1", "true", "yes", "on")
+        self.access_team_domain = os.environ.get("CONTRACTLY_ACCESS_TEAM_DOMAIN", "")
+        self.access_aud = _split(os.environ.get("CONTRACTLY_ACCESS_AUD", ""))
+        # paths reachable without the Access token (local health checks); "/x/" or "/x*" = prefix
+        self.access_exempt = _split(os.environ.get("CONTRACTLY_ACCESS_EXEMPT", "/healthz"))
 
     @property
     def db_path(self) -> Path:

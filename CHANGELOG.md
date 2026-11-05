@@ -6,6 +6,11 @@ Alle nennenswerten Änderungen an Contractly. Versionen folgen [Semantic Version
 
 ### Neu
 
+- **Hinter Cloudflare Access:** Läuft die Access-Sitzung ab, erkennt die App das (auch beim Start und
+  beim Zurückkehren in die App) und leitet zur Access-Anmeldung, statt zu hängen. Offline und ohne
+  Access passiert nichts.
+- Optional prüft der Server, dass jede Anfrage über Cloudflare Access kam (JWT-Prüfung,
+  `CONTRACTLY_ACCESS_REQUIRED`, standardmäßig aus).
 - **Plausibilitätsprüfung beim Speichern:** Hinweis auf wahrscheinliche Tippfehler (Preis ohne Komma,
   Jahres- statt Monatsbetrag, Arbeitspreis in Euro statt Cent, Abschlag passt nicht zum Verbrauch,
   Laufzeiten, die seit 01.03.2022 nicht mehr erlaubt sind). „Korrigieren“ springt ins Feld.
@@ -26,6 +31,10 @@ Alle nennenswerten Änderungen an Contractly. Versionen folgen [Semantic Version
 
 ### Behoben
 
+- Der Service Worker konnte Weiterleitungen zwischenspeichern und lieferte nach einem Login-Redirect
+  die alte Oberfläche aus dem Cache. Jetzt: Netz zuerst, Cache nur offline, Redirects, `/api` und
+  `/cdn-cgi` nie im Cache; neue Versionen ersetzen die alte sofort.
+- Scheiterte der Start der App (Server oder Login davor nicht erreichbar), blieb die Seite leer.
 - Das Monatsfeld im Dialog für Zusatzkosten hat das Format „JJJJ-MM“ nicht geprüft.
 - Beim schnellen Seitenwechsel konnte eine noch ladende Seite (z. B. die Übersicht) die gerade
   geöffnete überschreiben.

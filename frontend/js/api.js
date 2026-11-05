@@ -1,5 +1,15 @@
 // Thin fetch wrapper for the Contractly REST API.
 
+import { handleSuspect, looksLikeAccess } from "./access.js";
+
+/** Cloudflare Access ended: navigate to its login (the request then stays pending) or fail. */
+async function accessCheck(res, raw) {
+  if (!looksLikeAccess(res, { expectHtml: raw })) return;
+  const outcome = await handleSuspect();
+  if (outcome === "redirect") await new Promise(() => {}); // the page is about to leave
+  if (outcome === "expired") throw new Error("Sitzung abgelaufen – bitte die Seite neu laden");
+}
+
 async function request(method, url, body, { raw = false } = {}) {
   const opts = { method, headers: {}, credentials: "same-origin" };
   if (body instanceof FormData) opts.body = body;
@@ -7,7 +17,14 @@ async function request(method, url, body, { raw = false } = {}) {
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
-  const res = await fetch(url, opts);
+  let res;
+  try {
+    res = await fetch(url, opts);
+  } catch (err) {
+    await accessCheck(null, raw);
+    throw navigator.onLine ? err : new Error("Keine Verbindung – bist du offline?");
+  }
+  await accessCheck(res, raw);
   if (res.status === 401 && !url.startsWith("/api/auth/")) {
     // Session ended (logout elsewhere, expiry, server restart): back to the login screen.
     window.dispatchEvent(new CustomEvent("auth-required"));

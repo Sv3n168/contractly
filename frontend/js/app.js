@@ -1,6 +1,7 @@
 // App shell: routing, navigation state, theme, global search.
 
 import { api } from "./api.js";
+import { periodicCheck } from "./access.js";
 import { loadMeta, state } from "./store.js";
 import { $, $$, countUp, esc, icon, modal, money, toast } from "./ui.js";
 import { catColorVar, contractIcon, catLabel } from "./store.js";
@@ -270,6 +271,12 @@ export function start() {
       paintUser();
       watchIdle();
       router();
+    } catch (err) {
+      // e.g. the server or the login in front of it can't be reached: say so instead of a blank page
+      toast(err.message || "Contractly ist gerade nicht erreichbar", "error", 600000, {
+        label: "Neu laden",
+        run: () => location.reload(),
+      });
     } finally {
       starting = null;
     }
@@ -347,11 +354,28 @@ function boot() {
   window.addEventListener("unhandledrejection", (e) => {
     if (authenticated) toast(e.reason?.message || "Fehler", "error");
   });
-  if ("serviceWorker" in navigator && location.protocol === "https:") {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
-  }
+  registerServiceWorker();
+  // Cloudflare Access (if in front): on start and when coming back to the app
+  periodicCheck({ force: true });
+  document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && periodicCheck());
   takeSharedMessage();
   start();
+}
+
+/**
+ * A new service worker takes over at once (skipWaiting), so no old cached app lingers on devices.
+ * The open page then reloads: right away while it is in the background, otherwise on request, so
+ * nothing typed gets lost.
+ */
+function registerServiceWorker() {
+  if (!("serviceWorker" in navigator) || location.protocol !== "https:") return;
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hadController) return; // first install: the page is already current
+    if (document.visibilityState === "hidden") return location.reload();
+    toast("Neue Version verfügbar", "ok", 60000, { label: "Neu laden", run: () => location.reload() });
+  });
+  navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
 }
 
 /** "Teilen → Contractly" on the phone (PWA share target) opens /?title=…&text=… */

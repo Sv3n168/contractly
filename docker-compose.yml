@@ -32,3 +32,8 @@ services:
       # CONTRACTLY_BACKUP_KEEP: "14"
       # CONTRACTLY_BACKUP_PASSPHRASE: langer-geheimer-schluessel
       # CONTRACTLY_BACKUP_REMOTE: onedrive:Backups/Contractly   # rclone-Remote
+      # --- Nur Zugriffe über Cloudflare Access zulassen (siehe README) ---
+      # CONTRACTLY_ACCESS_REQUIRED: "true"
+      # CONTRACTLY_ACCESS_TEAM_DOMAIN: <team>.cloudflareaccess.com
+      # CONTRACTLY_ACCESS_AUD: <AUD-Tag der Access-Anwendung>
+      # CONTRACTLY_ACCESS_EXEMPT: /healthz

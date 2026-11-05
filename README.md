@@ -270,6 +270,59 @@ Backups lassen sich auch manuell erstellen, herunterladen, in die Cloud laden un
 (*Einstellungen → Datensicherung*). Vor jeder Wiederherstellung legt Contractly automatisch ein
 Sicherheits-Backup des aktuellen Stands an.
 
+### Hinter Cloudflare Access (Tunnel)
+
+Contractly läuft auch hinter einem Cloudflare Tunnel mit vorgeschaltetem **Cloudflare Access**. Die
+eigene Anmeldung von Contractly bleibt trotzdem nötig.
+
+**Abgelaufene Access-Sitzung:** Läuft die Access-Sitzung ab, beantwortet Cloudflare Anfragen der App
+mit einer Weiterleitung auf seine Anmeldeseite. Contractly erkennt das, prüft einmal
+`/cdn-cgi/access/get-identity` und lädt die Seite neu („Sitzung abgelaufen – Weiterleitung zur
+Anmeldung…“), damit Cloudflare die Anmeldung zeigen kann. Dasselbe prüft die App beim Start und wenn
+sie wieder in den Vordergrund kommt (höchstens alle 5 Minuten). Offline, im Heimnetz ohne Access und
+bei normalen Fehlern passiert nichts davon.
+
+Der Service Worker holt Seiten und Dateien immer zuerst aus dem Netz; den Zwischenspeicher nutzt er
+nur offline. Weiterleitungen, `/api/…` und `/cdn-cgi/…` speichert er nie.
+
+**Nach dem Update auf dem iPhone/iPad (App auf dem Home-Bildschirm):** Die neue Version ersetzt die
+alte beim nächsten Öffnen von selbst. Hängt die App trotzdem noch:
+
+1. App-Symbol lange drücken → *App entfernen* → *Vom Home-Bildschirm entfernen*.
+2. Optional: *Einstellungen → Safari → Erweitert → Website-Daten*, die Adresse von Contractly
+   suchen und löschen (entfernt alte Zwischenspeicher).
+3. Contractly in Safari öffnen, bei Cloudflare Access anmelden, dann bei Contractly.
+4. *Teilen* → *Zum Home-Bildschirm*.
+
+**Optional: nur Zugriffe über Access zulassen.** Contractly kann zusätzlich prüfen, dass jede
+Anfrage über Cloudflare Access kam (Header `Cf-Access-Jwt-Assertion`, signiert mit den Schlüsseln
+deines Teams). Direkte Zugriffe, etwa im Heimnetz auf die Container-Adresse, bekommen dann `403`.
+Die Prüfung ist standardmäßig aus:
+
+```yaml
+    environment:
+      CONTRACTLY_ACCESS_REQUIRED: "true"
+      CONTRACTLY_ACCESS_TEAM_DOMAIN: <team>.cloudflareaccess.com   # Zero Trust → Einstellungen
+      CONTRACTLY_ACCESS_AUD: <AUD-Tag der Access-Anwendung>        # Access → Anwendung → Übersicht
+      # ohne Access-Token erreichbar (Komma-Liste; "/x/" oder "/x*" = alles darunter):
+      CONTRACTLY_ACCESS_EXEMPT: /healthz
+```
+
+Fehlt Team-Domain oder AUD-Tag, startet Contractly nicht (Fehlkonfiguration fällt sofort auf). Die
+Schlüssel lädt Contractly von `https://<team>.cloudflareaccess.com/cdn-cgi/access/certs` und
+aktualisiert sie stündlich bzw. bei einem Schlüsselwechsel.
+
+Was mit der Prüfung nicht mehr geht, solange es nicht in `CONTRACTLY_ACCESS_EXEMPT` steht:
+
+- **Docker-Healthcheck:** `/healthz` ist als Vorgabe ausgenommen.
+- **Home Assistant** (`/api/ha/summary`) und **Kalender-Abos** (`/api/calendar/…`): Sie können sich
+  nicht bei Access anmelden. Entweder ausnehmen (`/healthz,/api/ha/summary,/api/calendar/` – beide
+  haben ein eigenes Token) oder über ein Access-Service-Token anbinden. Auch Pfade mit einer
+  *Bypass*-Regel in Access bekommen kein Token und müssen ausgenommen werden.
+- **Direktzugriff im Heimnetz** auf `http://<server>:8000`: gesperrt, das ist der Zweck.
+
+Backups, Push- und E-Mail-Benachrichtigungen sind nicht betroffen (sie gehen nach außen).
+
 ## Entwicklung
 
 ```bash

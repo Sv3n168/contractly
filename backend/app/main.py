@@ -8,7 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from . import __version__, demo
+from . import __version__, access_jwt, demo
 from . import db as database
 from .backup import backup_loop
 from .config import settings
@@ -126,11 +126,19 @@ def create_app(background: bool = True) -> FastAPI:
     app = FastAPI(title="Contractly", version=__version__, lifespan=lifespan)
     app.state.background = background
     vault.on_lock = _on_user_locked
+    # optional Cloudflare Access check; a missing team domain or AUD stops the start
+    access = None
+    if settings.access_required:
+        access = access_jwt.AccessVerifier(settings.access_team_domain, settings.access_aud)
 
     @app.middleware("http")
     async def require_login(request: Request, call_next):
         path = request.url.path
         request.state.user_id = None
+        if access and not access_jwt.is_exempt(path, settings.access_exempt):
+            token = request.headers.get(access_jwt.HEADER)
+            if not await asyncio.to_thread(access.verify, token):
+                return JSONResponse(status_code=403, content={"detail": "Zugriff verweigert"})
         # Browsers mark requests from other sites; changing data that way is never legitimate (CSRF).
         if request.method not in SAFE_METHODS and request.headers.get("sec-fetch-site") in ("cross-site", "same-site"):
             return JSONResponse(status_code=403, content={"detail": "Anfrage von fremder Seite abgelehnt"})

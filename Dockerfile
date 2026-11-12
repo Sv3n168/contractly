@@ -1,5 +1,5 @@
 # Contractly – self-hosted contract manager
-FROM python:3.12-slim
+FROM python:3.15-slim
 LABEL org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.source="https://github.com/sv3n168/contractly"
 
